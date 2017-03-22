@@ -1,0 +1,96 @@
+collections:
+  all: 
+    - simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC
+    - simulation-v006-endophilin-A1-PIP2-bilayer-large
+    - simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC
+    - simulation-v004-IRSp53-PIP2-bilayer-large
+slices:
+  simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':400000,'skip':200}
+  simulation-v004-IRSp53-PIP2-bilayer-large:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':200}
+  simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':430000,'skip':200}
+  simulation-v006-endophilin-A1-PIP2-bilayer-large:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':200}
+calculations:
+  protein_abstractor:
+    uptype: simulation
+    slice_name: current_protein
+    group: proteins
+    collections: all
+  lipid_abstractor:
+    uptype: simulation
+    slice_name: current_protein
+    group: all
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        lipid_tip: "name PO4"
+        monolayer_cutoff: 1.4
+      nojumps: "z"
+  protein_abstractor:
+    uptype: simulation
+    slice_name: current_protein
+    group: proteins
+    collections: all
+  undulations:
+    uptype: post
+    group: all
+    slice_name: current_protein
+    collections: all
+    specs:
+      grid_spacing: 1.0
+      upstream: lipid_abstractor
+variables:
+  selectors:
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+    protein_backbone: name BB
+    resnames_lipid: ['DOPC','DOPS','PIP2']
+  colordict:
+    simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC: gray
+    simulation-v004-IRSp53-PIP2-bilayer-large: orange
+    simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC: blue
+    simulation-v006-endophilin-A1-PIP2-bilayer-large: green
+meta:
+  short_namer: "lambda s : 'v'+re.match('^simulation-v(\\d+)',s).group(1)"
+  simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
+    label: "$\\mathrm{IRSp53}$"
+    nprots: 1
+  simulation-v004-IRSp53-PIP2-bilayer-large:
+    label: "$\\mathrm{IRSp53-{PIP}_{2}}$"
+    nprots: 1
+  simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC:
+    label: "$\\mathrm{endophilin}$"
+    nprots: 1
+  simulation-v006-endophilin-A1-PIP2-bilayer-large:
+    label: "$\\mathrm{endophilin-{PIP}_{2}}$"
+    nprots: 1
+  extrana: >
+    Note that simulations "simulation-v004-IRSp53-PIP2-bilayer-large" and "simulation-v006-endophilin-A1-PIP2-bilayer-large" have a minimal amount of water in them, and as a result, a few lipids broke the boundary. This is corrected by the "nojumps" flag.
+plots:
+  undulations:
+    calculation: undulations
+    slices: current_protein
+    collections: all
