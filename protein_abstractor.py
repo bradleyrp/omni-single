@@ -42,7 +42,7 @@ def protein_abstractor(grofile,trajfile,**kwargs):
 		trajectory.append(pts_mean)
 		trajectory_all.append(pts)
 		vecs.append(sel.dimensions[:3])
-	import ipdb;ipdb.set_trace()
+
 	#---pack
 	attrs,result = {},{}
 	result['resnames'] = array(sel.residues.resnames)

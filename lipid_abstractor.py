@@ -68,7 +68,6 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		trajectory.append(sel.positions/lenscale)
 		vecs.append(sel.dimensions[:3])
 	vecs = np.array(vecs)/lenscale
-	import ipdb;ipdb.set_trace()
 
     #---alternate lipid representation is useful for separating monolayers
 	monolayer_cutoff = kwargs['calc']['specs']['separator']['monolayer_cutoff']
