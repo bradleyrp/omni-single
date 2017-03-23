@@ -36,17 +36,30 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	elif 'type' in selector and selector['type'] == 'select' and 'selection' in selector:
 		selstring = selector['selection']
 	else: raise Exception('\n[ERROR] unclear selection %s'%str(selector))
-	
+
 	#---compute masses by atoms within the selection
 	sel = uni.select_atoms(selstring)
 	mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974}
 	#---martini mass table estimated from looking at sel.atoms.names and from martini-2.1.itp
-	mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
+	#---! add martini switch: mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
 	masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
 	resids = sel.resids
 	#---create lookup table of residue indices
-	divider = [np.where(resids==r) for r in np.unique(resids)]
-
+	if len(sel.resids)==len(np.unique(sel.resids)):
+		divider = [np.where(resids==r) for r in np.unique(resids)]
+	else:
+		if 'type' in selector and selector['type'] == 'com' and 'resnames' in selector:
+			#---this seemingly-nice MDAnalysis tool doesn't work because it uses absolute indices
+			#---also note that we could not use the standard does-it-change question to divide residues because
+			#---...in DF's case, there are four that have 266 atoms with no residue change
+			divider_abs = [i.atoms.indices for i in sel.residues]
+			sel_all = uni.select_atoms('all')
+			sel_to_all = np.where(np.in1d(sel_all.resnames,resnames))[0]
+			print('[WARNING] semi-slow ~30s step to figure out residues because indices are redundant')
+			divider = [np.where(np.in1d(sel_to_all,d))[0] for d in divider_abs]
+		else:
+			raise Exception('residues have redundant resids and selection is not the easy one')
+		
 	#---load trajectory into memory	
 	trajectory,vecs = [],[]
 	for fr in range(nframes):
@@ -55,6 +68,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		trajectory.append(sel.positions/lenscale)
 		vecs.append(sel.dimensions[:3])
 	vecs = np.array(vecs)/lenscale
+	import ipdb;ipdb.set_trace()
 
     #---alternate lipid representation is useful for separating monolayers
 	monolayer_cutoff = kwargs['calc']['specs']['separator']['monolayer_cutoff']
@@ -65,7 +79,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		for fr in range(nframes):
 			status('loading lipid tips',tag='load',i=fr,looplen=nframes)
 			uni.trajectory[fr]
-			atoms_separator.append(sel.coordinates()/lenscale)
+			atoms_separator.append(sel.positions/lenscale)
 	else: atoms_separator = coms
 
 	#---identify monolayers
@@ -77,7 +91,6 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 			monolayer_cutoff=monolayer_cutoff)
 		if type(monolayer_indices)!=bool: break
 	checktime()
-
 	#---parallel
 	start = time.time()
 	if parallel:
@@ -105,7 +118,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 
 	#---pack
 	attrs,result = {},{}
-	#attrs['selector'] = selector
+	attrs['selector'] = selector
 	attrs['nojumps'] = nojumps
 	result['resnames'] = np.array(sel.residues.resnames)
 	result['monolayer_indices'] = np.array(monolayer_indices)
@@ -115,37 +128,3 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	result['resids'] = np.array(np.unique(resids))
 	attrs['separator'] = kwargs['calc']['specs']['separator']
 	return result,attrs	
-
-def topologize(pos,vecs):
-
-	"""
-	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
-	of length equal to the box vectors so that there is a maximum amount of connectivity between adjacent
-	points. This method decides how to move the points by a consensus heuristic.
-	This function is necessary only if the bilayer breaks over a third spatial dimension.
-	"""
-
-	step = 0
-	kp = array(pos)
-	natoms = len(pos)
-	move_votes = zeros((1,natoms,3))
-	while sum(abs(move_votes[0])>len(pos)/2)>len(pos)*0.05 or step == 0:
-		move_votes = concatenate((move_votes,zeros((1,natoms,3))))
-		pos = array(kp)
-		pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(pos[:,d:d+1])) 
-			for d in range(3)]
-		for ind,bead in enumerate(pos):
-			#---compute distances to the probe
-			for d in range(3):
-				adds_high = zeros(natoms)
-				adds_low = zeros(natoms)
-				adds_high[where(all((pd[d][ind]>vecs[d]/2.,pos[ind,d]<pos[:,d]),axis=0))] = 1
-				adds_low[where(all((pd[d][ind]>vecs[d]/2.,pos[ind,d]>pos[:,d]),axis=0))] = -1
-				#---for each spatial dimension, we tally votes to move the point by a box vector
-				move_votes[step][:,d] += adds_high+adds_low
-		kp = array(pos)
-		step += 1
-		move_votes = concatenate((move_votes,zeros((1,natoms,3))))
-	moved = transpose([sum([1*(move_votes[it][:,d]<(-1*natoms/2.))-1*(move_votes[it][:,d]>(natoms/2.)) 
-		for it in range(step+1)],axis=0) for d in range(3)])
-	return moved

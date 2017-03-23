@@ -3,9 +3,9 @@
 from codes import undulate
 from copy import deepcopy
 
-sns = work.vars['collections']['all']
+sns = work.vars['collections'][work.plots[plotname]['collections']]
 colordict = work.vars['colordict']
-routine = ['spectra','height'][:1]
+routine = ['spectra','height'][:]
 
 def undulation_panel(ax,data,meta,keys=None,art=None,title=None,lims=None):
 	"""
@@ -70,10 +70,11 @@ if 'height' in routine:
 	cmap_mpl_name = cmap_names[cmap_name]
 	fs = {'axlabel':14,'title':20,'legend':14,'ticks':14,'tiny':10,'text_note':12,}
 	print_review = False
-	nrows,ncols = 2,2
+	#---! hacked. replace with a count of the actual sns.
+	nrows,ncols = 1,1
 	figsize = 8,8
 	panelspecs = dict(layout={'out':{'grid':[1,1]},'ins':[{'grid':[nrows,ncols],'hspace':0.4}]},figsize=figsize)
-	handle = 'wavevid-'+'.'.join([re.findall('simulation-(v[0-9]+).+',s)[0] for s in sns])+'.%s'%cmap_name
+	handle = 'wavevid-'+'.'.join([s for s in sns])+'.%s'%cmap_name
 
 	print_birdseye_snapshot_render(
 		avgzs,[p.mean(axis=0)[...,:2] for p in protein_pts_all],mvecs,nprots_list,

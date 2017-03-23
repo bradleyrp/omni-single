@@ -12,6 +12,9 @@ import scipy.spatial
 import scipy.interpolate
 from numpy import linalg
 
+#---import from omni.base
+from base.tools import status
+
 _not_reported = ['triarea','vecnorm','facenorm','torusnorm','reclock','beyonder','makemesh','rotation_matrix']
 _shared_extensions = ['vecnorm','rotation_matrix','makemesh']
 
@@ -19,6 +22,15 @@ _shared_extensions = ['vecnorm','rotation_matrix','makemesh']
 triarea = lambda a : linalg.norm(np.cross(a[1]-a[0],a[2]-a[0]))/2.
 vecnorm = lambda vec: np.array(vec)/linalg.norm(vec)
 facenorm = lambda a: np.cross(a[1]-a[0],a[2]-a[0])
+
+def centroid(coords,masses,divider):
+	"""
+	Compute the centroid of a collection of molecules given their atomistic XYZ coordinates, 
+	their masses, and a list of lists containing the indices for the atoms in each molecule.
+	This function refers to masses and divider from the global namespace. 
+	Note: using the global namespace improves speed from 2.3s to 1.2s for a test system.
+	"""
+	return np.array([np.dot(masses[r].T,coords[r])/np.sum(masses[r]) for r in divider])
 
 def rotation_matrix(axis,theta):
 	"""
@@ -182,7 +194,7 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(findframe[:,d:d+1])) 
 		for d in range(3)]
 	if pbc_rewrap:
-		pd3pbc = sqrt(np.sum(np.array([pd[d]-(pd[d]>vec[d]/2.)*vec[d]+(pd[d]<-1*vec[d]/2.)*vec[d] 
+		pd3pbc = np.sqrt(np.sum(np.array([pd[d]-(pd[d]>vec[d]/2.)*vec[d]+(pd[d]<-1*vec[d]/2.)*vec[d] 
 			for d in range(3)])**2,axis=0))
 	else: pd3pbc = pd
 	nbors = np.transpose(np.where(pd3pbc<monolayer_cutoff))
@@ -214,9 +226,42 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 		status('[WARNING] new monolayer_cutoff = '+str(monolayer_cutoff))
 		if monolayer_cutoff < 0: raise Exception('[ERROR] cutoff failure')
 		imono = identify_lipid_leaflets(pts,vec,monolayer_cutoff=monolayer_cutoff)
-	else: status('[STATUS] some lipids might be flipped %d'%np.sum(imono))
+	else: status('[STATUS] some lipids might be flipped %d %.2f'%(np.sum(imono),np.mean(imono)))
 	return imono
-	
+
+def topologize(pos,vecs):
+
+	"""
+	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
+	of length equal to the box vectors so that there is a maximum amount of connectivity between adjacent
+	points. This method decides how to move the points by a consensus heuristic.
+	This function is necessary only if the bilayer breaks over a third spatial dimension.
+	"""
+
+	step = 0
+	kp = np.array(pos)
+	natoms = len(pos)
+	move_votes = np.zeros((1,natoms,3))
+	while np.sum(np.abs(move_votes[0])>len(pos)/2)>len(pos)*0.05 or step == 0:
+		move_votes = np.concatenate((move_votes,np.zeros((1,natoms,3))))
+		pos = np.array(kp)
+		pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(pos[:,d:d+1])) 
+			for d in range(3)]
+		for ind,bead in enumerate(pos):
+			#---compute distances to the probe
+			for d in range(3):
+				adds_high = np.zeros(natoms)
+				adds_low = np.zeros(natoms)
+				adds_high[np.where(np.all((pd[d][ind]>vecs[d]/2.,pos[ind,d]<pos[:,d]),axis=0))] = 1
+				adds_low[np.where(np.all((pd[d][ind]>vecs[d]/2.,pos[ind,d]>pos[:,d]),axis=0))] = -1
+				#---for each spatial dimension, we tally votes to move the point by a box vector
+				move_votes[step][:,d] += adds_high+adds_low
+		kp = np.array(pos)
+		step += 1
+		move_votes = np.concatenate((move_votes,np.zeros((1,natoms,3))))
+	moved = np.transpose([np.sum([1*(move_votes[it][:,d]<(-1*natoms/2.))-1*(move_votes[it][:,d]>(natoms/2.)) 
+		for it in range(step+1)],axis=0) for d in range(3)])
+	return moved
 
 def makemesh_regular(data,vecs,grid):
 	

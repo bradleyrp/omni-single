@@ -25,7 +25,8 @@ def protein_abstractor(grofile,trajfile,**kwargs):
 	
 	#---get protein coms here
 	uni = MDAnalysis.Universe(grofile,trajfile)
-	sel = uni.select_atoms(work.vars['selectors']['protein_selection'])
+	#---! cgmd removed here sel = uni.select_atoms(work.vars['selectors']['protein_selection'])
+	sel = uni.select_atoms('protein')
 	nprots = work.meta[sn]['nprots']
 	beads_per_protein = len(sel.resids)/nprots
 	nframes = len(uni.trajectory)
@@ -33,15 +34,15 @@ def protein_abstractor(grofile,trajfile,**kwargs):
 	trajectory,trajectory_all,vecs = [],[],[]
 	start = time.time()
 	for fr in range(nframes):
-		status('collecting protein centroids',i=fr,looplen=nframes,start=start)
+		status('collecting protein centroids',i=fr,looplen=nframes,start=start,tag='compute')
 		uni.trajectory[fr]
 		#---center of geometry not centroid because masses are all 72 in martini
-		pts = sel.coordinates()[array(inds).astype(int)]/lenscale
+		pts = sel.positions[array(inds).astype(int)]/lenscale
 		pts_mean = pts.mean(axis=0)
 		trajectory.append(pts_mean)
 		trajectory_all.append(pts)
 		vecs.append(sel.dimensions[:3])
-
+	import ipdb;ipdb.set_trace()
 	#---pack
 	attrs,result = {},{}
 	result['resnames'] = array(sel.residues.resnames)

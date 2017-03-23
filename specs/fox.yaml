@@ -1,0 +1,70 @@
+collections:
+  all:
+    - mk001
+    - simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC
+  new:
+    - mk001
+slices:
+  mk001:
+    readymade_namd:
+      current_protein:
+        psf: "1protein_again_autopsf.psf"
+        dcds: ['test0000.dcd','test0001.dcd','test0002.dcd','test0003.dcd','test0004.dcd']
+        group: proteins
+      current:
+        psf: "1protein_again_autopsf.psf"
+        dcds: ['test0000.dcd','test0001.dcd','test0002.dcd','test0003.dcd','test0004.dcd']
+        group: all
+calculations:
+  protein_abstractor:
+    uptype: simulation
+    slice_name: current_protein
+    group: proteins
+    collections: new
+  lipid_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: new
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        lipid_tip: "name P"
+        monolayer_cutoff: 1.4
+      nojumps: "z"
+  undulations:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: new
+    specs:
+      grid_spacing: 0.25
+      upstream: lipid_abstractor
+variables:
+  selectors:
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+    resnames_lipid: ['DOPC','DOPS','PIP2','POPC']
+  colordict:
+    mk001: orange
+meta:
+  short_namer: "lambda s : ('v'+re.match('^simulation-v(\\d+)',s).group(1) if re.match('^simulation-v(\\d+)',s) else s)"
+  simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
+    label: "$\\mathrm{IRSp53}$"
+    nprots: 1
+  mk001: 
+    label: "???"
+    nprots: 1
+plots:
+  undulations:
+    calculation: undulations
+    slices: current
+    collections: new
+  protein_abstractor:
+    calculation: protein_abstractor
+    slices: current_protein
+    collections: new
+
