@@ -39,10 +39,18 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 
 	#---compute masses by atoms within the selection
 	sel = uni.select_atoms(selstring)
-	mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974}
+	
+	try:
+		mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974}
+		masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
+	except:
+		mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
+		masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
 	#---martini mass table estimated from looking at sel.atoms.names and from martini-2.1.itp
 	#---! add martini switch: mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
-	masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
+	#try: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
+	#except: mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
+	#	import ipdb;ipdb.set_trace()
 	resids = sel.resids
 	#---create lookup table of residue indices
 	if len(sel.resids)==len(np.unique(sel.resids)):
@@ -55,7 +63,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 			divider_abs = [i.atoms.indices for i in sel.residues]
 			sel_all = uni.select_atoms('all')
 			sel_to_all = np.where(np.in1d(sel_all.resnames,resnames))[0]
-			print('[WARNING] semi-slow ~30s step to figure out residues because indices are redundant')
+			print('[WARNING] slow step because some residue indices are probably repeated')
 			divider = [np.where(np.in1d(sel_to_all,d))[0] for d in divider_abs]
 		else:
 			raise Exception('residues have redundant resids and selection is not the easy one')

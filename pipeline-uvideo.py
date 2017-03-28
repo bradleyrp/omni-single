@@ -1,7 +1,4 @@
 #!/usr/bin/env python
-"exec" "python" "-iB" "$0" "$@"
-#---WHAT THE EVERLOVING FUCK
-execfile('/etc/pythonstart')
 
 #---plot prep
 from plotter import *

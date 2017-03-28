@@ -270,7 +270,8 @@ def makemesh_regular(data,vecs,grid):
 	"""
 	
 	data = beyonder(data,vecs,growsize=0.1)
-	xypts = np.array([[i,j] for i in np.linspace(0,vecs[0],grid[0]) for j in np.linspace(0,vecs[1],grid[1])])
+	xypts = np.array([[i,j] for i in np.linspace(0,vecs[0],grid[0].astype(int)) 
+		for j in np.linspace(0,vecs[1],grid[1].astype(int))])
 	interp = scipy.interpolate.LinearNDInterpolator(data[:,0:2],data[:,2],fill_value=0.0)
 	bilinear_pts = np.array([[i[0],i[1],interp(i[0],i[1])] for i in xypts])
 	result = scipy.interpolate.griddata(bilinear_pts[:,0:2],bilinear_pts[:,2],bilinear_pts[:,0:2],

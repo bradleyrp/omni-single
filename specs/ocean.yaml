@@ -1,31 +1,27 @@
 collections:
   all:
     - mk001
-    - simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC
-  new:
-    - mk001
+    - mk002
 slices:
   mk001:
     readymade_namd:
-      current_protein:
-        psf: "1protein_again_autopsf.psf"
-        dcds: ['test0000.dcd','test0001.dcd','test0002.dcd','test0003.dcd','test0004.dcd']
-        group: proteins
-      current:
-        psf: "1protein_again_autopsf.psf"
-        dcds: ['test0000.dcd','test0001.dcd','test0002.dcd','test0003.dcd','test0004.dcd']
-        group: all
+      current_proteins: +slices/mk001
+      current: +slices/mk001
+  mk002:
+    readymade_namd:
+      current_proteins: +slices/mk001
+      current: +slices/mk001
 calculations:
   protein_abstractor:
     uptype: simulation
-    slice_name: current_protein
+    slice_name: current_proteins
     group: proteins
-    collections: new
+    collections: all
   lipid_abstractor:
     uptype: simulation
     slice_name: current
     group: all
-    collections: new
+    collections: all
     specs:
       selector:
         loop:
@@ -40,9 +36,12 @@ calculations:
     uptype: post
     group: all
     slice_name: current
-    collections: new
+    collections: all
     specs:
-      grid_spacing: 0.25
+      grid_spacing: 
+        loop:
+          - 0.5
+          - 0.25
       upstream: lipid_abstractor
 variables:
   selectors:
@@ -50,21 +49,29 @@ variables:
     resnames_lipid: ['DOPC','DOPS','PIP2','POPC']
   colordict:
     mk001: orange
+    mk002: blue
+  slices:
+    mk001:
+        psf: "1protein_again_autopsf.psf"
+        dcds: ['test0000.dcd','test0001.dcd','test0002.dcd','test0003.dcd','test0004.dcd']
+    mk002:
+        psf: "1protein_again_autopsf-v2.psf"
+        dcds: ['test0000-v2.dcd','test0001-v2.dcd','test0002-v2.dcd','test0003-v2.dcd','test0004-v2.dcd']
 meta:
   short_namer: "lambda s : ('v'+re.match('^simulation-v(\\d+)',s).group(1) if re.match('^simulation-v(\\d+)',s) else s)"
-  simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
-    label: "$\\mathrm{IRSp53}$"
-    nprots: 1
   mk001: 
-    label: "???"
+    label: "v1"
+    nprots: 1
+  mk002: 
+    label: "v2"
     nprots: 1
 plots:
   undulations:
     calculation: undulations
     slices: current
-    collections: new
+    collections: all
   protein_abstractor:
     calculation: protein_abstractor
     slices: current_protein
-    collections: new
+    collections: all
 
