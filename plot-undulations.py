@@ -42,7 +42,7 @@ if 'spectra' in routine:
 		meta = deepcopy(calc)
 		meta['wavevector_limit'] = wavevector_limit
 		descriptor = 'qlim.%.1f'%wavevector_limit
-		picturesave('fig.%s.%s'%(plotname,descriptor),work,work.plotdir,backup=False,version=True,meta=meta)
+		picturesave('fig.%s.%s'%(plotname,descriptor),work.plotdir,backup=False,version=True,meta=meta)
 
 if 'height' in routine:
 
@@ -70,10 +70,11 @@ if 'height' in routine:
 	cmap_mpl_name = cmap_names[cmap_name]
 	fs = {'axlabel':14,'title':20,'legend':14,'ticks':14,'tiny':10,'text_note':12,}
 	print_review = False
-	#---! hacked. replace with a count of the actual sns.
-	nrows,ncols = 1,1
+	#---CUSTOMIZE THE FOLLOWING FOR YOUR PLOT
+	nrows,ncols = 1,len(work.sns())
 	figsize = 8,8
-	panelspecs = dict(layout={'out':{'grid':[1,1]},'ins':[{'grid':[nrows,ncols],'hspace':0.4}]},figsize=figsize)
+	panelspecs = dict(layout={'out':{'grid':[1,1]},'ins':[{'grid':[nrows,ncols],
+		'hspace':0.4}]},figsize=figsize)
 	handle = 'wavevid-'+'.'.join([s for s in sns])+'.%s'%cmap_name
 
 	print_birdseye_snapshot_render(

@@ -2,20 +2,24 @@ collections:
   all:
     - mk001
     - mk002
+    - mk003
+  long:
+    - mk003
 slices:
   mk001:
     readymade_namd:
-      current_proteins: +slices/mk001
       current: +slices/mk001
   mk002:
     readymade_namd:
-      current_proteins: +slices/mk001
       current: +slices/mk001
+  mk003:
+    readymade_namd:
+      current: +slices/mk003
 calculations:
   protein_abstractor:
     uptype: simulation
-    slice_name: current_proteins
-    group: proteins
+    slice_name: current
+    group: all
     collections: all
   lipid_abstractor:
     uptype: simulation
@@ -31,7 +35,6 @@ calculations:
       separator: 
         lipid_tip: "name P"
         monolayer_cutoff: 1.4
-      nojumps: "z"
   undulations:
     uptype: post
     group: all
@@ -50,6 +53,7 @@ variables:
   colordict:
     mk001: orange
     mk002: blue
+    mk003: green
   slices:
     mk001:
         psf: "1protein_again_autopsf.psf"
@@ -57,6 +61,9 @@ variables:
     mk002:
         psf: "1protein_again_autopsf-v2.psf"
         dcds: ['test0000-v2.dcd','test0001-v2.dcd','test0002-v2.dcd','test0003-v2.dcd','test0004-v2.dcd']
+    mk003:
+        psf: "1protein_again_autopsf-v2.psf"
+        dcds: ['repetitive.dcd']
 meta:
   short_namer: "lambda s : ('v'+re.match('^simulation-v(\\d+)',s).group(1) if re.match('^simulation-v(\\d+)',s) else s)"
   mk001: 
@@ -64,6 +71,9 @@ meta:
     nprots: 1
   mk002: 
     label: "v2"
+    nprots: 1
+  mk003: 
+    label: "v3"
     nprots: 1
 plots:
   undulations:
