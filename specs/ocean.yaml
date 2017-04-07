@@ -51,6 +51,39 @@ calculations:
           - 0.5
           - 0.25
       upstream: lipid_abstractor
+  lipid_mesh:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector: lipid_com
+  lipid_areas2d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+  lipid_areas3d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
 variables:
   selectors:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
@@ -93,4 +126,26 @@ plots:
     calculation: protein_abstractor
     slices: current_protein
     collections: all
+  lipid_areas:
+    calculation: lipid_mesh
+    slices: current
+    collections:
+      - all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector: lipid_com
 
+  lipid_areas2d:
+    calculation: lipid_areas2d
+    slices: current
+    collections:
+      - all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector: lipid_com
