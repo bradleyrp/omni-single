@@ -3,8 +3,9 @@ collections:
     - mk001
     - mk002
     - mk003
-  long:
-    - mk003
+    - mk004
+  cursor:
+    - mk004
 slices:
   mk001:
     readymade_namd:
@@ -15,6 +16,10 @@ slices:
   mk003:
     readymade_namd:
       current: +slices/mk003
+  mk004:
+    readymade_namd:
+      psf: "1protein_again_autopsf.psf"
+      dcds: ['BMEM_sample.dcd']
 calculations:
   protein_abstractor:
     uptype: simulation
@@ -54,6 +59,7 @@ variables:
     mk001: orange
     mk002: blue
     mk003: green
+    mk004: red
   slices:
     mk001:
         psf: "1protein_again_autopsf.psf"
@@ -73,6 +79,9 @@ meta:
     label: "v2"
     nprots: 1
   mk003: 
+    label: "v3"
+    nprots: 1
+  mk004: 
     label: "v3"
     nprots: 1
 plots:
