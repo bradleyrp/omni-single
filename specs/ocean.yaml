@@ -18,8 +18,9 @@ slices:
       current: +slices/mk003
   mk004:
     readymade_namd:
-      psf: "1protein_again_autopsf.psf"
-      dcds: ['BMEM_sample.dcd']
+      current:
+        psf: "1protein_again_autopsf.psf"
+        dcds: ['BMEM_sample.dcd']
 calculations:
   protein_abstractor:
     uptype: simulation

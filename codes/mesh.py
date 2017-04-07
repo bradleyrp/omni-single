@@ -133,6 +133,7 @@ def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 	points = ptsb[relevants]
 	ghost_indices = ptsb_inds[relevants]
 	ptsb = points
+
 	if debug: checkpoint("[STATUS] simplices %0.2f"%(time.time()-st))
 	simplices = np.array([[np.where(relevants==r)[0][0] for r in s] 
 		for s in simplices if np.all([r in relevants for r in s])])
@@ -178,6 +179,13 @@ def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 	mean = 1./2*((3*principals[:,0]-principals[:,1])+\
 		(3*principals[:,1]-principals[:,0]))
 	if debug: checkpoint("[STATUS] complete %0.2f"%(time.time()-st))
+
+	if debug:
+		import matplotlib as mpl;import matplotlib.pylab as plt
+		plt.scatter(points[:,0],points[:,1])
+		plt.show()
+		import pdb;pdb.set_trace()
+
 	return {'nmol':nmol,'vec':vec,'simplices':simplices,'points':points,
 		'areas':areas,'facenorms':facenorms,'vertnorms':vertnorms,'principals':principals,
 		'ghost_ids':ghost_indices,'gauss':gauss,'mean':mean}

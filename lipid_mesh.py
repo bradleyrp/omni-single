@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
-import time
+import sys,time
 from numpy import *
 from joblib import Parallel,delayed
 from joblib.pool import has_shareable_memory
@@ -8,6 +8,8 @@ from joblib.pool import has_shareable_memory
 from codes.mesh import *
 from base.timer import checktime
 from base.tools import status,framelooper
+
+debug = False
 
 def lipid_mesh(**kwargs):
 
@@ -27,6 +29,10 @@ def lipid_mesh(**kwargs):
 	#---parallel
 	start = time.time()
 	mesh = [[],[]]
+	if debug: 
+		mn,fr = 0,10
+		makemesh(dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr],debug=True)
+		sys.exit(1)
 	for mn in range(2):
 		mesh[mn] = Parallel(n_jobs=work.nprocs,verbose=0)(
 			delayed(makemesh)(
