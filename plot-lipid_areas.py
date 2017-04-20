@@ -107,5 +107,5 @@ if 'curvature' in routine:
 	#---only one protein
 	prot_pts = data_prot[sn]['data']['points_all'].mean(axis=0)[0]
 	ax.scatter(prot_pts[:,0],prot_pts[:,1])
-	picturesave('fig.%s.%s'%(plotname,'demo'),work.plotdir,backup=False,version=True,meta=meta)
+	picturesave('fig.%s.%s'%('curvature','demo'),work.plotdir,backup=False,version=True,meta=meta)
 	plt.close()
