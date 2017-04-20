@@ -1,10 +1,5 @@
 collections:
   all:
-    - mk001
-    - mk002
-    - mk003
-    - mk004
-  cursor:
     - mk004
 slices:
   mk001:
@@ -116,13 +111,15 @@ meta:
     label: "v3"
     nprots: 1
   mk004: 
-    label: "v3"
+    label: "example"
     nprots: 1
 plots:
   undulations:
     calculation: undulations
     slices: current
     collections: all
+    specs:
+      grid_spacing: 0.50
   protein_abstractor:
     calculation: protein_abstractor
     slices: current_protein
