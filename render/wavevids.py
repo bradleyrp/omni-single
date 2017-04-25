@@ -16,8 +16,9 @@ from plotter.panels import panelplot
 
 import numpy as np
 
-def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',outdir='',fi=0,pbc_expand=1.0,smooth=1.,
-	extrema=None,metadat=None,fs=None,titles=None,panelspecs=None,cmap_mpl_name='RdBu_r',fn=None,**kwargs):
+def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
+	outdir='',fi=0,pbc_expand=1.0,smooth=1.,extrema=None,metadat=None,fs=None,
+	titles=None,panelspecs=None,cmap_mpl_name='RdBu_r',fn=None,**kwargs):
 	"""
 	Outer loop for rendering protein videos.
 	"""

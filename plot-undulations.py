@@ -3,10 +3,14 @@
 from codes import undulate
 from copy import deepcopy
 
-sns = work.vars['collections'][work.plots[plotname]['collections']]
-colordict = work.vars['colordict']
+#---cellblock
 routine = ['spectra','height'][:]
 
+#---cellblock
+sns = work.vars['collections'][work.plots[plotname]['collections']]
+colordict = work.vars['colordict']
+
+#---cellblock
 def undulation_panel(ax,data,meta,keys=None,art=None,title=None,lims=None):
 	"""
 	Plot several undulation spectra on one panel.
@@ -31,6 +35,7 @@ def undulation_panel(ax,data,meta,keys=None,art=None,title=None,lims=None):
 if 'data' not in globals(): 
 	data,calc = plotload(plotname,work)
 
+#---cellblock
 if 'spectra' in routine:
 
 	art = {'fs':{'legend':12}}
@@ -44,6 +49,7 @@ if 'spectra' in routine:
 		descriptor = 'qlim.%.1f'%wavevector_limit
 		picturesave('fig.%s.%s'%(plotname,descriptor),work.plotdir,backup=False,version=True,meta=meta)
 
+#---cellblock
 if 'height' in routine:
 
 	import render
@@ -79,8 +85,8 @@ if 'height' in routine:
 
 	print_birdseye_snapshot_render(
 		avgzs,[p.mean(axis=0)[...,:2] for p in protein_pts_all],mvecs,nprots_list,
-		handle='OUT',outdir=work.paths['post_plot_spot'],
-		pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,fn='fig.average_height',
+		handle='OUT',pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,
 		extrema=extrema,fs=fs,titles=titles,cmap_mpl_name=cmap_mpl_name,
 		cbar_label_specs=dict(rotation=0,labelpad=-20,y=1.1),
-		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$')
+		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
+		**({} if is_live else dict(outdir=work.paths['post_plot_spot'],fn='fig.average_height')))
