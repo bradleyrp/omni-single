@@ -42,7 +42,7 @@ calculations:
     slice_name: current
     collections: all
     specs:
-      grid_spacing: 
+      grid_spacing:
         loop:
           - 0.5
           - 0.25
@@ -81,14 +81,12 @@ calculations:
                 loop:
                   - lipid_com
 variables:
+  #---protected
+  art_director: art_ocean.py
+  #---unprotected
   selectors:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
     resnames_lipid: ['DOPC','DOPS','PIP2','POPC']
-  colordict:
-    mk001: orange
-    mk002: blue
-    mk003: green
-    mk004: red
   slices:
     mk001:
         psf: "1protein_again_autopsf.psf"
@@ -115,7 +113,9 @@ meta:
     nprots: 1
 plots:
   undulations:
-    calculation: undulations
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
     slices: current
     collections: all
     specs:

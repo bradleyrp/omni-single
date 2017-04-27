@@ -1,41 +1,24 @@
 #!/usr/bin/env python
 
+"""
+Plot undulation spectra.
+Requires standard plots.
+"""
+
 from codes import undulate
 from copy import deepcopy
+from codes.undulate_plot import undulation_panel
+import numpy as np
 
-#---cellblock
+#---block: what to plot
 routine = ['spectra','height'][:]
+sns = work.sns()
 
-#---cellblock
-sns = work.vars['collections'][work.plots[plotname]['collections']]
-colordict = work.vars['colordict']
-
-#---cellblock
-def undulation_panel(ax,data,meta,keys=None,art=None,title=None,lims=None):
-	"""
-	Plot several undulation spectra on one panel.
-	"""
-	for sn in (keys if type(keys)==np.ndarray or not keys else data.keys()):
-		dat = data[sn]['data']
-		mesh = data[sn]['data']['mesh']
-		vecs = data[sn]['data']['vecs']
-		surf = np.mean(data[sn]['data']['mesh'],axis=0)
-		#---! need to add fitting limit to meta file here
-		uspec = undulate.calculate_undulations(surf,vecs,chop_last=True,perfect=True,lims=lims,raw=False)
-		x,y = uspec['x'],uspec['y']
-		color = colordict[sn]
-		label = meta[sn]['label']
-		label += '\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
-		ax.plot(x,y,'o-',lw=2,markersize=5,markeredgewidth=0,c=color,label=label)
-		ax.set_title(title)
-	undulate.add_undulation_labels(ax,art=art)
-	undulate.add_std_legend(ax,loc='upper right',art=art)
-	undulate.add_axgrid(ax,art=art)
-	
+#---block: load the calculation data
 if 'data' not in globals(): 
 	data,calc = plotload(plotname,work)
 
-#---cellblock
+#---block: plot the undulation spectra
 if 'spectra' in routine:
 
 	art = {'fs':{'legend':12}}
@@ -43,14 +26,30 @@ if 'spectra' in routine:
 		status('plotting undulations with limit %f'%wavevector_limit,tag='plot')
 		axes,fig = panelplot(layout={'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]},figsize=(5,5))
 		undulation_panel(axes[0],data,work.meta,keys=np.array(sns),
-			art=art,title='undulation spectra',lims=(0,wavevector_limit))
+			art=art,title='undulation spectra',lims=(0,wavevector_limit),colors=colors,labels=labels)
 		meta = deepcopy(calc)
 		meta['wavevector_limit'] = wavevector_limit
 		descriptor = 'qlim.%.1f'%wavevector_limit
 		picturesave('fig.%s.%s'%(plotname,descriptor),work.plotdir,backup=False,version=True,meta=meta)
 
-#---cellblock
+#---block: plot the average heights
 if 'height' in routine:
+
+	#---! settings direct from pipeline-uvideos
+	cmap_mpl_name = 'RdBu_r'
+	fs = {'axlabel':14,'title':20,'legend':14,'ticks':14,'tiny':10,'text_note':12,}
+	nrows,ncols = 1,len(work.sns())
+	figsize = 8,8
+	panelspecs = dict(layout={'out':{'grid':[1,1]},'ins':[{'grid':[nrows,ncols],
+		'hspace':0.4}]},figsize=figsize)
+
+	#---need number of proteins to draw hulls
+	#---! more systematic way to define a parameter across all simulations, via standard_plots?
+	try: nprots_list = [work.meta[sn]['nprots'] for sn in sns]
+	except: nprots_list = [1 for sn in sns]
+	#---! ditto
+	try: titles = [work.meta[sn]['label'] for sn in sns]
+	except: titles = [sn for sn in sns]
 
 	import render
 	from render.wavevids import print_birdseye_snapshot_render
@@ -65,24 +64,8 @@ if 'height' in routine:
 	avgzs = [i-i.mean() for i in avgzs]
 	extrema = np.array(avgzs).min(),np.array(avgzs).max()
 	extrema = [np.abs(extrema).max()*j for j in [-1,1]]
-	nprots_list = [work.meta[sn]['nprots'] for sn in sns]
-	titles = [work.meta[sn]['label'] for sn in sns]
 
-	#---settings direct from pipeline-uvideos
-	ppn = 4
-	frameskipper = 2
-	cmap_name = 'redblue'
-	cmap_names = {'seismic':'seismic','redblue':'RdBu_r'}
-	cmap_mpl_name = cmap_names[cmap_name]
-	fs = {'axlabel':14,'title':20,'legend':14,'ticks':14,'tiny':10,'text_note':12,}
-	print_review = False
-	#---CUSTOMIZE THE FOLLOWING FOR YOUR PLOT
-	nrows,ncols = 1,len(work.sns())
-	figsize = 8,8
-	panelspecs = dict(layout={'out':{'grid':[1,1]},'ins':[{'grid':[nrows,ncols],
-		'hspace':0.4}]},figsize=figsize)
-	handle = 'wavevid-'+'.'.join([s for s in sns])+'.%s'%cmap_name
-
+	#---use the standard birdseye renderer to render the average structure
 	print_birdseye_snapshot_render(
 		avgzs,[p.mean(axis=0)[...,:2] for p in protein_pts_all],mvecs,nprots_list,
 		handle='OUT',pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,
