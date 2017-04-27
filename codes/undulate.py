@@ -100,35 +100,3 @@ def calculate_undulations(surf,vecs,chop_last=False,lims=(0,1.0),perfect=False,r
 	goodslice = where(all((x3>lims[0],x3<lims[1]),axis=0))
 	kappa = mean(1/((y2[1:]*x2[1:]**4)[goodslice]*Lx*Ly/lenscale**2))
 	return {'y':y3,'x':x3,'kappa':kappa}
-	
-def add_undulation_labels(ax,art=None):
-
-	"""
-	Label an axes for undulation spectra.
-	"""
-
-	ax.set_ylabel(r'$\left\langle h_{q}h_{-q}\right\rangle \left(\mathrm{nm}^{2}\right)$')
-	ax.set_xlabel(r'${\left|\mathbf{q}\right|}(\mathrm{{nm}^{-1}})$')
-	ax.set_xscale('log')
-	ax.set_yscale('log')
-
-def add_axgrid(ax,art=None):
-
-	"""
-	Standard plot function for adding gridlines.
-	"""
-	
-	ax.grid(True,linestyle='-',zorder=0,alpha=0.35)
-	ax.set_axisbelow(True)
-
-def add_std_legend(ax,loc='upper right',lw=2.0,title=None,art=None):
-	
-	"""
-	Add a legend.
-	"""
-	
-	h,l = ax.get_legend_handles_labels()
-	leginds = range(len(h))
-	legend = ax.legend([h[i] for i in leginds],[l[i] for i in leginds],
-		loc=loc,fontsize=art['fs']['legend'],ncol=1,title=title)
-	for legobj in legend.legendHandles: legobj.set_linewidth(lw)
