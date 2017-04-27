@@ -1,0 +1,473 @@
+slices:
+  membrane-v509:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':28000,'end':108000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':28000,'end':108000,'skip':1}
+  membrane-v510:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':24000,'end':104000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':24000,'end':104000,'skip':1}
+  membrane-v511:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':24000,'end':104000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':24000,'end':104000,'skip':1}
+  membrane-v530:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v531:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v532:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v533:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v534:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v514:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v515:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v536:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v538:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  membrane-v542:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':0,'end':48000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
+  membrane-v543:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':0,'end':48000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
+
+variables:
+  composition_names:
+    symmetric: symmetric
+    asymmetric: asymmetric
+    position: asymmetric
+    charge: symmetric
+  selectors:
+    ions: (name NA or name CL or name MG or name Cal or name K)
+    cations: (name NA or name MG or name Cal or name K)
+    resnames_lipid: ['POPC','DOPC','DOPS','DOPE','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
+    resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
+  head_atoms: 'N  C12  C13  C14  C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C  C11 H11A H11B  P  O13  O14  O12  O11   C1   HA   HB   C2   HS N   HN1   HN2   HN3   C12  H12A   C13  O13A  O13B   C11  H11A  H11B     P   O13   O14   O12 O11    C1    HA    HB    C2    HS C12   H2   O2  HO2  C13   H3   O3  HO3  C14   H4   O4   P4 OP42 OP43 OP44  C15   H5   O5   P5  OP52 OP53 OP54  H52  C16   H6   O6  HO6  C11   H1    P  O13  O14  O12  O11   C1   HA   HB   C2   HS'
+  slices:
+    steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
+    current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
+    current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
+  names:
+    proper_residue_names_long:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PtdIns(4,5)P$_2$"
+      P35P: "PtdIns(3,5)P$_2$"
+      PIPP: "PtdIns(4,5)P$_2^{-3}$"
+      PIPU: "PtdIns(4,5)P$_2^{-5}$"
+  orders:
+    areas:
+      symmetric: 
+        - membrane-v509
+        - membrane-v514
+        - membrane-v515
+        - membrane-v543
+        - membrane-v510
+        - membrane-v511
+      asymmetric:
+        - membrane-v536
+        - membrane-v538
+        - membrane-v530
+        - membrane-v542
+        - membrane-v531
+        - membrane-v533
+        - membrane-v532
+        - membrane-v534
+    #---setting canonical orderings for plots based on our underlying hypotheses
+    canon:
+      asymmetric:
+        - membrane-v538
+        - membrane-v536
+        - membrane-v530
+        - membrane-v542
+        - membrane-v531
+        - membrane-v533
+        - membrane-v532
+        - membrane-v534
+      asymmetric_pi_first:
+        - membrane-v536
+        - membrane-v538
+        - membrane-v530
+        - membrane-v542
+        - membrane-v531
+        - membrane-v532
+        - membrane-v533
+        - membrane-v534
+      symmetric: 
+        - membrane-v509
+        - membrane-v514
+        - membrane-v515
+        - membrane-v543
+        - membrane-v510
+        - membrane-v511
+
+collections:
+  one:
+    - membrane-v530
+  symmetric:
+    - membrane-v509
+    - membrane-v510
+    - membrane-v511
+  asymmetric:
+    - membrane-v530
+    - membrane-v531
+    - membrane-v532
+  position:
+    - membrane-v531
+    - membrane-v532
+    - membrane-v533
+    - membrane-v534
+  charge:
+    - membrane-v509
+    - membrane-v514
+    - membrane-v515
+  all:
+    - membrane-v509
+    - membrane-v510
+    - membrane-v511
+    - membrane-v530
+    - membrane-v531
+    - membrane-v532
+    - membrane-v533
+    - membrane-v534
+    - membrane-v514
+    - membrane-v515
+    - membrane-v536
+    - membrane-v538
+    - membrane-v542
+    - membrane-v543
+  dilute:
+    - membrane-v542
+
+meta:
+  short_namer: 'lambda s : ''v''+re.findall(''membrane-v([0-9]+)'',s)[0]'
+  membrane-v509:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v510:
+    composition_name:    symmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v511:
+    composition_name:    symmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v514:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}^{-5}_{2}}$"
+    ptdins_resname:      PIPU
+  membrane-v515:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}^{-3}_{2}}$"
+    ptdins_resname:      PIPP
+  membrane-v530:
+    composition_name:    asymmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v531:
+    composition_name:    asymmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v532:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v533:
+    composition_name:    asymmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(3,5)P}_{2}}$"
+    ptdins_resname:      P35P
+  membrane-v534:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(3,5)P}_{2}}$"
+    ptdins_resname:      P35P
+  membrane-v536:
+    composition_name:    asymmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI}}$"
+    ptdins_resname:      SAPI
+  membrane-v538:
+    composition_name:    asymmetric
+    cation:              K
+    anion:               CL
+    ion_label:          "$\\mathrm{{K}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v542:
+    composition_name:    asymmetric
+    cation:              "Na,Cal"
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v543:
+    composition_name:    symmetric
+    cation:              "Na,Cal"
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+
+calculations:
+  lipid_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            monolayer_cutoff: 1.85
+            resnames: +selectors/resnames_lipid
+            type: com
+          lipid_chol_com:
+            monolayer_cutoff: 1.4
+            resnames: +selectors/resnames_lipid_chol
+            type: com
+  undulations:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+      - symmetric
+      - asymmetric
+      - position
+      - charge
+    specs:
+      grid_spacing: 0.2
+      upstream:
+        lipid_abstractor:
+          selector: lipid_com
+  diffusion_lipids:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      diffusion_skip: 1
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+  lipid_mesh:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector:
+            loop:
+              - lipid_com
+              - lipid_chol_com
+  lipid_areas2d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  lipid_areas3d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  head_angle:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections:
+      - asymmetric
+      - position
+      #---hacked for simple overlay
+      - dilute
+      - all
+    specs:
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_chol_com
+  ion_binding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      nrank: 3
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+  ion_binding_combinator:
+    uptype: post
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        ion_binding: None
+      zonecut:
+        loop: [1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.6,5.0]
+  ion_binding_norms:
+    uptype: post
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        ion_binding: None
+        ion_binding_combinator:
+          zonecut:
+            loop:
+              - 2.2
+              - 4.6
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector: lipid_com
+  hydrogen_bonding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
+  electron_density_profile:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      bin_size: 0.1
+      selector:
+        monolayer_cutoff: 1.4
+        resnames: +selectors/resnames_lipid_chol
+        type: com
+  lipid_order:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: asymmetric
+
+plots:
+  undulations:
+    calculation: undulations
+    slices: current
+    collections:
+      - all
