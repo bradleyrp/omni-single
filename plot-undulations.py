@@ -21,16 +21,32 @@ if 'data' not in globals():
 #---block: plot the undulation spectra
 if 'spectra' in routine:
 
+	#---settings
 	art = {'fs':{'legend':12}}
-	for wavevector_limit in [0.5,1.0,2.0]:
-		status('plotting undulations with limit %f'%wavevector_limit,tag='plot')
-		axes,fig = panelplot(layout={'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]},figsize=(5,5))
-		undulation_panel(axes[0],data,work.meta,keys=np.array(sns),
-			art=art,title='undulation spectra',lims=(0,wavevector_limit),colors=colors,labels=labels)
+	layout = {'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]}
+	figsize=(5,5)
+	wavevector_limits = [0.5,1.0,2.0]
+
+	#---sweep over plots
+	plotspecs = sweeper(**{'layout':layout,'wavevector_limit':wavevector_limits})
+	for pnum,plotspec in enumerate(plotspecs):
+		status('plotting layout',i=pnum,tag='plot')
+		wavevector_limit = plotspec['wavevector_limit']
+		axes,fig = panelplot(layout,figsize=figsize)
+		for aa,ax in enumerate(axes):
+			#---panel settings
+			title = 'undulation spectra'
+			keys = None
+			#---plotter
+			undulation_panel(ax,data,
+				keys=keys,art=art,title=title,labels=labels,colors=colors,
+				lims=(0,wavevector_limit))
+		#---metadata and file tag
 		meta = deepcopy(calc)
-		meta['wavevector_limit'] = wavevector_limit
-		descriptor = 'qlim.%.1f'%wavevector_limit
-		picturesave('fig.%s.%s'%(plotname,descriptor),work.plotdir,backup=False,version=True,meta=meta)
+		meta.update(**plotspec)
+		tag = 'qlim.%.1f'%wavevector_limit
+		picturesave('fig.%s.%s'%(plotname,tag),work.plotdir,backup=False,version=True,meta=plotspec)
+
 
 #---block: plot the average heights
 if 'height' in routine:
