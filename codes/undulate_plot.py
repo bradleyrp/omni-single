@@ -3,16 +3,17 @@
 import numpy as np
 from . undulate import calculate_undulations
 
-def undulation_panel(ax,data,meta,keys=None,art=None,title=None,lims=None,colors=None,labels=None):
+def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None,labels=None):
 	"""
 	Plot several undulation spectra on one panel.
 	"""
-	for sn in (keys if type(keys)==np.ndarray or not keys else data.keys()):
+	sns = keys if keys else data.keys()
+	for sn in sns:
 		dat = data[sn]['data']
 		mesh = data[sn]['data']['mesh']
 		vecs = data[sn]['data']['vecs']
 		surf = np.mean(data[sn]['data']['mesh'],axis=0)
-		#---! need to add fitting limit to meta file here
+		#---kernel of this plot: calculate the spectra here
 		uspec = calculate_undulations(surf,vecs,chop_last=True,perfect=True,lims=lims,raw=False)
 		x,y = uspec['x'],uspec['y']
 		label = labels[sn] if labels else sn

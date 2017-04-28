@@ -99,6 +99,7 @@ slices:
       current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
 
 variables:
+  art_director: art_ptdins.py
   composition_names:
     symmetric: symmetric
     asymmetric: asymmetric
@@ -466,6 +467,7 @@ calculations:
     collections: asymmetric
 
 plots:
+  undulations_ptdins: undulations
   undulations:
     calculation: undulations
     slices: current
