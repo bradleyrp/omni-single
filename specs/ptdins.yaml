@@ -211,6 +211,20 @@ collections:
     - membrane-v543
   dilute:
     - membrane-v542
+  symmetric_all:
+    - membrane-v509
+    - membrane-v510
+    - membrane-v511
+    - membrane-v514
+    - membrane-v515
+  asymmetric_all:
+    - membrane-v538
+    - membrane-v530
+    - membrane-v531
+    - membrane-v532
+    - membrane-v533
+    - membrane-v534
+    - membrane-v542
 
 meta:
   short_namer: 'lambda s : ''v''+re.findall(''membrane-v([0-9]+)'',s)[0]'
@@ -344,16 +358,6 @@ calculations:
       upstream:
         lipid_abstractor:
           selector: lipid_com
-  diffusion_lipids:
-    uptype: post
-    slice_name: current
-    collections:
-      - all
-    specs:
-      diffusion_skip: 1
-      upstream:
-        lipid_abstractor:
-          selector: lipid_chol_com
   lipid_mesh:
     uptype: post
     slice_name: current
@@ -366,46 +370,6 @@ calculations:
             loop:
               - lipid_com
               - lipid_chol_com
-  lipid_areas2d:
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        lipid_mesh:
-          upstream:
-            lipid_abstractor:
-              selector:
-                loop:
-                  - lipid_com
-                  - lipid_chol_com
-  lipid_areas3d:
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        lipid_mesh:
-          upstream:
-            lipid_abstractor:
-              selector:
-                loop:
-                  - lipid_com
-                  - lipid_chol_com
-  head_angle:
-    uptype: simulation
-    slice_name: current
-    group: all
-    collections:
-      - asymmetric
-      - position
-      #---hacked for simple overlay
-      - dilute
-      - all
-    specs:
-      upstream: 
-        lipid_abstractor:
-          selector: lipid_chol_com
   ion_binding:
     group: all
     uptype: simulation
@@ -449,6 +413,59 @@ calculations:
     specs:
       angle_cutoff: 160.0
       distance_cutoff: 3.4
+
+###
+calculations_aside:
+  diffusion_lipids:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      diffusion_skip: 1
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+  lipid_areas2d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  lipid_areas3d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  head_angle:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections:
+      - asymmetric
+      - position
+      #---hacked for simple overlay
+      - dilute
+      - all
+    specs:
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_chol_com
   electron_density_profile:
     group: all
     uptype: simulation
@@ -470,6 +487,11 @@ plots:
   undulations_ptdins: undulations
   undulations:
     calculation: undulations
-    slices: current
-    collections:
-      - all
+  ion_binding:
+    calculation: 
+      ion_binding: {}
+      ion_binding_combinator:
+        zonecut: 2.2
+      ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
+  hydrogen_bonding:
+    calculation: hydrogen_bonding

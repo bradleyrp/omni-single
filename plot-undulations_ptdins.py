@@ -43,6 +43,7 @@ if 'spectra' in routine:
 			keys = work.specs['collections'][collections[aa]]
 			labels = dict([(sn,work.meta[sn]['ptdins_label']+','+work.meta[sn]['ion_label']) for sn in keys])
 			colors = dict([(sn,colorize(work.meta[sn],comparison=collections[aa])) for sn in keys])
+			#---plotter
 			undulation_panel(ax,data,
 				keys=keys,art=art,title=title,labels=labels,colors=colors,
 				lims=(0,wavevector_limit))
