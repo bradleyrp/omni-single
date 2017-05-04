@@ -47,7 +47,6 @@ if 'spectra' in routine:
 		tag = 'qlim.%.1f'%wavevector_limit
 		picturesave('fig.%s.%s'%(plotname,tag),work.plotdir,backup=False,version=True,meta=plotspec)
 
-
 #---block: plot the average heights
 if 'height' in routine:
 

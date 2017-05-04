@@ -208,10 +208,15 @@ class BarGrouper:
 		fig = plt.figure(figsize=self.figsize)
 		ax = plt.subplot(111)
 		#---! here instead of set_ ???
-		xs,ys,ws = [np.array([b[k] for bb,b in enumerate(self.bars)]) for k in 'lvw']
+		xs,ws = [np.array([b[k] for bb,b in enumerate(self.bars)]) for k in 'lw']
+		#---incoming values are tuples of mean,std
+		yvals = np.array([b['v'] for bb,b in enumerate(self.bars)])
+		ys,yerrs = yvals[:,0],yvals[:,1]
 		alpha = 1.0 if not self.empty else 0.0
 		#---! ytf did they change default alignment?
 		rendered = ax.bar(xs,ys,width=ws,align='edge',zorder=3,alpha=alpha)
+		# ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=4,alpha=1.0,lw=5,c='w',ls='none')
+		ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=5,alpha=1.0,lw=3,c='k',ls='none')
 		if self.show_xticks:
 			xticks = np.mean(np.array([xs,ws+xs]),axis=0)
 			ax.set_xticks(xticks)
