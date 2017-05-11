@@ -1,0 +1,35 @@
+collections:
+  all:
+    - nwaspbilayer3
+slices:
+  nwaspbilayer3:
+    groups: 
+      all: all
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':20000,'skip':100}
+variables:
+  selectors:
+    ions: (name NA or name CL or name MG or name Cal or name K)
+    cations: (name NA or name MG or name Cal or name K)
+    resnames_lipid: ['POPC','DOPC','DOPS','DOPE','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
+    resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
+  head_atoms: 'N  C12  C13  C14  C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C  C11 H11A H11B  P  O13  O14  O12  O11   C1   HA   HB   C2   HS N   HN1   HN2   HN3   C12  H12A   C13  O13A  O13B   C11  H11A  H11B     P   O13   O14   O12 O11    C1    HA    HB    C2    HS C12   H2   O2  HO2  C13   H3   O3  HO3  C14   H4   O4   P4 OP42 OP43 OP44  C15   H5   O5   P5  OP52 OP53 OP54  H52  C16   H6   O6  HO6  C11   H1    P  O13  O14  O12  O11   C1   HA   HB   C2   HS'
+calculations:
+  lipid_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            monolayer_cutoff: 1.85
+            resnames: +selectors/resnames_lipid
+            type: com
+          lipid_chol_com:
+            monolayer_cutoff: 1.4
+            resnames: +selectors/resnames_lipid_chol
+            type: com
