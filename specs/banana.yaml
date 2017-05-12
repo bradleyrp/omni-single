@@ -10,25 +10,25 @@ slices:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':400000,'skip':200}
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':40000,'skip':2000}
   simulation-v004-IRSp53-PIP2-bilayer-large:
     groups:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':200}
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':49000,'skip':2000}
   simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC:
     groups:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':430000,'skip':200}
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':43000,'skip':2000}
   simulation-v006-endophilin-A1-PIP2-bilayer-large:
     groups:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':200}
+      current_protein: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':49000,'skip':2000}
 calculations:
   protein_abstractor:
     uptype: simulation
@@ -74,7 +74,7 @@ variables:
     simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC: blue
     simulation-v006-endophilin-A1-PIP2-bilayer-large: green
 meta:
-  short_namer: "lambda s : 'v'+re.match('^simulation-v(\\d+)',s).group(1)"
+  short_namer: "lambda s : '%sv%s'%re.match('^(\\w)-v(\\d+)',re.sub('^(membrane|simulation)',lambda x:x.group(1)[0],s)).groups()"
   simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
     label: "$\\mathrm{IRSp53}$"
     nprots: 1
