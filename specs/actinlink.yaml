@@ -23,6 +23,9 @@ calculations:
     group: all
     collections: all
     specs:
+      separator: 
+        lipid_tip: "name P"
+        monolayer_cutoff: 1.4
       selector:
         loop:
           lipid_com:
