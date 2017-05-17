@@ -11,7 +11,7 @@ from codes.undulate_plot import undulation_panel
 import numpy as np
 
 #---block: what to plot
-routine = ['spectra','height'][:]
+routine = ['spectra','height','dump_xyz'][:-1]
 sns = work.sns()
 
 #---block: load the calculation data
@@ -88,3 +88,27 @@ if 'height' in routine:
 		cbar_label_specs=dict(rotation=0,labelpad=-20,y=1.1),
 		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
 		**({} if is_live else dict(outdir=work.paths['post_plot_spot'],fn='fig.average_height')))
+
+#---block: plot the undulation spectra
+if 'dump_xyz' in routine:
+
+	nframes = 500
+	sn = 'simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC'
+	dat = data[sn]['data']
+	mesh = dat['mesh']	
+	out = mesh[:,:nframes].reshape((-1,49*49))
+	backin = out.reshape((2,-1,49,49))
+	print('checked? %s'%np.all(backin==mesh[:,:nframes]))
+	np.savetxt(
+		'banana-v003-0-400000-200-%d-frames.monolayer_heights_49x49.txt'%nframes,
+		out)
+	sys.path.insert(0,'calcs')
+	from codes.undulate_plot import calculate_undulations
+	surf = backin.mean(axis=0)
+	vecs = dat['vecs']	
+	lims = (0,1.0) 
+	uspec = calculate_undulations(surf,vecs,
+		chop_last=True,perfect=True,lims=lims,raw=False)
+	np.savetxt(
+		'banana-v003-0-400000-200-%d-frames.hqhq.txt'%nframes,
+		np.array(np.transpose([uspec['x'],uspec['y']])))
