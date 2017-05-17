@@ -39,7 +39,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 
 	#---compute masses by atoms within the selection
 	sel = uni.select_atoms(selstring)
-	mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974}
+	mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974,'S':32.065}
 	missing_atoms_aamd = list(set([i[0] for i in sel.atoms.names if i[0] not in mass_table]))
 	if any(missing_atoms_aamd): 
 		print('[WARNING] missing mass for atoms %s so we assume this is coarse-grained'%missing_atoms_aamd)
