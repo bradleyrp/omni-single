@@ -39,18 +39,20 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 
 	#---compute masses by atoms within the selection
 	sel = uni.select_atoms(selstring)
-	
-	try:
-		mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974}
-		masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
-	except:
+	mass_table = {'H':1.008,'C':12.011,'O':15.999,'N':14.007,'P':30.974}
+	missing_atoms_aamd = list(set([i[0] for i in sel.atoms.names if i[0] not in mass_table]))
+	if any(missing_atoms_aamd): 
+		print('[WARNING] missing mass for atoms %s so we assume this is coarse-grained'%missing_atoms_aamd)
+		#---MARTINI masses
 		mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
-		masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
-	#---martini mass table estimated from looking at sel.atoms.names and from martini-2.1.itp
-	#---! add martini switch: mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
-	#try: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
-	#except: mass_table = {'C':72,'N':72,'P':72,'S':45,'G':72,'D':72,'R':72}
-	#	import ipdb;ipdb.set_trace()
+		missing_atoms_cgmd = list(set([i[0] for i in sel.atoms.names if i[0] not in mass_table]))
+		if any(missing_atoms_cgmd):
+			raise Exception('we are trying to assign masses. if this simulation is atomistic then we are '+
+				'missing atoms "%s". if it is MARTINI then we are missing atoms "%s"'%(
+				missing_atoms_aamd,missing_atoms_cgmd))
+		else: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
+	else: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
+
 	resids = sel.resids
 	#---create lookup table of residue indices
 	if len(sel.resids)==len(np.unique(sel.resids)):
@@ -58,8 +60,8 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	else:
 		if 'type' in selector and selector['type'] == 'com' and 'resnames' in selector:
 			#---this seemingly-nice MDAnalysis tool doesn't work because it uses absolute indices
-			#---also note that we could not use the standard does-it-change question to divide residues because
-			#---...in DF's case, there are four that have 266 atoms with no residue change
+			#---also note that we could not use the standard does-it-change question to divide residues 
+			#---...because in the ocean test, there are four that have 266 atoms with no residue change
 			divider_abs = [i.atoms.indices for i in sel.residues]
 			sel_all = uni.select_atoms('all')
 			sel_to_all = np.where(np.in1d(sel_all.resnames,resnames))[0]
