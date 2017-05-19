@@ -218,13 +218,22 @@ collections:
     - membrane-v514
     - membrane-v515
   asymmetric_all:
+    - membrane-v536
+    - membrane-v538
+    - membrane-v530
+    - membrane-v542
+    - membrane-v531
+    - membrane-v533
+    - membrane-v532
+    - membrane-v534
+  asymmetric_all_no_mixed:
+    - membrane-v536
     - membrane-v538
     - membrane-v530
     - membrane-v531
-    - membrane-v532
     - membrane-v533
+    - membrane-v532
     - membrane-v534
-    - membrane-v542
 
 meta:
   short_namer: 'lambda s : ''v''+re.findall(''membrane-v([0-9]+)'',s)[0]'
@@ -315,6 +324,7 @@ meta:
   membrane-v542:
     composition_name:    asymmetric
     cation:              "Na,Cal"
+    cations:            ['NA','Cal']
     anion:               CL
     ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
@@ -322,6 +332,7 @@ meta:
   membrane-v543:
     composition_name:    symmetric
     cation:              "Na,Cal"
+    cations:            ['NA','Cal']
     anion:               CL
     ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
@@ -413,8 +424,25 @@ calculations:
     specs:
       angle_cutoff: 160.0
       distance_cutoff: 3.4
+  salt_bridges:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      distance_cutoff: 3.4
+nope:
+  salt_bridges_summary:
+    group: all
+    uptype: post
+    slice_name: current
+    collections: asymmetric_all
+    specs:
+      upstream: salt_bridges
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
 
-###
+# set aside
 calculations_aside:
   diffusion_lipids:
     uptype: post
@@ -495,3 +523,6 @@ plots:
       ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
   hydrogen_bonding:
     calculation: hydrogen_bonding
+  salt_bridges:
+    calculation: salt_bridges
+    collections: one
