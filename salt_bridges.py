@@ -302,7 +302,9 @@ def tabulator(tabulation,valid_frames,obs_by_frames):
 
 	start_time = time.time()
 	#---preallocate bond counts per frame
-	counts_per_frame = np.zeros((len(valid_frames),len(idx)))
+	try: counts_per_frame = np.zeros((len(valid_frames),len(idx)))
+	except:
+		import ipdb;ipdb.set_trace()
 	#---hash the binds over the indices
 	bonds_to_idx = dict([(tuple(b),bb) for bb,b in enumerate(bonds)])
 	frame_lims = np.concatenate(([0],np.cumsum(obs_by_frames)))
@@ -814,19 +816,20 @@ def salt_bridges(grofile,trajfile,**kwargs):
 			#---get the unique entry
 
 		tabulation_salt = np.transpose((
-			acceptors_side[salt_cat[:,0]].resnames,
-				acceptors_side[salt_cat[:,0]].resids,
-				acceptors_side[salt_cat[:,0]].names,
-			donors_side[salt_cat[:,2]].resnames,
-				donors_side[salt_cat[:,2]].resids,
-				donors_side[salt_cat[:,2]].names,
+			acceptors_side.resnames[salt_cat[:,0]],
+				acceptors_side.resids[salt_cat[:,0]],
+				#acceptors_side.names[salt_cat[:,0]],
+			donors_side.resnames[salt_cat[:,2]],
+				donors_side.resids[salt_cat[:,2]],
+				#donors_side.names[salt_cat[:,2]],
 			cations_side[salt_cat[:,1]].resids,))
 		#---send the hydrogen bonds to the tabulator
 		#---keeping ion identity for everything since some post-processed data are huge (5.6GB for v533)
 		#---to save space we previously dropped the last column
 		tabulation_salt_out = tabulation_salt
-		bonds_salt,counts_per_frame_salt = tabulator(tabulation_salt_out,
-			valid_frames_salt,obs_by_frames_salt)
+		import ipdb;ipdb.set_trace()
+		bonds_salt,counts_per_frame_salt = tabulator(tabulation_salt_out,valid_frames_salt,obs_by_frames_salt)
+		import ipdb;ipdb.set_trace()
 
 	#---package the dataset
 	result,attrs = {},{}

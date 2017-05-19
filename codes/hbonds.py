@@ -66,8 +66,9 @@ def hbonder_framewise(fr,**kwargs):
 vecnorm = lambda vec: vec/np.linalg.norm(vec)
 vecangle = lambda v1,v2 : np.arccos(np.dot(vecnorm(v1),vecnorm(v2)))*(180./np.pi)
 
-#---DEPRECATED BECAUSE too slow. see one-tree method below
 def hbonder_and_salt_bridges_framewise_DEPRECATED(fr,**kwargs):
+
+	#---DEPRECATED BECAUSE too slow. see one-tree method below
 
 	"""
 	Compute hydrogen bonds inside a joblib parallel call, over periodic boundary conditions.
@@ -392,7 +393,7 @@ def hbonder_salt_bridges_framewise(fr,**kwargs):
 	#---sometimes the tree fails?
 	except: return []
 
-	#---! in the following "close_donors" is e.g. the close ions
+	#---! in the following "close_donors" is e.g. the close ions not the heavy atoms
 	close_d,nns_d = tree.query(pts_back,k=10,distance_upper_bound=distance_cutoff/lenscale)
 	#---index pairs within the cutoff distance
 	close_pairs_d = np.transpose(np.where(np.all((close_d<distance_cutoff/lenscale,close_d>0),axis=0)))
@@ -407,24 +408,78 @@ def hbonder_salt_bridges_framewise(fr,**kwargs):
 	close_acceptors = nns_a[aind(close_pairs_a)]
 	close_ions_a = close_pairs_a[:,0]
 
-	#---waste some memory to organize these
-	cations_to_acceptors = np.zeros((len(pts_cations),len(pts_fore)))
-	cations_to_donors = np.zeros((len(pts_cations),len(pts_back)))
-	cations_to_donors[tuple((close_donors,close_ions_d))] += 1
-	cations_to_acceptors[tuple((close_acceptors,close_ions_a))] += 1
 
-	#---total number of salt bridges is here 180/400 which is neat
-	valid_bridges = np.where(np.all((cations_to_acceptors.sum(axis=1),
-		cations_to_donors.sum(axis=1)),axis=0))[0]
+	#---! this is too large see optimization below
+	if True:
 
-	#---take all combinations of donor and acceptor for each ion, particularly since they might be on the 
-	#---...same molecule and later we want to get the intermolecular ones
-	master_bridge_listing = []
-	for vb in valid_bridges:
-		combos = np.array(
-			np.meshgrid(np.where(close_acceptors==vb)[0],[vb],np.where(close_donors==vb)[0])
-			).T.reshape(-1,3)
-		master_bridge_listing.extend(combos)
-	master_bridge_listing = np.array(master_bridge_listing)
+		#---waste some memory to organize these
+		cations_to_acceptors = np.zeros((len(pts_cations),len(pts_fore)))
+		cations_to_donors = np.zeros((len(pts_cations),len(pts_back)))
+		cations_to_acceptors[tuple((close_acceptors,close_ions_a))] += 1
+		cations_to_donors[tuple((close_donors,close_ions_d))] += 1
+
+		if False:
+
+			#---this block is an addition to the original method to exclude waters
+			#---both tabulators above have a row for each ion and a column for each donor or acceptor
+			#---here we filter out the solvent. note that we could do this earlier before running the tree
+			#---! do this before the tree? or keep it here for indexing ease?
+			cols_lipids_d = np.where(np.in1d(donors_resnames,
+				np.array([i for i in np.unique(donors_resnames) if i!='SOL'])))[0]
+			cols_lipids_a = np.where(np.in1d(acceptors_resnames,
+				np.array([i for i in np.unique(acceptors_resnames) if i!='SOL'])))[0]
+
+			#---total number of salt bridges is here 180/400 which is neat
+			#---this line was modified below to exclude waters using the non-solvent columns from above
+			valid_bridges = np.where(np.all((cations_to_acceptors[:,cols_lipids_a].sum(axis=1),cations_to_donors[:,cols_lipids_d].sum(axis=1)),axis=0))[0]
+
+		#---! no longer removing water in the block above, but way upstream
+		else:
+
+			valid_bridges = np.where(np.all((cations_to_acceptors.sum(axis=1),cations_to_donors.sum(axis=1)),axis=0))[0]
+
+
+		#### GO HERE
+
+		#---take all combinations of donor and acceptor for each ion, particularly since they might be on the 
+		#---...same molecule and later we want to get the intermolecular ones
+		master_bridge_listing = []
+		for vb in valid_bridges:
+			combos = np.array(
+				np.meshgrid(np.where(close_acceptors==vb)[0],[vb],np.where(close_donors==vb)[0])
+				).T.reshape(-1,3)
+			master_bridge_listing.extend(combos)
+		master_bridge_listing = np.array(master_bridge_listing)
+
+		if False:
+
+			"""
+			pseudocode
+				at this point we have two lists of close donors and acceptors to the ions
+				some ions have multiple acceptors and donors close to them
+					hence the second column of e.g. close_pairs_a may be 1,2, etc not just 0
+						because it indexes the position in the nns array that has a valid close ion
+				what should we do with multiple bonds?
+					in the deprecated code above we take all combiniations and add them to a list
+						but rpb is rewriting because that code looks wrong and we need it to be smaller anyway
+					see what they are
+						ship out the resnames and resids for development
+						found that (duh!) there are a lot of bonds to water
+							ipdb> acceptors_resnames[np.where(cations_to_acceptors[0])[0]]
+							array(['PI2P', 'PI2P', 'SOL', 'SOL', 'SOL'], dtype=object)
+							ipdb> donors_resnames[np.where(cations_to_donors[0])[0]]
+							array(['SOL', 'SOL', 'SOL', 'SOL', 'SOL', 'SOL'], dtype=object)
+					realize now that the newest definition of a salt bridge is less strict
+						and along the way we forgot to throw away the solvent
+					filtered the columns on the big memory tabulator 
+						that matches (joins?) the cations to either the acceptors 
+				a note on indexing
+					either we exclude water upstream or we exclude it above
+						as long as it's not too slow, let's stick with what we have
+					excluding it before the tree will cause this code to diverge 
+						from the hydrogen bonding code
+						which will make more cognitive work
+			"""
+
 	#---return a list of acceptor, ion, donor triplets
 	return master_bridge_listing
