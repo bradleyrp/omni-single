@@ -430,17 +430,18 @@ calculations:
     slice_name: current
     collections: all
     specs:
-      distance_cutoff: 3.4
-nope:
+      distance_cutoff: 
+        loop: [2.2,3.4]
   salt_bridges_summary:
     group: all
     uptype: post
     slice_name: current
     collections: asymmetric_all
     specs:
-      upstream: salt_bridges
-      angle_cutoff: 160.0
-      distance_cutoff: 3.4
+      upstream: 
+        salt_bridges:
+          distance_cutoff: 
+            loop: [3.4]
 
 # set aside
 calculations_aside:
@@ -524,5 +525,7 @@ plots:
   hydrogen_bonding:
     calculation: hydrogen_bonding
   salt_bridges:
-    calculation: salt_bridges
+    calculation: 
+      salt_bridges:
+        distance_cutoff: 3.4
     collections: one

@@ -13,6 +13,7 @@ if is_live:
 #---block: import the post-processed data	
 if 'data' not in globals(): 
 	sns,(data,calc) = work.sns(),plotload(plotname,work)
+	data_salt,calc_salt = plotload('salt_bridges',work)
 
 #---block: prepare data for plotting
 def reorder_by_ion(sns,ion_order,identity=True):
@@ -22,15 +23,22 @@ def reorder_by_ion(sns,ion_order,identity=True):
 	#---otherwise we order by ion. probably better to use the collection order for more control
 	return sorted(sns,key=lambda x:ion_order.index(work.meta[x]['cation']))
 
-def count_hydrogen_bonds():
-	"""Compute the hydrogen bond counts"""
+def count_hydrogen_bonds(data,bonds_key='bonds'):
+	"""
+	Compute the hydrogen bond counts.
+	You can send salt bridge data which only has extra columns with the cation information.
+	"""
 	post = {}
 	sns = work.sns()
 	for sn in sns:
 		dat = data[sn]['data']
-		bonds,obs = dat['bonds'],dat['observations']
+		bonds,obs = dat[bonds_key],dat['observations']
 		#---filter out intralipid hydrogen bonds
-		resids_d = bonds[:,1].astype(int)
+		#---some simulations have no salt bridges at all
+		try: resids_d = bonds[:,1].astype(int)
+		except: 
+			post[sn] = {'result':{},'result_err':{}}
+			continue
 		resids_a = bonds[:,4].astype(int)
 		inter_inds = np.where(resids_d!=resids_a)[0]
 		inter = bonds[inter_inds]
@@ -123,8 +131,8 @@ def hbonds_bardat(sns,format_name=None,ion_order=None):
 	if ion_order: sns = reorder_by_ion(sns,ion_order)
 	#---empty plot uses a random key and zeros it
 	empty = not sns
-	if not empty: keys = sorted(set(list([tuple(j) for j in 
-		np.concatenate([post[sn]['result'].keys() for sn in sns])])))
+	if not empty: 
+		keys = sorted(set(list([tuple(j) for j in np.concatenate([m for m in [post[sn]['result'].keys() for sn in sns] if m])])))
 	else: keys = post.keys()[:1]
 	bardat,barspec,extras = [],[],[]
 	#---group by the first key (the donor)
@@ -172,7 +180,8 @@ sns_names = dict([(sn,work.meta[sn]['ptdins_resname']+' and '+
 namer = lambda ((a,b),c): ('%s-%s'%(a,b))
 bar_formats = make_bar_formats(sns,style=bar_style)
 #---premake the data for the outline style
-post = count_hydrogen_bonds()
+#post = count_hydrogen_bonds(data)
+post = count_hydrogen_bonds(data_salt,bonds_key='bonds_salt')
 bardat,barspec,extras = hbonds_bardat(sns)
 bars_premade = BarGrouper(bardat,figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
 	extras=extras,specs=barspec,dimmer=dimmer,namer=namer,show_xticks=False)

@@ -18,7 +18,6 @@ def count_hydrogen_bonds_redux(bonds,obs,resnames,nmols,resnames_PIP2):
 	Innermost loop of count_hydrogen_bonds function in plot-hydrogen_bonding.py for use on both 
 	hydrogen bonding data and the salt bridge data. 
 	"""
-
 	#---filter out intralipid hydrogen bonds
 	resids_d = bonds[:,1].astype(int)
 	resids_a = bonds[:,4].astype(int)
