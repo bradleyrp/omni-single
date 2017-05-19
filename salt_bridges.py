@@ -8,24 +8,64 @@ import sklearn.neighbors
 vecnorm = lambda vec: vec/np.linalg.norm(vec)
 vecangle = lambda v1,v2 : np.arccos(np.dot(vecnorm(v1),vecnorm(v2)))*(180./np.pi)
 
-def hydrogen_bonding(grofile,trajfile,**kwargs):
+def tabulator(tabulation,valid_frames,obs_by_frames):
 
 	"""
-	Generic hydrogen bonding code.
-	Revamped on 2017.4.28 to generate a more uniform data structure.
+	Given a giant list of atomistic details, count up all of the unique entries for each frame.
+	"""
+
+	start_time = time.time()
+	status('unique-ifying the tabulated bonds (estimated %ds)'%(len(tabulation)*1.3*10**-6),tag='compute')
+	status('note: with 32GB memory, 33M observations works fine, but 46M hits the swap',tag='warning')
+	#---note that unique is getting "axis" in np 1.13 but at some point on or before 1.12 they added some 
+	#---...kind of a safety check on the following trick for unique rows, which check returns an error
+	#---...message: "TypeError: Cannot change data-type for object array." which is solved by forcing 
+	#---...the object to a string type. note that this method requires void and not a blank string, which
+	#---...some examples will use. this changed must have happened in the <1 week since we wrote 
+	#---...the hydrogen bonds code and tested it again on the factory
+	#---uniquify the enormous list of all possible hydrogen bonds
+	tabulation_reform = tabulation.astype(str)
+	tabulation_unique = np.ascontiguousarray(tabulation_reform).view(
+		np.dtype((np.void,tabulation_reform.dtype.itemsize*tabulation_reform.shape[1])))
+	tabulation_view_unique,idx,counts = np.unique(tabulation_unique,return_index=True,return_counts=True)
+	bonds = tabulation[idx]
+	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
+
+	start_time = time.time()
+	#---preallocate bond counts per frame
+	try: counts_per_frame = np.zeros((len(valid_frames),len(idx)))
+	except:
+		import ipdb;ipdb.set_trace()
+	#---hash the binds over the indices
+	bonds_to_idx = dict([(tuple(b),bb) for bb,b in enumerate(bonds)])
+	frame_lims = np.concatenate(([0],np.cumsum(obs_by_frames)))
+	for fr,i in enumerate(frame_lims[:-1]):
+		status('counting observations per frame',i=fr,looplen=len(valid_frames),
+			tag='compute',start=start_time)
+		try: 
+			obs = tabulation[frame_lims[fr]:frame_lims[fr+1]]
+			counts_per_frame[fr][np.array([bonds_to_idx[tuple(o)] for o in obs])] += 1
+		except:
+			import ipdb;ipdb.set_trace()
+	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
+	status('done heavy lifting',tag='compute')
+	return bonds,counts_per_frame
+
+def salt_bridges(grofile,trajfile,**kwargs):
+
+	"""
+	Identify salt bridges. Mimics the beginning of the hydrogen bond
 	"""
 
 	#---unpack
 	sn = kwargs['sn']
 	work = kwargs['workspace']
 	calc = kwargs['calc']
-	debug = kwargs.get('debug',True)
+	debug = kwargs.get('debug',False)
 	run_parallel = kwargs.get('run_parallel',True)
 
-	#---settings
-	distance_cutoff,angle_cutoff = [calc['specs'][i] for i in ['distance_cutoff','angle_cutoff']]
-	#---cutoff for inferring hydrogens from a one-time distance search
-	distance_h_cutoff = distance_cutoff
+	#---settings. distance cutoff is larger for salt bridges than hydrogen bonds
+	distance_cutoff = calc['specs']['distance_cutoff']
 
 	#---prepare universe	
 	uni = MDAnalysis.Universe(grofile,trajfile)
@@ -76,10 +116,12 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	acceptors = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
 	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))#+' or name NA')
 
-	#---METHOD: ckdtree_torus_explicit_bonds
+
+	#---we can either exclude water here or after the KD-Tree. tried the latter and there was index problem
+	#---! note that we exclude water by ignoring OW and HW1 and HW2. they should not appear in other mol
+	hydrogen_bond_ref = dict([(i,j) for i,j in hydrogen_bond_ref.items() if i!='water'])
 
 	donors_h_pairs = [m for n in [i.get('donors',[]) for i in hydrogen_bond_ref.values()] for m in n]
-	import ipdb;ipdb.set_trace()
 	donors_h_pairs_flat = list(set([i for j in donors_h_pairs for i in j]))
 	sel_d,sel_h = [uni.select_atoms(' or '.join(['name %s'%i 
 		for i in list(set(zip(*donors_h_pairs)[j]))])) for j in range(2)]
@@ -126,13 +168,19 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 		donors_inds[anum] = lookup[tuple(bond_opps_unique.T)]
 
 	#---prepare the acceptors selections
-	acceptors_names = np.unique([j for k in 
-		[i.get('acceptors',[]) for i in hydrogen_bond_ref.values()] for j in k])
+	acceptors_names = np.unique([j for k in [i.get('acceptors',[]) for i in hydrogen_bond_ref.values()] for j in k])
 	acceptors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
+
+	#---extend to include salt bridges
+	#---some systems have two types of cations
+	cation_names = work.meta[sn].get('cations',work.meta[sn]['cation'])
+	if type(cation_names)!=list: cation_names = [cation_names]
+	multiple_cations = len(cation_names)>1
+	cations_side = uni.select_atoms(' or '.join(['name %s'%i for i in cation_names]))
 
 	#---prepare coordinates for each frame
 	st = time.time()
-	vecs,all_donor_coords,all_acceptor_coords,all_h_coords = [],[],[],[]
+	vecs,all_donor_coords,all_acceptor_coords,all_h_coords,all_cation_coords = [],[],[],[],[]
 	#---purposefully profligate with the memory so this goes quickly
 	for fr in range(nframes):
 		status('caching coordinates',tag='compute',i=fr,looplen=nframes,start=st)	
@@ -141,7 +189,9 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 		all_donor_coords.append(donors_side.positions[donors_inds[0]]/lenscale)
 		all_h_coords.append(donors_side.positions[donors_inds[1]]/lenscale)
 		all_acceptor_coords.append(acceptors_side.positions/lenscale)
+		all_cation_coords.append(cations_side.positions/lenscale)
 	status('completed caching in %.1f minutes'%((time.time()-st)/60.),tag='status')
+	#---the preceding code is identical to the beginning of hydrogen_bonding
 
 	#---export variables
 	from codes import hbonds
@@ -149,106 +199,66 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	hbonds.all_donor_coords = all_donor_coords
 	hbonds.all_acceptor_coords = all_acceptor_coords
 	hbonds.all_h_coords = all_h_coords
+	hbonds.all_cation_coords = all_cation_coords
 	hbonds.vecs = vecs
-		
+
+	#---extra exports for development
+	hbonds.acceptors_resids = acceptors_side.resids
+	hbonds.acceptors_resnames = acceptors_side.resnames
+	hbonds.donors_resids = donors_side.resids
+	hbonds.donors_resnames = donors_side.resnames
+
 	#---debug
 	if debug:
 		fr = 36
-		incoming = hbonds.hbonder_framewise(fr,distance_cutoff=distance_cutoff,angle_cutoff=angle_cutoff)
+		incoming_salt = hbonds.hbonder_salt_bridges_framewise(
+			fr,distance_cutoff=distance_cutoff)
 		import ipdb;ipdb.set_trace()
 		sys.quit()
 
 	start = time.time()
-	out_args = {'distance_cutoff':distance_cutoff,'angle_cutoff':angle_cutoff}
+	out_args = {'distance_cutoff':distance_cutoff}
 	if run_parallel:
-		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
-			delayed(hbonds.hbonder_framewise,has_shareable_memory)(fr,**out_args) 
+		incoming_salt = Parallel(n_jobs=4,verbose=10 if debug else 0)(
+			delayed(hbonds.hbonder_salt_bridges_framewise,has_shareable_memory)(fr,**out_args) 
 			for fr in framelooper(nframes,start=start))
 	else: 
-		incoming = []
+		incoming,incoming_salt = [],[]
 		for fr in framelooper(nframes):
-			incoming.append(hbonds.hbonder_framewise(fr,**out_args))
+			incoming_salt.append(hbonds.hbonder_salt_bridges_framewise(fr,**out_args))
 
-	#---get valid frames
-	valid_frames = np.where([len(i['donors'])>0 for i in incoming])[0]
-	#---concatenate the donor/acceptor indices across all frames
-	donor_cat = np.concatenate([donors_inds[0][incoming[i]['donors']] for i in valid_frames]).astype(int)
-	acceptor_cat = np.concatenate([incoming[i]['acceptors'] for i in valid_frames]).astype(int)
-	obs_by_frames = np.array([len(incoming[i]['acceptors']) for i in valid_frames]).astype(int)
+	#---extension to salt bridges. tabulate each salt
+	valid_frames_salt = np.array([ii for ii,i in enumerate(incoming_salt) if len(i)>0])
+	obs_by_frames_salt = np.array([len(i) for ii,i in enumerate(incoming_salt) if len(i)>0]).astype(int)
+	#---some simulations have no salt bridges
+	if len(valid_frames_salt)==0: bonds_salt,counts_per_frame_salt = np.array([]),np.array([])
+	else:
+		salt_cat = np.concatenate([incoming_salt[i] for i in valid_frames_salt])
+		status('tabulating all distinct salt bridges',tag='compute')
+		status('sluggish sequence because there are {:,} bond observations'.format(len(salt_cat)),tag='warning')
 
-	#---compile the massive bond table
-	if False:
-		tabulation = []
-		for ff,fr in enumerate(valid_frames):
-			status('compiling large bond table',i=ff,looplen=len(valid_frames),tag='compute')
-			iii = incoming[fr]
-			donors_resnames = donors_side.resnames[donors_inds[0][iii['donors']]]
-			donors_resids = donors_side.resids[donors_inds[0][iii['donors']]]
-			donors_names1 = donors_side.names[donors_inds[0][iii['donors']]]
-			donors_names2 = donors_side.names[donors_inds[1][iii['donors']]]
-			acceptors_resnames = acceptors_side.resnames[iii['acceptors']]
-			acceptors_resids = acceptors_side.resids[iii['acceptors']]
-			acceptors_names = acceptors_side.names[iii['acceptors']]
-			tabulation.append([
-				donors_resnames,donors_resids,donors_names1,donors_names2,
-				acceptors_resnames,acceptors_resids,acceptors_names])
-
-	start_time = time.time()
-	#---tabulate each bond observation
-	status('sluggish sequence because there are {:,} bond observations'.format(len(donor_cat)),tag='warning')
-	status('tabulating all distinct hydrogen bonds',tag='compute')
-	tabulation = np.transpose((donors_side.resnames[donor_cat],donors_side.resids[donor_cat],
-		donors_side.names[donor_cat],acceptors_side.resnames[acceptor_cat],
-		acceptors_side.resids[acceptor_cat],acceptors_side.names[acceptor_cat],))
-	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
-
-	#---reduce tabulation by discarding all SOL-SOL bonds
-	#---...note that this is necessary because we have 33M observations and almost all of them are "unique"
-	#---...precisely because so many of them involve water
-	#---actually, instead of discarding, let us change all waters to a single residue
-	tabulation_explicit = tabulation
-	tabulation = np.array(tabulation_explicit)
-	for p in [0,3]:
-		sols = np.where(tabulation[:,p]=='SOL')[0]
-		tabulation[(sols,(np.ones((len(sols)))*(p+1)).astype(int))] = '1'
-
-	start_time = time.time()
-	status('unique-ifying the tabulated bonds (estimated %ds)'%(len(donor_cat)*1.3*10**-6),tag='compute')
-	status('note: with 32GB memory, 33M observations works fine, but 46M hits the swap',tag='warning')
-	#---note that unique is getting "axis" in np 1.13 but at some point on or before 1.12 they added some 
-	#---...kind of a safety check on the following trick for unique rows, which check returns an error
-	#---...message: "TypeError: Cannot change data-type for object array." which is solved by forcing 
-	#---...the object to a string type. note that this method requires void and not a blank string, which
-	#---...some examples will use. this changed must have happened in the <1 week since we wrote 
-	#---...the hydrogen bonds code and tested it again on the factory
-	#---uniquify the enormous list of all possible hydrogen bonds
-	tabulation_reform = tabulation.astype(str)
-	tabulation_unique = np.ascontiguousarray(tabulation_reform).view(
-		np.dtype((np.void,tabulation_reform.dtype.itemsize*tabulation_reform.shape[1])))
-	tabulation_view_unique,idx,counts = np.unique(tabulation_unique,return_index=True,return_counts=True)
-	bonds = tabulation[idx]
-	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
-
-	start_time = time.time()
-	#---preallocate bond counts per frame
-	counts_per_frame = np.zeros((len(valid_frames),len(idx)))
-	#---hash the binds over the indices
-	bonds_to_idx = dict([(tuple(b),bb) for bb,b in enumerate(bonds)])
-	frame_lims = np.concatenate(([0],np.cumsum(obs_by_frames)))
-	for fr,i in enumerate(frame_lims[:-1]):
-		status('counting observations per frame',i=fr,looplen=len(valid_frames),
-			tag='compute',start=start_time)
-		obs = tabulation[frame_lims[fr]:frame_lims[fr+1]]
-		counts_per_frame[fr][np.array([bonds_to_idx[tuple(o)] for o in obs])] += 1
-	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
-	status('done heavy lifting',tag='compute')
+		#---having excluded water we are small enough to add back the ion name
+		tabulation_salt = np.transpose((
+			acceptors_side.resnames[salt_cat[:,0]],
+				acceptors_side.resids[salt_cat[:,0]],
+				acceptors_side.names[salt_cat[:,0]],
+			donors_side.resnames[salt_cat[:,2]],
+				donors_side.resids[salt_cat[:,2]],
+				donors_side.names[salt_cat[:,2]],
+			cations_side[salt_cat[:,1]].resids,
+			cations_side[salt_cat[:,1]].resnames))
+		#---send the hydrogen bonds to the tabulator
+		tabulation_salt_out = tabulation_salt
+		bonds_salt,counts_per_frame_salt = tabulator(tabulation_salt_out,
+			valid_frames_salt,obs_by_frames_salt)
 
 	#---package the dataset
 	result,attrs = {},{}
 	#---everything is indexed by idx
-	result['bonds'] = bonds
-	result['observations'] = counts_per_frame
-	result['valid_frames'] = valid_frames
+	result['bonds'] = bonds_salt
+	result['observations'] = counts_per_frame_salt
+	result['bonds_salt'] = bonds_salt
+	result['valid_frames'] = valid_frames_salt
 	result['nframes'] = np.array(nframes)
 	result['resnames'] = resnames
 	result['nmols'] = rescounts

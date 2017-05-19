@@ -214,8 +214,8 @@ class BarGrouper:
 		ys,yerrs = yvals[:,0],yvals[:,1]
 		alpha = 1.0 if not self.empty else 0.0
 		#---! ytf did they change default alignment?
-		rendered = ax.bar(xs,ys,width=ws,align='edge',zorder=3,alpha=alpha)
-		# ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=4,alpha=1.0,lw=5,c='w',ls='none')
+		#---no outline around the bars. the hatch colors are set below, and match the edge color
+		rendered = ax.bar(xs,ys,width=ws,align='edge',zorder=3,alpha=alpha,lw=0)
 		ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=5,alpha=1.0,lw=3,c='k',ls='none')
 		if self.show_xticks:
 			xticks = np.mean(np.array([xs,ws+xs]),axis=0)
@@ -225,24 +225,16 @@ class BarGrouper:
 		if self.specs:
 			#---post processing works on both the rendered objects and on the children
 			for bb,(bar,child) in enumerate(zip(self.bars,rendered.get_children())):
+				#---! between mpl v2.0.0 and v2.0.2 they must have changed behavior so hatches are 
+				#---! ...using the edge color. note that you can set the color for each bar specifically
+				#---! ...in the ax.bar command above but we retain full control down here
+				rendered[bb].set_hatch(self.bars[bb].get('hatch',None))
 				rendered[bb].set_color(bar.get('c','k'))
-				hatch = self.bars[bb].get('hatch',None)
-				child.set_hatch(hatch)
+				#---by mpl v2.0.2 (or earlier?) the hatches have the edge color
+				#---hatch color is the edge color set here
+				rendered[bb].set_edgecolor('k')
 				#---apply the dimmer if this bar is "off"
-				if not self.namesdict[self.names[bb]] and self.dimmer or self.empty: 
-					#---dimmer takes the bar and the child
-					#self.dimmer(bar=rendered[bb],child=child)
-					child.set_hatch('||||')
-					child.set_visible(False)
-					#bar.set_visible(False)
-			if False:
-				#---! SEPARATE HATCH ROUTINE WHYYYYYY???
-				children = rendered.get_children()
-				for cc,child in enumerate(children):
-					hatch = self.bars[cc].get('hatch',None)
-					child.set_hatch(hatch)
-					#---apply the dimmer if this bar is "off"
-					if not self.namesdict[self.names[bb]] and self.dimmer: self.dimmer(rendered[bb])
+				if not self.namesdict[self.names[bb]] and self.dimmer: self.dimmer(rendered[bb])
 		self.plot_extras(ax)
 		if not wait: plt.show()
 		self.ax = ax
