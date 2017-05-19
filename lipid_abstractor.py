@@ -52,23 +52,46 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 				missing_atoms_aamd,missing_atoms_cgmd))
 		else: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
 	else: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
-
+	
 	resids = sel.resids
 	#---create lookup table of residue indices
 	if len(sel.resids)==len(np.unique(sel.resids)):
 		divider = [np.where(resids==r) for r in np.unique(resids)]
+	#---note that redundant residue numbering requires special treatment
 	else:
 		if 'type' in selector and selector['type'] == 'com' and 'resnames' in selector:
-			#---this seemingly-nice MDAnalysis tool doesn't work because it uses absolute indices
-			#---also note that we could not use the standard does-it-change question to divide residues 
-			#---...because in the ocean test, there are four that have 266 atoms with no residue change
-			divider_abs = [i.atoms.indices for i in sel.residues]
-			sel_all = uni.select_atoms('all')
-			sel_to_all = np.where(np.in1d(sel_all.resnames,resnames))[0]
-			print('[WARNING] slow step because some residue indices are probably repeated')
-			divider = [np.where(np.in1d(sel_to_all,d))[0] for d in divider_abs]
-		else:
-			raise Exception('residues have redundant resids and selection is not the easy one')
+			#---note that MDAnalysis sel.residues *cannot* handle redundant numbering
+			#---note also that the "ocean" test case has redundant residues *and* adjacent residues with
+			#---...the same numbering. previously we tried a method that used the following sequence:
+			#---......divider = [np.where(np.in1d(np.where(np.in1d(
+			#---..........uni.select_atoms('all').resnames,resnames))[0],d))[0] for d in divider_abs]
+			#---...however this method is flawed because it uses MDAnalysis sel.residues and in fact
+			#---...since it recently worked, RPB suspects that a recent patch to MDAnalysis has broken it
+			#---note that rpb started a method to correct this and found v inconsistent MDAnalysis behavior
+			#---the final fix is heavy-handed: leaving nothing to MDAnalysis subselections
+			allsel = uni.select_atoms('all')
+			lipids = np.where(np.in1d(allsel.resnames,np.array(selector['resnames'])))[0]
+			resid_changes = np.where(allsel[lipids].resids[1:]!=allsel[lipids].resids[:-1])[0]
+			residue_atomcounts = resid_changes[1:]-resid_changes[:-1]
+			#---use the number of atoms between resid changes to represent the number of atoms in that residue
+			guess_atoms_per_residue = np.array(list(set(zip(allsel.resnames[lipids][resid_changes],
+				residue_atomcounts))))
+			#---figure out the number of atoms in each lipid type by consensus
+			atoms_per_residue = {}
+			lipid_resnames_obs = np.unique(allsel.resnames[lipids])
+			for name in lipid_resnames_obs:
+				subs = np.where(guess_atoms_per_residue[:,0]=='POPC')[0]
+				consensus_count = guess_atoms_per_residue[np.argsort(
+					guess_atoms_per_residue[subs][:,1].astype(int))[0]][1].astype(int)
+				atoms_per_residue[name] = consensus_count
+			#---iterate over the list of lipid atoms and get the indices for each N-atoms for each lipid type
+			counter,divider = 0,[]
+			while counter<len(lipids):
+				#---until the end, get the next lipid resname
+				this_resname = allsel.resnames[lipids][counter]
+				divider.append(np.arange(counter,counter+atoms_per_residue[this_resname]))
+				counter += atoms_per_residue[this_resname]
+		else: 	raise Exception('residues have redundant resids and selection is not the easy one')
 		
 	#---load trajectory into memory	
 	trajectory,vecs = [],[]
@@ -99,6 +122,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		monolayer_indices = codes.mesh.identify_lipid_leaflets(atoms_separator[fr],vecs[fr],
 			monolayer_cutoff=monolayer_cutoff)
 		if type(monolayer_indices)!=bool: break
+
 	checktime()
 	#---parallel
 	start = time.time()
@@ -111,9 +135,9 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		for fr in range(nframes):
 			status('computing centroid',tag='compute',i=fr,looplen=nframes,start=start)
 			coms.append(codes.mesh.centroid(trajectory[fr],masses,divider))
+
 	checktime()
 	coms_out = np.array(coms)
-
 	#---remove jumping in some directions if requested
 	if nojumps:
 		nojump_dims = ['xyz'.index(j) for j in nojumps]
@@ -135,5 +159,6 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	result['nframes'] = np.array(nframes)
 	result['points'] = coms_out
 	result['resids'] = np.array(np.unique(resids))
+	result['resids_exact'] = resids
 	attrs['separator'] = kwargs['calc']['specs']['separator']
 	return result,attrs	
