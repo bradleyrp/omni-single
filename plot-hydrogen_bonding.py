@@ -15,8 +15,11 @@ if 'data' not in globals():
 	sns,(data,calc) = work.sns(),plotload(plotname,work)
 
 #---block: prepare data for plotting
-def reorder_by_ion(sns,ion_order):
+def reorder_by_ion(sns,ion_order,identity=True):
 	"""reorder simulations by ion name"""
+	#---identity function means that the order follows the order of the collection
+	if identity: return sns
+	#---otherwise we order by ion. probably better to use the collection order for more control
 	return sorted(sns,key=lambda x:ion_order.index(work.meta[x]['cation']))
 
 def count_hydrogen_bonds():
@@ -60,18 +63,6 @@ def count_hydrogen_bonds():
 		post[sn] = {'result':result,'result_err':result_err}
 	return post
 
-#---block: plot scheme
-def color_schemer_candy(sns):
-	"""New, candy-colored schemes for plotting bars."""
-	colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
-	for key,val in {
-		'red':0,'blue':1,'green':2,'purple':3,'orange':4,
-		'yellow':5,'brown':6,'pink':7,'grey':8,}.items()])
-	colors['beige'] = mpl.colors.ColorConverter().to_rgb("#C3C3AA")
-	colors_ions = {'NA':'green','Na,Cal':'green','MG':'red','Cal':'blue','K':'grey',}
-	hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':'',}
-	return 
-
 def make_bar_formats(sns,style):
 	"""Make bar formats, most recently, candy-colored bars with hatches."""
 	if style=='original':
@@ -99,7 +90,7 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None):
 	barspecs = bar_formats
 	ion_names = ['K','NA','Na,Cal','MG','Cal']
-	ptdins_names = ['PI2P','P35P','SAPI'][:-1]
+	ptdins_names = ['PI2P','P35P','SAPI']
 	rectangle_specs,patches,labels = {},[],[]
 	for name,group in [('cation',ion_names),('ptdins_resname',ptdins_names)]:
 		for item in group:
@@ -110,10 +101,11 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 				rectangle_specs[sn]['fc'] = barspecs[sn]['edgecolor']
 				rectangle_specs[sn]['lw'] = 0
 				patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+				labels.append(work.meta[sn]['ion_label'])
 			elif name=='ptdins_resname':
-				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=0.5,fc='w',lw=3,
+				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=1.0,fc='w',lw=3,ec='k',
 					hatch=barspecs[sn]['hatch']*(1 if work.meta[sn]['ptdins_resname']=='PI2P' else 2)))
-			labels.append(work.meta[sn][name])
+				labels.append(work.meta[sn]['ptdins_label'])
 	if not patches: patches,labels = [mpl.patches.Rectangle((0,0),1.0,1.0,fc='w')],['empty']
 	legend = ax.legend(patches,labels,loc=loc,fontsize=fs,
 		ncol=ncol,title=title,bbox_to_anchor=bbox,labelspacing=1.2,
@@ -168,7 +160,8 @@ ion_order = ['K','NA','Na,Cal','MG','Cal']
 sns = reorder_by_ion(sns,ion_order)
 #---aesthetics
 mpl.rcParams['hatch.linewidth'] = 1.5
-mpl.rcParams['hatch.color'] = 'k'
+#---hatch color was controllable here in mpl v2.0.0 but they reverted
+mpl.rcParams['hatch.color'] = 'w'
 def dimmer(bar,child):
 	"""Dim a bar."""
 	bar.set_edgecolor(bar.get_facecolor())
