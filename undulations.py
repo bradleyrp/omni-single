@@ -16,14 +16,6 @@ def undulations(**kwargs):
 	Compute bilayer midplane structures for studying undulations.
 	"""
 
-	if False:
-		pts = kwargs['upstream']['lipid_abstractor']['points']
-		pts[0,:,1:2+1]
-		import matplotlib as mpl
-		import matplotlib.pylab as plt
-		plt.scatter(*pts[0,:,1:2+1].T);plt.show()
-		import pdb;pdb.set_trace()
-
 	#---parameters
 	sn = kwargs['sn']
 	work = kwargs['workspace']
@@ -40,7 +32,6 @@ def undulations(**kwargs):
 	#---choose grid dimensions
 	grid = np.array([round(i) for i in np.mean(vecs,axis=0)/grid_spacing])[:2]
 	#---! removed timeseries from result for new version of omnicalc
-
 	#---parallel
 	start = time.time()
 	mesh = [[],[]]
