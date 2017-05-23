@@ -36,6 +36,8 @@ calculations:
       separator: 
         lipid_tip: "name P"
         monolayer_cutoff: 1.4
+        monolayer_cutoff_retry: True
+        topologize_tolerance: 0.1
   undulations:
     uptype: post
     group: all

@@ -236,7 +236,7 @@ collections:
     - membrane-v534
 
 meta:
-  short_namer: 'lambda spot,sn : ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
+  short_namer: 'lambda sn,spot : ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
   membrane-v509:
     composition_name:    symmetric
     cation:              NA
