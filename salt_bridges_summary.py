@@ -71,7 +71,10 @@ def salt_bridges_summary(**kwargs):
 
 	#---extension for salt bridges
 	#---! sorry for the inconsistent naming scheme
-	bonds,obs = dat['bonds_salt'],dat['counts_per_frame_salt']
+	bonds,obs = dat['bonds_salt'],dat['observations']
 	mean_salt,std_salt = count_hydrogen_bonds_redux(bonds,obs,dat['resnames'],dat['nmols'],resnames_PIP2)
-
+	mean_salt = dict([('%s,%s'%i,j) for i,j in mean_salt.items()])
+	std_salt = dict([('%s,%s'%i,j) for i,j in std_salt.items()])
+	attrs = dict(mean=mean_salt,std=std_salt)
 	import ipdb;ipdb.set_trace()
+	return dict(),attrs
