@@ -236,7 +236,7 @@ collections:
     - membrane-v534
 
 meta:
-  short_namer: 'lambda s : ''v''+re.findall(''membrane-v([0-9]+)'',s)[0]'
+  short_namer: 'lambda spot,sn : ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
   membrane-v509:
     composition_name:    symmetric
     cation:              NA
@@ -516,5 +516,8 @@ plots:
     calculation: hydrogen_bonding
     collections: asymmetric_all
   salt_bridges:
-    calculation: salt_bridges
+    calculation: 
+      salt_bridges:
+        # RYAN DO NOT USE SPECS HERE THIS IS VERY COUNTERINTUITIVE
+        distance_cutoff: 2.2
     collections: asymmetric_all
