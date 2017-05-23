@@ -120,8 +120,10 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	#---randomly select frames for testing monolayers
 	random_tries = 3
 	for fr in [0]+[np.random.randint(nframes) for i in range(random_tries)]:
-		monolayer_indices = codes.mesh.identify_lipid_leaflets(atoms_separator[fr],vecs[fr],
-			monolayer_cutoff=monolayer_cutoff,monolayer_cutoff_retry=monolayer_cutoff_retry)
+		finder_args = dict(monolayer_cutoff=monolayer_cutoff,monolayer_cutoff_retry=monolayer_cutoff_retry)
+		top_tol = kwargs['calc']['specs']['separator'].get('topologize_tolerance',None)
+		if top_tol: finder_args.update(topologize_tolerance=top_tol)
+		monolayer_indices = codes.mesh.identify_lipid_leaflets(atoms_separator[fr],vecs[fr],**finder_args)
 		if type(monolayer_indices)!=bool: break
 
 	checktime()
