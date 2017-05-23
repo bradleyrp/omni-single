@@ -61,7 +61,7 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	sn = kwargs['sn']
 	work = kwargs['workspace']
 	calc = kwargs['calc']
-	debug = kwargs.get('debug',False)
+	debug = kwargs.get('debug',True)
 	run_parallel = kwargs.get('run_parallel',True)
 
 	#---settings. distance cutoff is larger for salt bridges than hydrogen bonds
@@ -92,7 +92,8 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	for resname in targets:
 		mol = land.itps[land.objects[resname]['fn']][resname]
 		#---collect all possible hydrogen bond acceptors
-		acceptor_names = [i['atom'] for i in mol['atoms'] if re.match('^(N|O|S)',i['atom'])]
+		#---! forbid water here for salt bridge calculation
+		acceptor_names = [i['atom'] for i in mol['atoms'] if re.match('^(N|O|S)',i['atom']) and i!='OW']
 		h_name = [i['atom'] for i in mol['atoms'] if re.match('^H',i['atom'])]	
 		donor_candidates = [(j,k) for j,k in [(int(i['i']),int(i['j'])) 
 			for i in mol['bonds']] 
@@ -114,62 +115,75 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	#---generate atom groups
 	donors = uni.select_atoms(' or '.join(['name %s'%i for i in donors_names]))
 	acceptors = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
-	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))#+' or name NA')
+	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))
 
+	#---! not necessary
+	if False:
 
-	#---we can either exclude water here or after the KD-Tree. tried the latter and there was index problem
-	#---! note that we exclude water by ignoring OW and HW1 and HW2. they should not appear in other mol
-	hydrogen_bond_ref = dict([(i,j) for i,j in hydrogen_bond_ref.items() if i!='water'])
+		#---we can either exclude water here or after the KD-Tree. tried the latter and there was index problem
+		#---! note that we exclude water by ignoring OW and HW1 and HW2. they should not appear in other mol
+		hydrogen_bond_ref = dict([(i,j) for i,j in hydrogen_bond_ref.items() if i!='water'])
+		donors_h_pairs = [m for n in [i.get('donors',[]) for i in hydrogen_bond_ref.values()] for m in n]
+		donors_h_pairs_flat = list(set([i for j in donors_h_pairs for i in j]))
+		#---compared to the hydrogen bonding version, we only take the heavy atom the in donor pairs
 
-	donors_h_pairs = [m for n in [i.get('donors',[]) for i in hydrogen_bond_ref.values()] for m in n]
-	donors_h_pairs_flat = list(set([i for j in donors_h_pairs for i in j]))
-	sel_d,sel_h = [uni.select_atoms(' or '.join(['name %s'%i 
-		for i in list(set(zip(*donors_h_pairs)[j]))])) for j in range(2)]
-	resids = np.unique(np.concatenate([sel_d.resids,sel_h.resids]))
-	donors_side = uni.select_atoms(' or '.join(['name %s'%i for i in donors_h_pairs_flat]))
+		sel_d,sel_h = [uni.select_atoms(' or '.join(['name %s'%i 
+			for i in list(set(zip(*donors_h_pairs)[j]))])) for j in range(2)]
+		resids = np.unique(np.concatenate([sel_d.resids,sel_h.resids]))
+		donors_side = uni.select_atoms(' or '.join(['name %s'%i for i in donors_h_pairs_flat]))
+		donors_resids = np.unique(donors_side.resids)
+
+	#---! use acceptor names for both donor and acceptor pairs for this calculation. that is, we do not 
+	#---! ...require an intervening hydrogen
+
+	donors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptor_names]))
 	donors_resids = np.unique(donors_side.resids)
 
-	#---identifying residues with both a donor and a corresponding hydrogen
-	both = np.zeros((len(resids),len(donors_h_pairs),2),dtype=bool)
-	alles = np.array([[donors_side.names==i for i in zip(*donors_h_pairs)[j]] for j in range(2)])
-	#---lookups for different atom names (fast because there are relatively few atom names)
-	subsels = [[np.where(i)[0] for i in alles[j]] for j in range(2)]
+	#---! not necessary
+	if False:
+		#---identifying residues with both a donor and a corresponding hydrogen
+		both = np.zeros((len(resids),len(donors_h_pairs),2),dtype=bool)
+		alles = np.array([[donors_side.names==i for i in zip(*donors_h_pairs)[j]] for j in range(2)])
+		#---lookups for different atom names (fast because there are relatively few atom names)
+		subsels = [[np.where(i)[0] for i in alles[j]] for j in range(2)]
 
-	#---loop over heavy/light types
-	for anum in range(2):
-		#---loop over possible pairs
-		for pnum in range(len(alles[anum])):
-			#---crucial conversion back to zero-numbering from resids here
-			both[donors_side.resids[subsels[anum][pnum]]-1,pnum,anum] = True
+		#---loop over heavy/light types
+		for anum in range(2):
+			#---loop over possible pairs
+			for pnum in range(len(alles[anum])):
+				#---crucial conversion back to zero-numbering from resids here
+				both[donors_side.resids[subsels[anum][pnum]]-1,pnum,anum] = True
 
-	#---use all to find out which residues have which opportunities for bonding
-	bond_opps = np.transpose(np.where(np.all(both,axis=2)))
+		#---use all to find out which residues have which opportunities for bonding
+		bond_opps = np.transpose(np.where(np.all(both,axis=2)))
 
-	#---some hydrogen bonds have the same donors for multiple hydrogens
-	donors_inds = np.zeros((2,len(bond_opps))).astype(int)
-	for anum in range(2):
-		donors_names_u = np.unique(zip(*donors_h_pairs)[anum])
-		#---for each bond opportunity, we list the heavy donor
-		donors_side_names = np.array(donors_h_pairs).T[anum][bond_opps[:,1]]
-		#---convert this into index (this is fast because it is over a short list of donor names)
-		donors_side_inds = -1*np.ones(len(donors_side_names)).astype(int)
-		for nn,n in enumerate(donors_names_u): donors_side_inds[np.where(donors_side_names==n)] = nn
-		#---lookup from residue and unique heavy donor atom to absolute index in donors_side
-		lookup = len(donors_names_u)*np.ones((len(donors_resids),len(donors_names_u)+1)).astype(int)
-		#---convert this into index (this is fast because it is over a short list of donor names)		
-		donors_side_names_inds = len(donors_names_u)*np.ones((len(donors_side.names))).astype(int)
-		for nn,n in enumerate(donors_names_u): 
-			donors_side_names_inds[np.where(donors_side.names==n)] = nn		
-		lookup[tuple(np.transpose([donors_side.resids-1,donors_side_names_inds]).T)] = \
-			np.arange(len(donors_side.resids))
-		#---translate bond_opps from pair numbering to heavy donor numbering (which is unique)
-		bond_opps_unique = np.array(bond_opps)
-		bond_opps_unique[:,1] = donors_side_inds
-		donors_inds[anum] = lookup[tuple(bond_opps_unique.T)]
+		#---some hydrogen bonds have the same donors for multiple hydrogens
+		donors_inds = np.zeros((2,len(bond_opps))).astype(int)
+		for anum in range(2):
+			donors_names_u = np.unique(zip(*donors_h_pairs)[anum])
+			#---for each bond opportunity, we list the heavy donor
+			donors_side_names = np.array(donors_h_pairs).T[anum][bond_opps[:,1]]
+			#---convert this into index (this is fast because it is over a short list of donor names)
+			donors_side_inds = -1*np.ones(len(donors_side_names)).astype(int)
+			for nn,n in enumerate(donors_names_u): donors_side_inds[np.where(donors_side_names==n)] = nn
+			#---lookup from residue and unique heavy donor atom to absolute index in donors_side
+			lookup = len(donors_names_u)*np.ones((len(donors_resids),len(donors_names_u)+1)).astype(int)
+			#---convert this into index (this is fast because it is over a short list of donor names)		
+			donors_side_names_inds = len(donors_names_u)*np.ones((len(donors_side.names))).astype(int)
+			for nn,n in enumerate(donors_names_u): 
+				donors_side_names_inds[np.where(donors_side.names==n)] = nn		
+			lookup[tuple(np.transpose([donors_side.resids-1,donors_side_names_inds]).T)] = \
+				np.arange(len(donors_side.resids))
+			#---translate bond_opps from pair numbering to heavy donor numbering (which is unique)
+			bond_opps_unique = np.array(bond_opps)
+			bond_opps_unique[:,1] = donors_side_inds
+			donors_inds[anum] = lookup[tuple(bond_opps_unique.T)]
 
 	#---prepare the acceptors selections
-	acceptors_names = np.unique([j for k in [i.get('acceptors',[]) for i in hydrogen_bond_ref.values()] for j in k])
-	acceptors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
+	acceptors_names = np.unique([j for k in [i.get('acceptors',[]) 
+		for i in hydrogen_bond_ref.values()] for j in k])
+	#---! use acceptor_names not acceptors_names
+	acceptors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptor_names]))
 
 	#---extend to include salt bridges
 	#---some systems have two types of cations
@@ -186,8 +200,8 @@ def salt_bridges(grofile,trajfile,**kwargs):
 		status('caching coordinates',tag='compute',i=fr,looplen=nframes,start=st)	
 		uni.trajectory[fr]
 		vecs.append(uni.dimensions[:3]/lenscale)
-		all_donor_coords.append(donors_side.positions[donors_inds[0]]/lenscale)
-		all_h_coords.append(donors_side.positions[donors_inds[1]]/lenscale)
+		all_donor_coords.append(donors_side.positions/lenscale)
+		all_h_coords.append(donors_side.positions/lenscale)
 		all_acceptor_coords.append(acceptors_side.positions/lenscale)
 		all_cation_coords.append(cations_side.positions/lenscale)
 	status('completed caching in %.1f minutes'%((time.time()-st)/60.),tag='status')
@@ -211,7 +225,7 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	#---debug
 	if debug:
 		fr = 36
-		incoming_salt = hbonds.hbonder_salt_bridges_framewise(
+		incoming_salt = hbonds.salt_bridges_framewise(
 			fr,distance_cutoff=distance_cutoff)
 		import ipdb;ipdb.set_trace()
 		sys.quit()
@@ -220,12 +234,12 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	out_args = {'distance_cutoff':distance_cutoff}
 	if run_parallel:
 		incoming_salt = Parallel(n_jobs=4,verbose=10 if debug else 0)(
-			delayed(hbonds.hbonder_salt_bridges_framewise,has_shareable_memory)(fr,**out_args) 
+			delayed(hbonds.salt_bridges_framewise,has_shareable_memory)(fr,**out_args) 
 			for fr in framelooper(nframes,start=start))
 	else: 
 		incoming,incoming_salt = [],[]
 		for fr in framelooper(nframes):
-			incoming_salt.append(hbonds.hbonder_salt_bridges_framewise(fr,**out_args))
+			incoming_salt.append(hbonds.salt_bridges_framewise(fr,**out_args))
 
 	#---extension to salt bridges. tabulate each salt
 	valid_frames_salt = np.array([ii for ii,i in enumerate(incoming_salt) if len(i)>0])
@@ -245,12 +259,18 @@ def salt_bridges(grofile,trajfile,**kwargs):
 			donors_side.resnames[salt_cat[:,2]],
 				donors_side.resids[salt_cat[:,2]],
 				donors_side.names[salt_cat[:,2]],
-			cations_side[salt_cat[:,1]].resids,
-			cations_side[salt_cat[:,1]].resnames))
+			#cations_side[salt_cat[:,1]].resids,
+			#cations_side[salt_cat[:,1]].resnames,
+			))
 		#---send the hydrogen bonds to the tabulator
 		tabulation_salt_out = tabulation_salt
 		bonds_salt,counts_per_frame_salt = tabulator(tabulation_salt_out,
 			valid_frames_salt,obs_by_frames_salt)
+
+		#---!!! development note. data are too big so we discard cation data in the tabulation
+		#---!!! ...which means that 
+
+	import ipdb;ipdb.set_trace()
 
 	#---package the dataset
 	result,attrs = {},{}

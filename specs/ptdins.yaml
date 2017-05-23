@@ -431,17 +431,7 @@ calculations:
     collections: all
     specs:
       distance_cutoff: 
-        loop: [2.2,3.4]
-  salt_bridges_summary:
-    group: all
-    uptype: post
-    slice_name: current
-    collections: asymmetric_all
-    specs:
-      upstream: 
-        salt_bridges:
-          distance_cutoff: 
-            loop: [3.4]
+        loop: [2.2,3.4,4.6]
 
 # set aside
 calculations_aside:
@@ -524,8 +514,7 @@ plots:
       ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
   hydrogen_bonding:
     calculation: hydrogen_bonding
+    collections: asymmetric_all
   salt_bridges:
-    calculation: 
-      salt_bridges:
-        distance_cutoff: 3.4
-    collections: one
+    calculation: salt_bridges
+    collections: asymmetric_all
