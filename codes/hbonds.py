@@ -66,7 +66,7 @@ def hbonder_framewise(fr,**kwargs):
 	#---discard the precise angles and distances since we are only trying to count bonds
 	return {'donors':valid_donors,'acceptors':valid_acceptors}
 
-def hbonder_salt_bridges_framewise(fr,**kwargs):
+def salt_bridges_framewise(fr,**kwargs):
 
 	"""
 	Compute hydrogen bonds inside a joblib parallel call, over periodic boundary conditions.
@@ -94,26 +94,21 @@ def hbonder_salt_bridges_framewise(fr,**kwargs):
 	#---sometimes the tree fails?
 	except: return []
 
-	#---! in the following "close_donors" is e.g. the close ions not the heavy atoms
+	#---query both the accceptors and donors against the cations tree (fore/back is just historical name)
 	close_d,nns_d = tree.query(pts_back,k=10,distance_upper_bound=distance_cutoff/lenscale)
-	#---index pairs within the cutoff distance
-	close_pairs_d = np.transpose(np.where(np.all((close_d<distance_cutoff/lenscale,close_d>0),axis=0)))
-	#---list of close donors
-	close_donors = nns_d[aind(close_pairs_d)]
-	close_ions_d = close_pairs_d[:,0]
-	#---now get the acceptors
 	close_a,nns_a = tree.query(pts_fore,k=10,distance_upper_bound=distance_cutoff/lenscale)
-	#---index pairs within the cutoff distance
+	#---get the valid close pairs of acceptor-cation and donor-cation where the first column is the index
+	#---...in the input to the query while the second is the rank in the nearest neighbors
+	close_pairs_d = np.transpose(np.where(np.all((close_d<distance_cutoff/lenscale,close_d>0),axis=0)))
 	close_pairs_a = np.transpose(np.where(np.all((close_a<distance_cutoff/lenscale,close_a>0),axis=0)))
-	#---list of close donors
-	close_acceptors = nns_a[aind(close_pairs_a)]
-	close_ions_a = close_pairs_a[:,0]
-
-	#---waste some memory to organize these
+	#---get the ions with close donors or acceptors
+	close_ions_to_donors = nns_d[aind(close_pairs_d)]
+	close_ions_to_acceptors = nns_a[aind(close_pairs_a)]
+	#---use some memory to organize these for an easy comparison by row (ions)
 	cations_to_acceptors = np.zeros((len(pts_cations),len(pts_fore)))
 	cations_to_donors = np.zeros((len(pts_cations),len(pts_back)))
-	cations_to_acceptors[tuple((close_acceptors,close_ions_a))] += 1
-	cations_to_donors[tuple((close_donors,close_ions_d))] += 1
+	cations_to_acceptors[tuple((close_ions_to_acceptors,close_pairs_a[:,0]))] += 1
+	cations_to_donors[tuple((close_ions_to_donors,close_pairs_d[:,0]))] += 1
 
 	#---previously filtered SOL out here but this had an indexing inconsistency 
 	#---...so we moved that filter to salt_bridges.py
@@ -125,10 +120,48 @@ def hbonder_salt_bridges_framewise(fr,**kwargs):
 	master_bridge_listing = []
 	for vb in valid_bridges:
 		combos = np.array(
-			np.meshgrid(np.where(close_acceptors==vb)[0],[vb],np.where(close_donors==vb)[0])
+			np.meshgrid(np.where(cations_to_acceptors[vb])[0],[vb],np.where(cations_to_donors[vb])[0])
 			).T.reshape(-1,3)
 		master_bridge_listing.extend(combos)
 	master_bridge_listing = np.array(master_bridge_listing)
+
+	#---! NAMES ARE REAL BAD HERE. this was a mistake
+	if False:
+		#---! in the following "close_donors" is e.g. the close ions not the heavy atoms
+		close_d,nns_d = tree.query(pts_back,k=10,distance_upper_bound=distance_cutoff/lenscale)
+		#---index pairs within the cutoff distance
+		close_pairs_d = np.transpose(np.where(np.all((close_d<distance_cutoff/lenscale,close_d>0),axis=0)))
+		#---list of close donors
+		close_donors = nns_d[aind(close_pairs_d)]
+		close_ions_d = close_pairs_d[:,0]
+		#---now get the acceptors
+		close_a,nns_a = tree.query(pts_fore,k=10,distance_upper_bound=distance_cutoff/lenscale)
+		#---index pairs within the cutoff distance
+		close_pairs_a = np.transpose(np.where(np.all((close_a<distance_cutoff/lenscale,close_a>0),axis=0)))
+		#---list of close donors
+		close_acceptors = nns_a[aind(close_pairs_a)]
+		close_ions_a = close_pairs_a[:,0]
+
+		#---waste some memory to organize these
+		cations_to_acceptors = np.zeros((len(pts_cations),len(pts_fore)))
+		cations_to_donors = np.zeros((len(pts_cations),len(pts_back)))
+		cations_to_acceptors[tuple((close_acceptors,close_ions_a))] += 1
+		cations_to_donors[tuple((close_donors,close_ions_d))] += 1
+
+		#---previously filtered SOL out here but this had an indexing inconsistency 
+		#---...so we moved that filter to salt_bridges.py
+		valid_bridges = np.where(np.all((cations_to_acceptors.sum(axis=1),
+			cations_to_donors.sum(axis=1)),axis=0))[0]
+
+		#---take all combinations of donor and acceptor for each ion, particularly since they might be on the 
+		#---...same molecule and later we want to get the intermolecular ones
+		master_bridge_listing = []
+		for vb in valid_bridges:
+			combos = np.array(
+				np.meshgrid(np.where(close_acceptors==vb)[0],[vb],np.where(close_donors==vb)[0])
+				).T.reshape(-1,3)
+			master_bridge_listing.extend(combos)
+		master_bridge_listing = np.array(master_bridge_listing)
 
 	#---return a list of acceptor, ion, donor triplets
 	return master_bridge_listing

@@ -19,7 +19,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	sn = kwargs['sn']
 	work = kwargs['workspace']
 	calc = kwargs['calc']
-	debug = kwargs.get('debug',True)
+	debug = kwargs.get('debug',False)
 	run_parallel = kwargs.get('run_parallel',True)
 
 	#---settings
@@ -76,10 +76,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	acceptors = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
 	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))#+' or name NA')
 
-	#---METHOD: ckdtree_torus_explicit_bonds
-
 	donors_h_pairs = [m for n in [i.get('donors',[]) for i in hydrogen_bond_ref.values()] for m in n]
-	import ipdb;ipdb.set_trace()
 	donors_h_pairs_flat = list(set([i for j in donors_h_pairs for i in j]))
 	sel_d,sel_h = [uni.select_atoms(' or '.join(['name %s'%i 
 		for i in list(set(zip(*donors_h_pairs)[j]))])) for j in range(2)]
@@ -155,7 +152,6 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	if debug:
 		fr = 36
 		incoming = hbonds.hbonder_framewise(fr,distance_cutoff=distance_cutoff,angle_cutoff=angle_cutoff)
-		import ipdb;ipdb.set_trace()
 		sys.quit()
 
 	start = time.time()
