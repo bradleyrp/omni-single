@@ -145,8 +145,8 @@ class BarGrouper:
 	Each bar object has a left and right object.
 	We wish to retain sequences from the incoming data.
 	"""
-	def __init__(self,dat,**kwargs): 
-		self.dat = dat
+	def __init__(self,**kwargs): 
+		self.dat = kwargs.get('dat',kwargs.get('bardat',None))
 		self.width = kwargs.get('width',1.0)
 		self.spacers = kwargs.get('spacers',{0:0,1:0.5,2:1.0,3:2.0})
 		self.dividers = kwargs.get('dividers',{})
@@ -155,7 +155,7 @@ class BarGrouper:
 		self.names,self.namesdict = [],{}
 		self.cursor,self.level = 0.0,None
 		self.extras = kwargs.get('extras',{})
-		self.routes = list(catalog(dat))
+		self.routes = list(catalog(self.dat))
 		self.dimmer = kwargs.get('dimmer',None)
 		self.namer = kwargs.get('namer',lambda x:x)
 		self.show_xticks = kwargs.get('show_xticks',True)
@@ -163,7 +163,7 @@ class BarGrouper:
 		#---mimic the incoming data structure and store bar properties
 		self.barsave = copy.deepcopy(self.dat)
 		#---plot specs for each bar
-		self.specs = kwargs.get('specs',None)
+		self.specs = kwargs.get('specs',kwargs.get('barspec',None))
 		self.proc()
 	def proc(self):
 		"""Process the bars."""
