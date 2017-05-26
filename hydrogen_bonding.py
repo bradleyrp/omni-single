@@ -41,7 +41,8 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	import makeface
 	#---get an automacs landscape
 	#---! DEV. needs a clone and make to work
-	mod = makeface.import_remote('amx/amx')
+	try: mod = makeface.import_remote('amx/amx')
+	except: raise Exception('please clone a copy of automacs next to omni in `amx`')
 	mod['state'].force_field = 'charmm'
 	Landscape = mod['Landscape']
 	land = Landscape(cwd='amx/')
@@ -73,9 +74,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	#---generate atom groups
 	donors = uni.select_atoms(' or '.join(['name %s'%i for i in donors_names]))
 	acceptors = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
-	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))
-
-	#---METHOD: ckdtree_torus_explicit_bonds
+	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))#+' or name NA')
 
 	donors_h_pairs = [m for n in [i.get('donors',[]) for i in hydrogen_bond_ref.values()] for m in n]
 	donors_h_pairs_flat = list(set([i for j in donors_h_pairs for i in j]))
@@ -135,7 +134,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	for fr in range(nframes):
 		status('caching coordinates',tag='compute',i=fr,looplen=nframes,start=st)	
 		uni.trajectory[fr]
-		vecs.append(uni.SYSTEM.dimensions[:3]/lenscale)
+		vecs.append(uni.dimensions[:3]/lenscale)
 		all_donor_coords.append(donors_side.positions[donors_inds[0]]/lenscale)
 		all_h_coords.append(donors_side.positions[donors_inds[1]]/lenscale)
 		all_acceptor_coords.append(acceptors_side.positions/lenscale)
@@ -153,7 +152,6 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	if debug:
 		fr = 36
 		incoming = hbonds.hbonder_framewise(fr,distance_cutoff=distance_cutoff,angle_cutoff=angle_cutoff)
-		import ipdb;ipdb.set_trace()
 		sys.quit()
 
 	start = time.time()
@@ -213,9 +211,16 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	start_time = time.time()
 	status('unique-ifying the tabulated bonds (estimated %ds)'%(len(donor_cat)*1.3*10**-6),tag='compute')
 	status('note: with 32GB memory, 33M observations works fine, but 46M hits the swap',tag='warning')
+	#---note that unique is getting "axis" in np 1.13 but at some point on or before 1.12 they added some 
+	#---...kind of a safety check on the following trick for unique rows, which check returns an error
+	#---...message: "TypeError: Cannot change data-type for object array." which is solved by forcing 
+	#---...the object to a string type. note that this method requires void and not a blank string, which
+	#---...some examples will use. this changed must have happened in the <1 week since we wrote 
+	#---...the hydrogen bonds code and tested it again on the factory
 	#---uniquify the enormous list of all possible hydrogen bonds
-	tabulation_unique = np.ascontiguousarray(tabulation).view(
-		np.dtype((np.void,tabulation.dtype.itemsize*tabulation.shape[1])))
+	tabulation_reform = tabulation.astype(str)
+	tabulation_unique = np.ascontiguousarray(tabulation_reform).view(
+		np.dtype((np.void,tabulation_reform.dtype.itemsize*tabulation_reform.shape[1])))
 	tabulation_view_unique,idx,counts = np.unique(tabulation_unique,return_index=True,return_counts=True)
 	bonds = tabulation[idx]
 	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')

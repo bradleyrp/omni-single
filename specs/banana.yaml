@@ -83,7 +83,11 @@ variables:
     simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC: blue
     simulation-v006-endophilin-A1-PIP2-bilayer-large: green
 meta:
+<<<<<<< HEAD
   short_namer: "lambda sn,spot : '%sv%s'%re.match('^(\\w)-v(\\d+)',re.sub('^(membrane|simulation)',lambda x:x.group(1)[0],sn)).groups()"
+=======
+  short_namer: "lambda s : '%sv%s'%re.match('^(\\w)-v(\\d+)',re.sub('^(membrane|simulation)',lambda x:x.group(1)[0],s)).groups()"
+>>>>>>> f98105c450da81837d7db41b6ae1c7935cfe7f26
   simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
     label: "$\\mathrm{IRSp53}$"
     nprots: 1

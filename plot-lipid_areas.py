@@ -46,7 +46,7 @@ if 'curvature' in routine:
 	def get(mn,fr,name): return dat['%d.%d.%s'%(mn,fr,name)]
 
 	mvecs = np.mean([get(0,fr,'vec') for fr in range(nframes)],axis=0)
-	ngrid = np.round(mvecs/spacing)
+	ngrid = np.round(mvecs/spacing).astype(int)
 
 	#---curvature of each leaflet
 	curvs_map = [np.zeros((ngrid[0],ngrid[1])) for mn in range(2)]
@@ -77,7 +77,7 @@ if 'curvature' in routine:
 	#---ironically back to nan for the imshow
 	curvs_map[np.where(curvs_counts==0)] = np.nan
 	#---! these maps are noisy so we smooth them --- no theory here though ...
-	curvs_map = scipy.ndimage.gaussian_filter(curvs_map,sigma=(4,4),order=0)
+	#curvs_map = scipy.ndimage.gaussian_filter(curvs_map,sigma=(4,4),order=0)
 	vmax = max([abs(j) for j in [curvs_map.max(),curvs_map.min()]])
 	ax = plt.gca()
 	im = ax.imshow(curvs_map,cmap=mpl.cm.RdBu,vmax=vmax,vmin=-1*vmax,origin='lower',

@@ -191,13 +191,16 @@ def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 		'ghost_ids':ghost_indices,'gauss':gauss,'mean':mean}
 
 def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
-	monolayer_cutoff_retry=True,max_count_asymmetry=0.05,pbc_rewrap=True):
+	monolayer_cutoff_retry=True,max_count_asymmetry=0.05,pbc_rewrap=True,
+	topologize_tolerance=None):
 
 	"""
 	Identify leaflets in a bilayer by consensus.
 	"""
-
-	wrapper = topologize(pts,vec)
+	
+	#---! note that topologize sometimes gets stuck. needs a timer
+	wrapper = topologize(pts,vec,
+		**({'tol':topologize_tolerance} if topologize_tolerance else {}))
 	findframe = pts + wrapper*np.array(vec)
 	pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(findframe[:,d:d+1])) 
 		for d in range(3)]
@@ -237,7 +240,7 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	else: status('[STATUS] some lipids might be flipped %d %.2f'%(np.sum(imono),np.mean(imono)))
 	return imono
 
-def topologize(pos,vecs):
+def topologize(pos,vecs,tol=0.05):
 
 	"""
 	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
@@ -250,7 +253,7 @@ def topologize(pos,vecs):
 	kp = np.array(pos)
 	natoms = len(pos)
 	move_votes = np.zeros((1,natoms,3))
-	while np.sum(np.abs(move_votes[0])>len(pos)/2)>len(pos)*0.05 or step == 0:
+	while np.sum(np.abs(move_votes[0])>len(pos)/2)>len(pos)*tol or step == 0:
 		move_votes = np.concatenate((move_votes,np.zeros((1,natoms,3))))
 		pos = np.array(kp)
 		pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(pos[:,d:d+1])) 

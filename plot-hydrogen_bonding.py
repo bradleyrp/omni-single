@@ -13,21 +13,68 @@ if is_live:
 #---block: import the post-processed data	
 if 'data' not in globals(): 
 	sns,(data,calc) = work.sns(),plotload(plotname,work)
+	data_salt,calc_salt = plotload('salt_bridges',work)
 
 #---block: prepare data for plotting
-def reorder_by_ion(sns,ion_order):
+def reorder_by_ion(sns,ion_order,identity=True):
 	"""reorder simulations by ion name"""
+	#---identity function means that the order follows the order of the collection
+	if identity: return sns
+	#---otherwise we order by ion. probably better to use the collection order for more control
 	return sorted(sns,key=lambda x:ion_order.index(work.meta[x]['cation']))
 
-def count_hydrogen_bonds():
-	"""Compute the hydrogen bond counts"""
+def count_hydrogen_bonds_by_sn(bonds,obs,nmols):
+	"""!!!"""
+	#---filter out intralipid hydrogen bonds
+	#---some simulations have no salt bridges at all
+	try: resids_d = bonds[:,1].astype(int)
+	except: return {'result':{},'result_err':{}}
+	resids_a = bonds[:,4].astype(int)
+	inter_inds = np.where(resids_d!=resids_a)[0]
+	inter = bonds[inter_inds]
+	#---catalog bonding pairs by residue
+	resnames_combos = np.transpose((inter[:,0],inter[:,3]))
+	inds,counts = uniquify(resnames_combos)
+	pairs = resnames_combos[inds]
+	#---discard sol
+	lipid_only = np.where(np.all(pairs!='SOL',axis=1))[0]
+	#---cut cholesterol in half because it is in both leaflets and POPC does not make hbonds
+	nmols_leaflet = 400 
+	if 'CHL1' in nmols: nmols['CHL1'] /= 2.0
+	#---get the proportions relative to combos
+	#---! CHECK THE MEANING OF THIS NUMBER, COMBINATORICALLY-WISE
+	#---subsample the obs matrix (frames by combos) to pick out each unique resname combo
+	#---summing over the first axis adds up all unique instances of a particular combo
+	counts_by_pair = [obs[:,np.where(resnames_combos==p)[0]].sum(axis=1) for p in pairs[lipid_only]]
+	#---counts are normalized by the number of each species (note that 400 choose 2 is 79800)
+	norm_combos = lambda i,j: (nmols[i]*nmols[j])
+	props_mean = np.array([float(counts_by_pair[k].mean())/norm_combos(i,j)
+		for k,(i,j) in enumerate(pairs[lipid_only])])
+	props_std = np.array([float(counts_by_pair[k].std())/norm_combos(i,j)
+		for k,(i,j) in enumerate(pairs[lipid_only])])
+	#---convert pairs to PtdIns alias
+	pip2_alias = lambda x: 'PtdIns' if x in work.vars['selectors']['resnames_PIP2'] else x
+	aliased_names = np.array([[pip2_alias(i) for i in j] for j in pairs[lipid_only]])
+	result = dict(zip([tuple(i) for i in aliased_names],props_mean))
+	result_err = dict(zip([tuple(i) for i in aliased_names],props_std))
+	return {'result':result,'result_err':result_err}
+
+def count_hydrogen_bonds(data,bonds_key='bonds'):
+	"""
+	Compute the hydrogen bond counts.
+	You can send salt bridge data which only has extra columns with the cation information.
+	"""
 	post = {}
 	sns = work.sns()
 	for sn in sns:
 		dat = data[sn]['data']
-		bonds,obs = dat['bonds'],dat['observations']
+		bonds,obs = dat[bonds_key],dat['observations']
 		#---filter out intralipid hydrogen bonds
-		resids_d = bonds[:,1].astype(int)
+		#---some simulations have no salt bridges at all
+		try: resids_d = bonds[:,1].astype(int)
+		except: 
+			post[sn] = {'result':{},'result_err':{}}
+			continue
 		resids_a = bonds[:,4].astype(int)
 		inter_inds = np.where(resids_d!=resids_a)[0]
 		inter = bonds[inter_inds]
@@ -60,18 +107,6 @@ def count_hydrogen_bonds():
 		post[sn] = {'result':result,'result_err':result_err}
 	return post
 
-#---block: plot scheme
-def color_schemer_candy(sns):
-	"""New, candy-colored schemes for plotting bars."""
-	colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
-	for key,val in {
-		'red':0,'blue':1,'green':2,'purple':3,'orange':4,
-		'yellow':5,'brown':6,'pink':7,'grey':8,}.items()])
-	colors['beige'] = mpl.colors.ColorConverter().to_rgb("#C3C3AA")
-	colors_ions = {'NA':'green','Na,Cal':'green','MG':'red','Cal':'blue','K':'grey',}
-	hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':'',}
-	return 
-
 def make_bar_formats(sns,style):
 	"""Make bar formats, most recently, candy-colored bars with hatches."""
 	if style=='original':
@@ -99,7 +134,7 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None):
 	barspecs = bar_formats
 	ion_names = ['K','NA','Na,Cal','MG','Cal']
-	ptdins_names = ['PI2P','P35P','SAPI'][:-1]
+	ptdins_names = ['PI2P','P35P','SAPI']
 	rectangle_specs,patches,labels = {},[],[]
 	for name,group in [('cation',ion_names),('ptdins_resname',ptdins_names)]:
 		for item in group:
@@ -110,10 +145,11 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 				rectangle_specs[sn]['fc'] = barspecs[sn]['edgecolor']
 				rectangle_specs[sn]['lw'] = 0
 				patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+				labels.append(work.meta[sn]['ion_label'])
 			elif name=='ptdins_resname':
-				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=0.5,fc='w',lw=3,
+				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=1.0,fc='w',lw=3,ec='k',
 					hatch=barspecs[sn]['hatch']*(1 if work.meta[sn]['ptdins_resname']=='PI2P' else 2)))
-			labels.append(work.meta[sn][name])
+				labels.append(work.meta[sn]['ptdins_label'])
 	if not patches: patches,labels = [mpl.patches.Rectangle((0,0),1.0,1.0,fc='w')],['empty']
 	legend = ax.legend(patches,labels,loc=loc,fontsize=fs,
 		ncol=ncol,title=title,bbox_to_anchor=bbox,labelspacing=1.2,
@@ -123,7 +159,8 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	frame.set_facecolor('white')
 	return legend,patches
 
-def hbonds_bardat(sns,format_name=None,ion_order=None):
+def hbonds_bardat(format_name=None,ion_order=None,**kwargs):
+	sns,post = kwargs['sns'],kwargs['post']
 	"""Generate hydrogen bonding counts bar data."""
 	format_name = format_name if format_name else 'color_schemer_original'
 	#---! move hatch choices to art_ptdins.py
@@ -131,8 +168,9 @@ def hbonds_bardat(sns,format_name=None,ion_order=None):
 	if ion_order: sns = reorder_by_ion(sns,ion_order)
 	#---empty plot uses a random key and zeros it
 	empty = not sns
-	if not empty: keys = sorted(set(list([tuple(j) for j in 
-		np.concatenate([post[sn]['result'].keys() for sn in sns])])))
+	if not empty: 
+		keys = sorted(set(list([tuple(j) for j in 
+			np.concatenate([m for m in [post[sn]['result'].keys() for sn in sns] if m])])))
 	else: keys = post.keys()[:1]
 	bardat,barspec,extras = [],[],[]
 	#---group by the first key (the donor)
@@ -141,9 +179,11 @@ def hbonds_bardat(sns,format_name=None,ion_order=None):
 		#---group by pairs
 		for key in [k for k in keys if k[0]==donor]:
 			#---group by simulation
-			group_donor.append([((key,sn),
-				(post[sn]['result'][key],post[sn]['result_err'][key]) 
+			try: group_donor.append([((key,sn),
+				(post[sn]['result'].get(key,0.0),post[sn]['result_err'].get(key,0.0)) 
 				if not empty else 0.0) for sn in sns])
+			except:
+				import ipdb;ipdb.set_trace()
 			#---include the label with the bar format
 			group_barspec.append([dict(tl='%s\m%s'%key,**bar_formats[sn]) for sn in sns])
 			new_names = [(key,sn) for sn in sns]
@@ -154,13 +194,12 @@ def hbonds_bardat(sns,format_name=None,ion_order=None):
 			'names':names,'label':key[0],'fs':26,'bbox':dict(boxstyle="round4",fc="w",lw=3)}))
 		bardat.append(group_donor)
 		barspec.append(group_barspec)
-	return bardat,barspec,extras
+	return dict(bardat=bardat,barspec=barspec,extras=extras)
 
 #---block: plot settings
 bar_style = ['original','candy'][-1]
-#---! note that outline does not work with candy
 live_plot_style = ['outline','reveal'][-1]
-show_static = True
+show_static,press = True,is_live
 #---choices
 comparison = ['asymmetric_all','symmetric_all'][0]
 sns = work.specs['collections'][comparison]
@@ -168,7 +207,8 @@ ion_order = ['K','NA','Na,Cal','MG','Cal']
 sns = reorder_by_ion(sns,ion_order)
 #---aesthetics
 mpl.rcParams['hatch.linewidth'] = 1.5
-mpl.rcParams['hatch.color'] = 'k'
+#---hatch color was controllable here in mpl v2.0.0 but they reverted
+mpl.rcParams['hatch.color'] = 'w'
 def dimmer(bar,child):
 	"""Dim a bar."""
 	bar.set_edgecolor(bar.get_facecolor())
@@ -179,12 +219,45 @@ sns_names = dict([(sn,work.meta[sn]['ptdins_resname']+' and '+
 namer = lambda ((a,b),c): ('%s-%s'%(a,b))
 bar_formats = make_bar_formats(sns,style=bar_style)
 #---premake the data for the outline style
-post = count_hydrogen_bonds()
-bardat,barspec,extras = hbonds_bardat(sns)
-bars_premade = BarGrouper(bardat,figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
-	extras=extras,specs=barspec,dimmer=dimmer,namer=namer,show_xticks=False)
-#---tag for saving the plot
-pictag = 'test'
+posts = dict([(key,{}) for key in ['hbonds','salt']])
+for key,(bonds_key,data_name) in [('hbonds',('bonds','data')),('salt',('bonds_salt','data_salt'))]:
+	this_data = globals()[data_name]
+	posts[key] = dict([(sn,
+		count_hydrogen_bonds_by_sn(
+			bonds=this_data[sn]['data'][bonds_key],
+			obs=this_data[sn]['data']['observations'],
+			nmols=dict(zip(this_data[sn]['data']['resnames'],this_data[sn]['data']['nmols'])))) 
+		for sn in sns])
+#---merge the two calculations
+posts['both'] = {}
+for sn in sns:
+	posts['both'][sn] = {}
+	for measure in ['result','result_err']:
+		posts['both'][sn][measure] = {}
+		pairs = list(set(posts['hbonds'][sn][measure].keys()+posts['salt'][sn][measure].keys()))
+		for pair in pairs:
+			#---sum the means
+			if measure=='result':
+				val = posts['hbonds'][sn][measure].get(pair,0.0)+posts['salt'][sn][measure].get(pair,0.0)
+			elif measure=='result_err':
+				val = np.sqrt(posts['hbonds'][sn][measure].get(pair,0.0)**2+
+					posts['salt'][sn][measure].get(pair,0.0)**2)
+			else: raise Exception('measure is %s'%measure)
+			posts['both'][sn][measure][pair] = val
+#---filter out POPC because we don't care about outer leaflet lipids
+for upkey in ['both','salt']:
+	for sn in sns:
+		for measure in ['result','result_err']:
+			pairs = list(set(posts[upkey][sn][measure].keys()+posts['salt'][sn][measure].keys()))
+			pairs = [p for p in pairs if 'POPC' not in p]
+			posts[upkey][sn][measure] = dict([(p,posts[upkey][sn][measure][p]) for p in pairs])
+
+#---select the plotting target
+post = posts['both']
+#---prepare the data
+bardat = hbonds_bardat(sns=sns,post=post)
+bars_premade = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
+	dimmer=dimmer,namer=namer,show_xticks=False,**bardat)
 
 #---block: plot function and static plot
 def hbonds_plotter(bars=None,**checks):
@@ -203,15 +276,13 @@ def hbonds_plotter(bars=None,**checks):
 	else:
 		keys = reorder_by_ion([k for k,v in checks.items() if v],ion_order)
 		empty = not keys
-		bardat,barspec,extras = hbonds_bardat(sns=checks.keys()[:1] if empty else keys)
-		bars = BarGrouper(bardat,figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
-			extras=extras,specs=barspec,dimmer=dimmer,
-			namer=namer,show_xticks=False,empty=empty)
+		bardat = hbonds_bardat(sns=checks.keys()[:1] if empty else keys)
+		bars = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
+			dimmer=dimmer,namer=namer,show_xticks=False,empty=empty,**bardat)
 	#---additional 
 	bars.plot(wait=True)
 	bars.ax.tick_params(axis='both', which='major',labelsize=16)
 	bars.ax.set_ylabel(r'$\frac{\langle {N}_{bonds} \rangle}{{N}_{donor}{N}_{acceptor}}$',fontsize=26)
-	#bars.ax.yaxis.set_minor_locator(mpl.ticker.MultipleLocator(0.02))
 	bars.ax.yaxis.grid(which="minor",color='k',linewidth=0.5,alpha=0.5,zorder=0)
 	bars.ax.tick_params(axis=u'both', which=u'both',length=0)
 	bars.ax.set_title('hydrogen bonding',fontsize=40)
@@ -222,11 +293,24 @@ def hbonds_plotter(bars=None,**checks):
 if is_live: checks = dict([(sn,widgets.ToggleButton(value=False,description=sns_names[sn])) for sn in sns])
 else: checks = dict([(sn,True) for sn in sns])
 #---show a static version of the plot
-if show_static:
-	legend = hbonds_plotter(bars_premade,**checks)
-	if is_live: plt.show()
-	else: picturesave('fig.%s.%s'%(plotname,pictag),work.plotdir,
-		backup=False,version=True,meta={},extras=[legend])
+if show_static and is_live:
+	hbonds_plotter(bars_premade,extras=bars_premade['extras'],**checks)
+	plt.show()
+#---batch plot several version of the data
+if press:
+	#---which figures to make
+	press_specs = {
+		'hydrogen_bonding.salt':{'posts_subkey':'salt'},
+		'hydrogen_bonding.hbonds':{'posts_subkey':'hbonds'},
+		'hydrogen_bonding.both_hbonds_salt':{'posts_subkey':'both'},}
+	#---batch of figures
+	for tag,spec in press_specs.items():
+		bars_premade = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
+			dimmer=dimmer,namer=namer,show_xticks=False,
+			**hbonds_bardat(sns=sns,post=posts[spec['posts_subkey']]))
+		legend = hbonds_plotter(bars_premade,**checks)
+		picturesave('fig.%s'%(tag),work.plotdir,
+			backup=False,version=True,meta={},extras=[legend])
 
 #---block: interactive plot
 if is_live:

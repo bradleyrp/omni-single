@@ -145,8 +145,8 @@ class BarGrouper:
 	Each bar object has a left and right object.
 	We wish to retain sequences from the incoming data.
 	"""
-	def __init__(self,dat,**kwargs): 
-		self.dat = dat
+	def __init__(self,**kwargs): 
+		self.dat = kwargs.get('dat',kwargs.get('bardat',None))
 		self.width = kwargs.get('width',1.0)
 		self.spacers = kwargs.get('spacers',{0:0,1:0.5,2:1.0,3:2.0})
 		self.dividers = kwargs.get('dividers',{})
@@ -155,7 +155,7 @@ class BarGrouper:
 		self.names,self.namesdict = [],{}
 		self.cursor,self.level = 0.0,None
 		self.extras = kwargs.get('extras',{})
-		self.routes = list(catalog(dat))
+		self.routes = list(catalog(self.dat))
 		self.dimmer = kwargs.get('dimmer',None)
 		self.namer = kwargs.get('namer',lambda x:x)
 		self.show_xticks = kwargs.get('show_xticks',True)
@@ -163,7 +163,7 @@ class BarGrouper:
 		#---mimic the incoming data structure and store bar properties
 		self.barsave = copy.deepcopy(self.dat)
 		#---plot specs for each bar
-		self.specs = kwargs.get('specs',None)
+		self.specs = kwargs.get('specs',kwargs.get('barspec',None))
 		self.proc()
 	def proc(self):
 		"""Process the bars."""
@@ -214,8 +214,8 @@ class BarGrouper:
 		ys,yerrs = yvals[:,0],yvals[:,1]
 		alpha = 1.0 if not self.empty else 0.0
 		#---! ytf did they change default alignment?
-		rendered = ax.bar(xs,ys,width=ws,align='edge',zorder=3,alpha=alpha)
-		# ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=4,alpha=1.0,lw=5,c='w',ls='none')
+		#---no outline around the bars. the hatch colors are set below, and match the edge color
+		rendered = ax.bar(xs,ys,width=ws,align='edge',zorder=3,alpha=alpha,lw=0)
 		ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=5,alpha=1.0,lw=3,c='k',ls='none')
 		if self.show_xticks:
 			xticks = np.mean(np.array([xs,ws+xs]),axis=0)
@@ -225,24 +225,16 @@ class BarGrouper:
 		if self.specs:
 			#---post processing works on both the rendered objects and on the children
 			for bb,(bar,child) in enumerate(zip(self.bars,rendered.get_children())):
+				#---! between mpl v2.0.0 and v2.0.2 they must have changed behavior so hatches are 
+				#---! ...using the edge color. note that you can set the color for each bar specifically
+				#---! ...in the ax.bar command above but we retain full control down here
+				rendered[bb].set_hatch(self.bars[bb].get('hatch',None))
 				rendered[bb].set_color(bar.get('c','k'))
-				hatch = self.bars[bb].get('hatch',None)
-				child.set_hatch(hatch)
+				#---by mpl v2.0.2 (or earlier?) the hatches have the edge color
+				#---hatch color is the edge color set here
+				rendered[bb].set_edgecolor('k')
 				#---apply the dimmer if this bar is "off"
-				if not self.namesdict[self.names[bb]] and self.dimmer or self.empty: 
-					#---dimmer takes the bar and the child
-					#self.dimmer(bar=rendered[bb],child=child)
-					child.set_hatch('||||')
-					child.set_visible(False)
-					#bar.set_visible(False)
-			if False:
-				#---! SEPARATE HATCH ROUTINE WHYYYYYY???
-				children = rendered.get_children()
-				for cc,child in enumerate(children):
-					hatch = self.bars[cc].get('hatch',None)
-					child.set_hatch(hatch)
-					#---apply the dimmer if this bar is "off"
-					if not self.namesdict[self.names[bb]] and self.dimmer: self.dimmer(rendered[bb])
+				if not self.namesdict[self.names[bb]] and self.dimmer: self.dimmer(rendered[bb])
 		self.plot_extras(ax)
 		if not wait: plt.show()
 		self.ax = ax
