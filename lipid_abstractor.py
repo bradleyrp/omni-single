@@ -73,17 +73,30 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 			lipids = np.where(np.in1d(allsel.resnames,np.array(selector['resnames'])))[0]
 			resid_changes = np.where(allsel[lipids].resids[1:]!=allsel[lipids].resids[:-1])[0]
 			residue_atomcounts = resid_changes[1:]-resid_changes[:-1]
-			#---use the number of atoms between resid changes to represent the number of atoms in that residue
-			guess_atoms_per_residue = np.array(list(set(zip(allsel.resnames[lipids][resid_changes],
-				residue_atomcounts))))
-			#---figure out the number of atoms in each lipid type by consensus
+			#---! this method fails
+			if False:
+				#---use the number of atoms between resid changes to represent the number of atoms in that residue
+				guess_atoms_per_residue = np.array(list(set(zip(allsel.resnames[lipids][resid_changes],
+					residue_atomcounts))))
+				#---figure out the number of atoms in each lipid type by consensus
+				atoms_per_residue = {}
+				lipid_resnames_obs = np.unique(allsel.resnames[lipids])
+				for name in lipid_resnames_obs:
+					subs = np.where(guess_atoms_per_residue[:,0]==name)[0]
+					consensus_count = guess_atoms_per_residue[np.argsort(
+						guess_atoms_per_residue[subs][:,1].astype(int))[0]][1].astype(int)
+					atoms_per_residue[name] = consensus_count
+			#---get the residue names for each lipid in our selection by the first atom in that lipid
+			#---! this probably skip the last residue but if everything hinges on that well oh well
+			resnames = allsel[lipids].resnames[resid_changes]
+			guess_atoms_per_residue = np.array(zip(resnames,residue_atomcounts))
+			#---get consensus counts for each lipid name
 			atoms_per_residue = {}
-			lipid_resnames_obs = np.unique(allsel.resnames[lipids])
-			for name in lipid_resnames_obs:
-				subs = np.where(guess_atoms_per_residue[:,0]=='POPC')[0]
-				consensus_count = guess_atoms_per_residue[np.argsort(
-					guess_atoms_per_residue[subs][:,1].astype(int))[0]][1].astype(int)
-				atoms_per_residue[name] = consensus_count
+			for name in np.unique(resnames):
+				#---get the most common count
+				counts,obs_counts = np.unique(guess_atoms_per_residue[:,1][
+					np.where(guess_atoms_per_residue[:,0]==name)[0]].astype(int),return_counts=True)
+				atoms_per_residue[name] = counts[obs_counts.argmax()]
 			#---iterate over the list of lipid atoms and get the indices for each N-atoms for each lipid type
 			counter,divider = 0,[]
 			while counter<len(lipids):
@@ -91,7 +104,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 				this_resname = allsel.resnames[lipids][counter]
 				divider.append(np.arange(counter,counter+atoms_per_residue[this_resname]))
 				counter += atoms_per_residue[this_resname]
-		else: 	raise Exception('residues have redundant resids and selection is not the easy one')
+		else: raise Exception('residues have redundant resids and selection is not the easy one')
 		
 	#---load trajectory into memory	
 	trajectory,vecs = [],[]
