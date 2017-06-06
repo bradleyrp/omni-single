@@ -31,6 +31,7 @@ variables:
 collections:
   all:
     - nwaspbilayer3
+    - mdia2bilayer_nochl2
   model_compare:
     - mdia2robetta3
     - mdia2robetta4
@@ -93,6 +94,12 @@ meta:
     name:               "gelbilayer"
   nwaspbilayer3:
     name:               "nwaspbilayer3"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+  mdia2bilayer_nochl2:
+    name:               "mdia2bilayer nochl"
     ptdins_resname:     "PI2P"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ion_label:          "$\\mathrm{{Na}^{+}}$"
@@ -264,6 +271,11 @@ slices:
       all: all
     slices:
       current: {'pbc':'mol','groups':['all'],'start':10000,'end':20000,'skip':100}
+  mdia2bilayer_nochl2:
+    groups: 
+      all: all
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':500,'end':6500,'skip':100}
 
 calculations:
   lipid_abstractor:
@@ -285,6 +297,11 @@ calculations:
             monolayer_cutoff: 1.4
             resnames: +selectors/resnames_lipid_chol
             type: com
+  protein_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: all
   head_angle:
     uptype: simulation
     slice_name: current
@@ -298,6 +315,15 @@ calculations:
 ### end testing
 
 plots:
+  lipid_abstractor:
+    calculation: 
+      lipid_abstractor:
+        selector:
+          monolayer_cutoff: 1.85
+          resnames: +selectors/resnames_lipid
+          type: com
+    slices: current
+    collections: all
   protein_rmsd:
     calculation: protein_rmsd
     slices: compare_v1
@@ -313,7 +339,6 @@ plots:
       - model_comparenwaspbilayer
       - model_comparegelhelix
       - nwasppepbilayer2pip
-
   nearby_pip2:
     calculation: nearby_pip2
     slices: compare_v1
