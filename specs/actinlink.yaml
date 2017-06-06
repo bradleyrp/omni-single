@@ -1,13 +1,10 @@
-collections:
-  all:
-    - nwaspbilayer3
-slices:
-  nwaspbilayer3:
-    groups: 
-      all: all
-    slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':20000,'skip':100}
+
 variables:
+  composition_names:
+    symmetric: symmetric
+    asymmetric: asymmetric
+    position: asymmetric
+    charge: symmetric
   selectors:
     ions: (name NA or name CL or name MG or name Cal or name K)
     cations: (name NA or name MG or name Cal or name K)
@@ -15,7 +12,259 @@ variables:
     resnames_lipid_chol: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI']
     resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
     resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
-  head_atoms: 'N  C12  C13  C14  C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C  C11 H11A H11B  P  O13  O14  O12  O11   C1   HA   HB   C2   HS N   HN1   HN2   HN3   C12  H12A   C13  O13A  O13B   C11  H11A  H11B     P   O13   O14   O12 O11    C1    HA    HB    C2    HS C12   H2   O2  HO2  C13   H3   O3  HO3  C14   H4   O4   P4 OP42 OP43 OP44  C15   H5   O5   P5  OP52 OP53 OP54  H52  C16   H6   O6  HO6  C11   H1    P  O13  O14  O12  O11   C1   HA   HB   C2   HS'
+  slices:
+    steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
+    current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
+    current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
+  names:
+    proper_residue_names_long:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PtdIns(4,5)P$_2$"
+      P35P: "PtdIns(3,5)P$_2$"
+      PIPP: "PtdIns(4,5)P$_2^{-3}$"
+      PIPU: "PtdIns(4,5)P$_2^{-5}$"
+
+collections:
+  all:
+    - nwaspbilayer3
+  model_compare:
+    - mdia2robetta3
+    - mdia2robetta4
+    - mdia2hm1
+  model_comparemdia2:
+    - mdia2robetta3
+    - mdia2robetta4
+    - mdia2hm1
+  model_comparenwasp:
+    - nwasphm1
+    - nwasprobetta4
+  model_comparenwaspbilayer:
+    - nwasppeptide2
+    - nwaspbilayernochl
+    - nwaspbilayer3
+    - nwasppeptideb
+  model_comparegelbilayer:
+    - gelbilayer
+  model_comparenwaspbilayer3:
+    - nwaspbilayer3
+  model_comparenwaspbilayernochl:
+    - nwaspbilayernochl
+  model_comparegelhelix:
+    - gelhelix
+  model_comparenwaspbilayermut:
+    - nwaspbilayermut1
+    - nwaspbilayermut1redo
+    - nwaspbilayermut2redo
+    - nwaspbilayermut2
+    - nwaspbilayermut3
+    - nwasppeptideb
+    - nwasppeptide2
+  model_comparenwasppeptide:
+    - nwasppeptide2
+    - nwasppeptideb
+    - nwasppepbilayer2pip
+  nwasppepbilayer2pip:
+    - nwasppepbilayer2pip
+  nwaspbilayermut3:
+    - nwaspbilayermut3
+  nwasppeptide2:
+    - nwasppeptide2
+  nwasppeptideb:
+    - nwasppeptideb
+
+meta:
+  #! note that this short_namer must be compatible with the spots prefixer!
+  short_namer: "lambda sn,spot : 'v'+re.findall('(.+)',sn)[0]"
+  mdia2robetta3:
+    name:               "mdia2robetta3"
+  mdia2robetta4:
+    name:               "mdia2robetta4"
+  mdia2hm1:
+    name:               "mdia2hm1"
+  nwasphm1:
+    name:               "nwasphm1"
+  nwasprobetta4:
+    name:               "nwasprobetta4"
+  gelbilayer:
+    name:               "gelbilayer"
+  nwaspbilayer3:
+    name:               "nwaspbilayer3"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+  nwaspbilayernochl:
+    name:               "nwaspbilayernochl"
+  gelhelix:
+    name:               "gelhelix"
+  nwaspbilayermut1:
+    name:               "nwaspbilayermut1"
+  nwaspbilayermut2:
+    name:               "nwaspbilayermut2"
+  nwaspbilayermut3:
+    name:               "nwaspbilayermut3"
+  nwasppeptide2:
+    name:               "nwasppeptide2"
+  nwasppeptideb:
+    name:               "nwasppeptideb"
+  nwaspbilayermut1redo:
+    name:               "nwaspbilayermut1redo"
+  nwaspbilayermut2redo:
+    name:               "nwaspbilayermut2redo"
+  nwasppepbilayer2pip:
+    name:               "nwasppepbilayer2pip"
+
+off slices:
+  mdia2robetta4:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':58000,'skip':100}
+  mdia2robetta3:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':58000,'skip':100}
+  mdia2hm1:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':58000,'skip':100}
+  nwasprobetta4:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':30000,'skip':100}
+  nwasphm1:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':60000,'skip':100}
+  gelbilayer:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':100000,'skip':500}
+  nwaspbilayer3:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':120000,'skip':500}
+  nwaspbilayernochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':80000,'skip':500}
+  gelhelix:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':100000,'skip':500}
+  nwaspbilayermut2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':35000,'skip':500}
+  nwaspbilayermut3:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':28000,'skip':500}
+  nwaspbilayermut1:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':47000,'skip':500}
+  nwasppeptide2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':69000,'skip':500}
+  nwasppeptideb:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':68000,'skip':500}
+  nwasppepbilayer2pip:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':14000,'skip':500}
+  nwaspbilayermut1redo:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':43000,'skip':500}
+  nwaspbilayermut2redo:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      compare_v1: {'pbc':'mol','groups':['all','protein'],'start':0,'end':10000,'skip':500}
+
+off calculations:
+  protein_rmsd:
+    uptype: simulation
+    slice_name: compare_v1
+    group: protein
+    collections:
+      - model_comparenwasp
+      - model_comparemdia2
+      - model_comparegelbilayer
+      - model_comparenwaspbilayer3
+      - model_comparenwaspbilayernochl
+      - model_comparegelhelix
+      - model_comparenwaspbilayermut
+      - model_comparenwasppeptide
+      - model_comparenwaspbilayer
+      - model_comparegelhelix
+      - nwasppepbilayer2pip
+
+  nearby_pip2:
+    uptype: simulation
+    slice_name: compare_v1
+    group: all
+    collections:
+      - model_comparenwaspbilayernochl
+      - model_comparenwaspbilayer3
+      - model_comparenwaspbilayermut
+      - model_comparenwasppeptide
+      - model_comparenwaspbilayer
+      - model_comparegelhelix
+      - nwasppepbilayer2pip
+
+    specs:
+      gaps: [2.2,4.6,10.0,20.0]
+
+### testing
+
+slices:
+  nwaspbilayer3:
+    groups: 
+      all: all
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':20000,'skip':100}
+
 calculations:
   lipid_abstractor:
     uptype: simulation
@@ -36,3 +285,44 @@ calculations:
             monolayer_cutoff: 1.4
             resnames: +selectors/resnames_lipid_chol
             type: com
+  head_angle:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: all
+    specs:
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_com
+
+### end testing
+
+plots:
+  protein_rmsd:
+    calculation: protein_rmsd
+    slices: compare_v1
+    collections:
+      - model_comparenwasp
+      - model_comparemdia2
+      - model_comparegelbilayer
+      - model_comparenwaspbilayer3
+      - model_comparenwaspbilayernochl
+      - model_comparegelhelix
+      - model_comparenwaspbilayermut
+      - model_comparenwasppeptide
+      - model_comparenwaspbilayer
+      - model_comparegelhelix
+      - nwasppepbilayer2pip
+
+  nearby_pip2:
+    calculation: nearby_pip2
+    slices: compare_v1
+    collections:
+      - model_comparegelbilayer
+      - model_comparenwaspbilayer3
+      - model_comparenwaspbilayernochl
+      - model_comparenwaspbilayermut
+      - model_comparenwasppeptide
+      - model_comparenwaspbilayer
+      - model_comparegelhelix
+      - nwasppepbilayer2pip

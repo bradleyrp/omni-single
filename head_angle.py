@@ -54,8 +54,8 @@ def head_angle(grofile,trajfile,**kwargs):
 	#---assume imono==0 is the "top" leaflet and set the normalvector accordingly
 	#---! is this worth checking? 
 	normalvec = np.zeros((len(imono_this),3))
-	normalvec[np.where(imono_this==0),2] = 1
-	normalvec[np.where(imono_this==1),2] = -1
+	normalvec[np.where(leaflets==0),2] = 1
+	normalvec[np.where(leaflets==1),2] = -1
 
 	#---geometry functions
 	cat = lambda a,b : np.concatenate((a,b))
@@ -106,8 +106,6 @@ def head_angle(grofile,trajfile,**kwargs):
 		for n in range(nmols)] 
 		for fr in range(nframes)])\
 		*normalvec[:,2]*(1-2*orients_rot)
-
-	#import pdb;pdb.set_trace()
 
 	#---kernel density estimates
 	if perform_kernel:
