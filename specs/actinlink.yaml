@@ -269,13 +269,15 @@ slices:
   nwaspbilayer3:
     groups: 
       all: all
+      protein: protein
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':20000,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':10000,'end':20000,'skip':100}
   mdia2bilayer_nochl2:
     groups: 
       all: all
+      protein: protein
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':500,'end':6500,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':500,'end':6500,'skip':100}
 
 calculations:
   lipid_abstractor:
@@ -311,6 +313,11 @@ calculations:
       upstream: 
         lipid_abstractor:
           selector: lipid_com
+  protein_rmsd:
+    uptype: simulation
+    slice_name: current
+    group: protein
+    collections: all
 
 ### end testing
 
@@ -326,19 +333,8 @@ plots:
     collections: all
   protein_rmsd:
     calculation: protein_rmsd
-    slices: compare_v1
-    collections:
-      - model_comparenwasp
-      - model_comparemdia2
-      - model_comparegelbilayer
-      - model_comparenwaspbilayer3
-      - model_comparenwaspbilayernochl
-      - model_comparegelhelix
-      - model_comparenwaspbilayermut
-      - model_comparenwasppeptide
-      - model_comparenwaspbilayer
-      - model_comparegelhelix
-      - nwasppepbilayer2pip
+    slices: current
+    collections: all
   nearby_pip2:
     calculation: nearby_pip2
     slices: compare_v1
