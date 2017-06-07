@@ -50,11 +50,6 @@ calculations:
         lipid_tip: "name PO4"
         monolayer_cutoff: 1.4
       nojumps: "z"
-  protein_abstractor:
-    uptype: simulation
-    slice_name: current_protein
-    group: proteins
-    collections: all
   undulations:
     uptype: post
     group: all
@@ -63,6 +58,19 @@ calculations:
     specs:
       grid_spacing: 1.0
       upstream: lipid_abstractor
+  #curvature_coupling:
+  #  uptype: post
+  #  slice_name: current_protein
+  #  collections: all
+  #  specs: 
+  #    upstream: undulations
+  #diffusion_proteins:
+  #  uptype: post
+  #  group: all
+  #  slice_name: current_protein
+  #  collections: all
+  #  specs:
+  #    upstream: protein_abstractor
   lipid_mesh:
     uptype: post
     slice_name: current_protein
@@ -83,11 +91,7 @@ variables:
     simulation-v005-endophilin-A1-large-bilayer-50-50-DOPS-DOPC: blue
     simulation-v006-endophilin-A1-PIP2-bilayer-large: green
 meta:
-<<<<<<< HEAD
   short_namer: "lambda sn,spot : '%sv%s'%re.match('^(\\w)-v(\\d+)',re.sub('^(membrane|simulation)',lambda x:x.group(1)[0],sn)).groups()"
-=======
-  short_namer: "lambda s : '%sv%s'%re.match('^(\\w)-v(\\d+)',re.sub('^(membrane|simulation)',lambda x:x.group(1)[0],s)).groups()"
->>>>>>> f98105c450da81837d7db41b6ae1c7935cfe7f26
   simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC:
     label: "$\\mathrm{IRSp53}$"
     nprots: 1
@@ -107,7 +111,13 @@ plots:
     calculation: undulations
     slices: current_protein
     collections: all
-  xyz:
-    calculation: lipid_abstractor
-    slices: current_protein
+  lipid_areas:
+    calculation: lipid_mesh
+    slices: current
+    collections:
+      - one
+  curvature_coupling:
+    calculation: 
+      - undulations
+      - protein_abstractor
     collections: all
