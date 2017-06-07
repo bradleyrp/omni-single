@@ -11,7 +11,7 @@ from codes.undulate_plot import undulation_panel
 import numpy as np
 
 #---block: what to plot
-routine = ['spectra','height','dump_xyz'][:-1]
+routine = ['spectra','height','dump_xyz'][:1]
 sns = work.sns()
 
 #---block: load the calculation data
@@ -89,18 +89,19 @@ if 'height' in routine:
 		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
 		**({} if is_live else dict(outdir=work.paths['post_plot_spot'],fn='fig.average_height')))
 
-#---block: plot the undulation spectra
+#---block: export data for comparison to other labmates' methods
 if 'dump_xyz' in routine:
 
-	nframes = 500
 	sn = 'simulation-v003-IRSp53-large-bilayer-50-50-DOPS-DOPC'
+	outname = 'banana-v003-0-400000-2000'
 	dat = data[sn]['data']
 	mesh = dat['mesh']	
+	nframes = min(data[sn]['data']['mesh'].shape[1],500)
 	out = mesh[:,:nframes].reshape((-1,49*49))
 	backin = out.reshape((2,-1,49,49))
 	print('checked? %s'%np.all(backin==mesh[:,:nframes]))
 	np.savetxt(
-		'banana-v003-0-400000-200-%d-frames.monolayer_heights_49x49.txt'%nframes,
+		work.postdir+'%s-%d-frames.monolayer_heights_49x49.txt'%(outname,nframes),
 		out)
 	sys.path.insert(0,'calcs')
 	from codes.undulate_plot import calculate_undulations
@@ -110,5 +111,24 @@ if 'dump_xyz' in routine:
 	uspec = calculate_undulations(surf,vecs,
 		chop_last=True,perfect=True,lims=lims,raw=False)
 	np.savetxt(
-		'banana-v003-0-400000-200-%d-frames.hqhq.txt'%nframes,
+		work.postdir+'banana-v003-0-400000-2000-%d-frames.hqhq.txt'%nframes,
 		np.array(np.transpose([uspec['x'],uspec['y']])))
+
+	#---the above uses the undulation data but we also load some of the raw points and dump them
+	#---...the following section uses lipid_abstractor, collections all, slices current_protein
+	data,calc = plotload('lipid_abstractor',work)
+	nframes = min(data[sn]['data']['vecs'].shape[0],nframes)
+	np.savetxt(
+		work.postdir+'%s-%s-frames.xyz.txt'%(outname,nframes),
+		data[sn]['data']['points'][:nframes].reshape((-1,3)))
+	np.savetxt(
+		work.postdir+'%s-%s-frames.vecs.txt'%(outname,nframes),
+		data[sn]['data']['vecs'][:nframes])
+	np.savetxt(
+		work.postdir+'%s.monolayers.txt'%outname,
+		data[sn]['data']['monolayer_indices'])
+	#---checking reshape 
+	out = data[sn]['data']['points'][:nframes].reshape((-1,3))
+	backin = out.reshape((nframes,-1,3))
+	dat = data[sn]['data']['points'][:nframes]
+	print('checked? %s'%np.all(dat[0]==backin[0]))
