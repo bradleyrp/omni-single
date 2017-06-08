@@ -17,7 +17,7 @@ color_map_name = 'gnuplot2 pink jet'.split()[-1]
 plot_simple = True
 angle_ticks = np.arange(-150,200,50)
 cmap = mpl.cm.get_cmap(color_map_name)
-routine = ['simple','head_angle_vs_distance'][-1:]
+routine = ['simple','head_angle_vs_distance'][:]
 
 #---block: utility functions
 def angle_image_format(ax,sn=None):
@@ -58,7 +58,7 @@ if 'postdat' not in globals():
 if 'simple' in routine:
 
 	zmax = max([postdat[sn]['zi'].max() for sn in sns])
-	axes,fig = square_tiles(len(sns),figsize=(10,10))
+	axes,fig = square_tiles(len(sns),figsize=(10,10),wspace=0.5,hspace=0.5)
 	for pnum,sn in enumerate(sns):
 		status('plotting %s'%sn,looplen=len(sns),i=pnum,tag='plot')
 		#---! previously used a custom function for getting the right axis
@@ -70,7 +70,7 @@ if 'simple' in routine:
 		#---! whitespace problem
 		ax.set_aspect('equal')
 		#---got latex errors? remove underscores from the name or use dollar signs
-		ax.set_title(work.meta[sn]['name'])
+		ax.set_title(re.sub('_','-',work.meta[sn]['name']))
 		angle_image_format(ax,sn)
 		ax.set_xlim(xmin,xmax)
 		ax.set_ylim(ymin,ymax)
@@ -103,6 +103,7 @@ if 'head_angle_vs_distance' in routine:
 			nframes,nlipids = data_lipids[sn]['data']['points'].shape[:2]
 			inds_pip2 = np.where(data_lipids[sn]['data']['resnames']==work.meta[sn]['ptdins_resname'])[0]
 			distances = np.zeros((nframes,len(inds_pip2)))
+			valid_frames = np.ones(nframes).astype(bool)
 			#---get nearest distances for each frame
 			for fr in range(nframes):
 				status('finding closest distance between lipids and proteins',i=fr,looplen=nframes,tag='compute')
@@ -110,24 +111,29 @@ if 'head_angle_vs_distance' in routine:
 				pts_fore = lipid_pts = data_lipids[sn]['data']['points'][fr][inds_pip2]
 				pts_back = prot_pts = data_proteins[sn]['data']['points_all'][fr][nprot]
 				vec = data_lipids[sn]['data']['vecs'][fr]
-				tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=np.concatenate((vec,vec)))
+				try: tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=np.concatenate((vec,vec)))
+				except: 
+					#---very rarely we have frames with PBC problems
+					valid_frames[fr] = False
+					continue
 				close,nns = tree.query(pts_fore,k=1)
 				distances[fr] = close
+			distances,
 			#---correlate angle and distance for each lipid for each frame
 			ax = axes[pnum]
 
 			if angle_distance_style=='means':
 				reducer = lambda x: x.mean(axis=0)
-				ys = reducer(data[sn]['data'][angle])
-				xs = reducer(distances)
+				ys = reducer(data[sn]['data'][angle][valid_frames])
+				xs = reducer(distances[valid_frames])
 				ax.scatter(xs,ys)
 			elif angle_distance_style=='all_each':
 				nlipids = distances.shape[1]
 				colors = [mpl.cm.get_cmap('jet')(i) for i in np.linspace(0,1.0,nlipids)]
 				np.random.shuffle(colors)
 				for nl in range(nlipids):
-					ys = data[sn]['data'][angle][:,nl]
-					xs = distances[:,nl]
+					ys = data[sn]['data'][angle][valid_frames,nl]
+					xs = distances[valid_frames,nl]
 					ax.scatter(xs,ys,color=colors[nl])
 				#---save the entire set of points for later
 				reducer = lambda x: x.reshape(-1)
@@ -136,7 +142,7 @@ if 'head_angle_vs_distance' in routine:
 			ax.set_xlim((xmin,xmax))
 			ax.set_ylim((ymin,ymax))
 			ax.set_aspect(abs((xmax-xmin)/(ymax-ymin))/1.0)
-			ax.set_title(work.meta[sn]['name'])
+			ax.set_title(re.sub('_','-',work.meta[sn]['name']))
 			ax.set_xlabel('distance (nm)')
 			ax.set_ylabel({'theta':r'$\mathrm{\theta}$','phi':r'$\mathrm{\phi}$'}[angle])
 			ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
