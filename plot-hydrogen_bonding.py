@@ -199,7 +199,7 @@ def hbonds_bardat(format_name=None,ion_order=None,**kwargs):
 #---block: plot settings
 bar_style = ['original','candy'][-1]
 live_plot_style = ['outline','reveal'][-1]
-show_static,press = True,is_live
+show_static,press = True,not is_live
 #---choices
 comparison = ['asymmetric_all','symmetric_all'][0]
 sns = work.specs['collections'][comparison]
@@ -276,7 +276,7 @@ def hbonds_plotter(bars=None,**checks):
 	else:
 		keys = reorder_by_ion([k for k,v in checks.items() if v],ion_order)
 		empty = not keys
-		bardat = hbonds_bardat(sns=checks.keys()[:1] if empty else keys)
+		bardat = hbonds_bardat(sns=checks.keys()[:1] if empty else keys,post=post)
 		bars = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
 			dimmer=dimmer,namer=namer,show_xticks=False,empty=empty,**bardat)
 	#---additional 
@@ -294,7 +294,7 @@ if is_live: checks = dict([(sn,widgets.ToggleButton(value=False,description=sns_
 else: checks = dict([(sn,True) for sn in sns])
 #---show a static version of the plot
 if show_static and is_live:
-	hbonds_plotter(bars_premade,extras=bars_premade['extras'],**checks)
+	hbonds_plotter(bars_premade,extras=bars_premade.extras,**checks)
 	plt.show()
 #---batch plot several version of the data
 if press:
@@ -314,6 +314,9 @@ if press:
 
 #---block: interactive plot
 if is_live:
+	#---! sometimes this throws an annoying "widget javascript not enabled" warning
+	#---! ...which you can eliminate by running "jupyter nbextension enable --py widgetsnbextension"
+	#---! ...followed by a full shutdown/run of the factory
 	def hbonds_plotter_interactive(**checks): 
 		hbonds_plotter(bars={'outline':bars_premade,'reveal':None}[live_plot_style],**checks)
 		plt.show()
