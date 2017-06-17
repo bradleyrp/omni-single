@@ -70,7 +70,7 @@ if 'simple' in routine:
 		#---! whitespace problem
 		ax.set_aspect('equal')
 		#---got latex errors? remove underscores from the name or use dollar signs
-		ax.set_title(re.sub('_','-',work.meta[sn]['name']))
+		ax.set_title(re.sub('_','-',work.meta[sn].get('name',sn)))
 		angle_image_format(ax,sn)
 		ax.set_xlim(xmin,xmax)
 		ax.set_ylim(ymin,ymax)
