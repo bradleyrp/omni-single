@@ -9,19 +9,22 @@ slices:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current: {'pbc':'mol','groups':['all','proteins'],'start':50000,'end':850000,'skip':500}
+      current_v0: {'pbc':'mol','groups':['all','proteins'],'start':50000,'end':850000,'skip':500}
+      current: +common_slices/v1
   v007:
     groups:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current: {'pbc':'mol','groups':['all','proteins'],'start':240000,'end':590000,'skip':500}
+      current_v0: {'pbc':'mol','groups':['all','proteins'],'start':240000,'end':590000,'skip':500}
+      current: +common_slices/v1
   v008:
     groups:
       all: all
       proteins: +selectors/protein_selection
     slices:
-      current: {'pbc':'mol','groups':['all','proteins'],'start':50000,'end':550000,'skip':500}
+      current_v0: {'pbc':'mol','groups':['all','proteins'],'start':50000,'end':550000,'skip':500}
+      current: +common_slices/v1
 calculations:
   protein_abstractor:
     uptype: simulation
@@ -51,19 +54,6 @@ calculations:
     specs:
       grid_spacing: 1.0
       upstream: lipid_abstractor
-  #curvature_coupling:
-  #  uptype: post
-  #  slice_name: current_protein
-  #  collections: all
-  #  specs: 
-  #    upstream: undulations
-  #diffusion_proteins:
-  #  uptype: post
-  #  group: all
-  #  slice_name: current_protein
-  #  collections: all
-  #  specs:
-  #    upstream: protein_abstractor
   lipid_mesh:
     uptype: post
     slice_name: current
@@ -73,11 +63,27 @@ calculations:
       upstream:
         lipid_abstractor:
           selector: lipid_com
+off calculations:
+  curvature_coupling:
+    uptype: post
+    slice_name: current_protein
+    collections: all
+    specs: 
+      upstream: undulations
+  diffusion_proteins:
+    uptype: post
+    group: all
+    slice_name: current_protein
+    collections: all
+    specs:
+      upstream: protein_abstractor
 variables:
   selectors:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
     protein_backbone: name BB
     resnames_lipid: ['DOPC','DOPS','PIP2']
+  common_slices:
+    v1: {'pbc':'mol','groups':['all','proteins'],'start':200000,'end':700000,'skip':1000}
 meta:
   short_namer: "lambda sn,spot: sn"
   v005: {}
