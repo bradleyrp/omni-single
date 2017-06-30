@@ -2,7 +2,7 @@
 
 import time
 from codes import curvature_coupling as couplecalc
-#---this code manually stores data
+#---we manually store/load data instead of using omnicalc
 from omnicalc import store,load
 import multiprocessing as mp
 import scipy
@@ -10,33 +10,32 @@ import scipy
 #---switches
 do_single = False
 do_strict = False
-show_optimization_log = True
+show_optimization_log = False
 do_next = 'plotting'
 eps = np.finfo(np.float32).eps
 huge_number = 1./eps
 
-#---everything must be perfect
-#---! this is too strict. fails on sphinx or something?
+#---everything must be perfect (avoid division-by-zero errors)
+#---! this is too strict. fails on sphinx.
 if do_strict:
 	import warnings
 	warnings.filterwarnings('error')
 
-#---SETTINGS///PARAMETERS
-#-------------------------------------------------------------------------------------------------------------
+###---ENERGY FUNCTIONS
 
-#---hard-coded energy functions, optimizer
-def energy_form_original(energy_raw,q_raw,kappa,gamma,vibe):
-	return (energy_raw(kappa,gamma)+1./2)/(vibe*q_raw)/(1./2+1./(np.exp(vibe*q_raw)-1))
 def energy_form(energy_raw,q_raw,kappa,gamma,vibe): 
-	#return (energy_raw(kappa,gamma)+eps)/((vibe+eps)*q_raw)/(eps+1./(np.exp((vibe+eps)*q_raw)-1+eps))
+	"""Objective function which tests the basic energy function against the harmonic oscillators."""
+	#---! excessive epsilons seem dangerous so the optimization is worth checking later
 	return (energy_raw(kappa,gamma))/((abs(vibe)+eps)*q_raw)/(eps+1./(np.exp((abs(vibe)+eps)*q_raw)-1+eps))
-def energy_form_subtract(energy_raw,q_raw,kappa,gamma,vibe):
-	return energy_raw(kappa,gamma)-(vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))
+
 def optimize_hypothesis(energy,residual,band,init_cond):
-	fit = scipy.optimize.fmin(residual(energy,band=band),x0=(tuple(init_cond),),disp=True)
+	"""Optimize the energy function within a particular range of wavevectors."""
+	fit = scipy.optimize.fmin(residual(energy,band=band),x0=(tuple(init_cond),),disp=show_optimization_log)
 	error = residual(energy,band=band)(fit)
 	result = {'kappa':fit[0],'gamma':fit[1],'vibe':fit[2],'error':error}
 	return result
+
+###
 
 #---hard-coded version controls
 roundsig = 'hcv3'
@@ -62,18 +61,7 @@ tweak_menu += [('v42',{
 	'cut_curve':(0.0,0.032),'error_ceiling':0.0014,
 	'kappa_gamma_prefactor':{'kappa':1/2.0,'gamma':1/2.0,'vibe':1.0}})]
 #---! THIS IS THE CURRENT CALCULATION FOR THE PNAS DRAFT
-tweak_menu += [('v40',{
-	'residual_form':'log',
-	'sweep_code':'sweep-v1',
-	'energy_form':energy_form,
-	'curvature_field_spec':'cfv5',
-	'inner_sign':-1.0,'fft_flag':'complex',
-	#---! errors so changed vibe below from 2.0 to 10.0
-	'init':[20,0.0,10.0],'hicut':1.0,'opt':optimize_hypothesis,
-	#---! much higher error with IBAR 0.0014 to 0.006
-	#---! must also modify cut curve or no countourf shows up
-	'cut_curve':(-0.05,0.05),'error_ceiling':0.02,
-	'kappa_gamma_prefactor':{'kappa':1/2.0,'gamma':1/2.0,'vibe':1.0}})]
+tweak_menu += [('v40',)]
 
 #---select a hard-coded version
 re_hcv = '^hcv=(.+)$'
@@ -91,6 +79,20 @@ tweak_cf = {
 	#---ignore static for now despite the cost of dynamic
 	'cfv5':[{'motion':j,'mapping':i} for i in ['single','protein'] for j in ['static','dynamic'][1:]],
 }[cfsig]
+
+#---set the motion of the curvature fields
+tweak_cf = [{'motion':j,'mapping':i} 
+	for i in ['single','protein'] for j in ['static','dynamic'][1:]]
+
+#---specify the energy function, prefactors, and default behaviors
+tweak = {
+	'residual_form':'log',
+	'sweep_code':'sweep-v1',
+	'energy_form':energy_form,
+	'init':[20,0.0,10.0],
+	'hicut':1.0,'opt':optimize_hypothesis,
+	'kappa_gamma_prefactor':{
+		'kappa':1/2.0,'gamma':1/2.0,'vibe':1.0}}
 
 #---scripting sequence logic
 goto = 'plotting'
