@@ -15,7 +15,8 @@ contour_lineskip = 4
 contour_nlevels = 100
 contour_interp_pts = 100
 cut_curve = tweak['cut_curve']
-error_ceiling = tweak['error_ceiling']
+error_ceiling = tweak.get('error_ceiling',None)
+error_floor = None
 routine = ['summary']
 
 #---COLLECT
@@ -38,9 +39,9 @@ def prepare_postdat(hypo_groups,**kwargs):
 		if tweak_cf_spec['mapping'] == 'single': 
 			compspec = [('single',sn,'none') for sn in sns_all]
 		elif tweak_cf_spec['mapping'] == 'protein': 
-			control_sns = [sn for sn in sns_all if work.meta[sn]['nprots']==0]
+			control_sns = [sn for sn in sns_all if work.meta[sn].get('nprots',1)==0]
 			if control_sns:
-				sn_free, = [sn for sn in sns_all if work.meta[sn]['nprots']==0]
+				sn_free, = [sn for sn in sns_all if work.meta[sn].get('nprots',1)==0]
 				compspec = [('protein',sn_free,sn) for sn in sns_unfree]
 			#---! former typo? compspec = [('protein',sn,'none') for sn in sns_unfree]
 			compspec = [('protein',sn,'none') for sn in sns_all]
@@ -240,7 +241,7 @@ def fit_cooperativity(ax,plot_placer_sigmoid,fs=10):
 		if False: return np.pi*fac*sig**2*nprots/2.
 		return 2*np.pi*fac*sig**2*nprots
 	#---independent variable is the number of proteins
-	xs = np.array([work.meta[sn]['nprots'] for sn in sns])
+	xs = np.array([work.meta[sn].get('nprots',1) for sn in sns])
 	#---dependent variable is the bending
 	bends = ys = np.zeros(len(xs))
 	for snum,sn in enumerate(sns_all):
@@ -506,6 +507,7 @@ if 'summary' in routine:
 		#---plot the top row of raw error maps
 		error_min = min([postdat[(m,s,f)]['errormap_raw'].min() for snum,(m,s,f) in enumerate(subcomp)])
 		error_max_abs = max([postdat[(m,s,f)]['errormap_raw'].max() for snum,(m,s,f) in enumerate(subcomp)])
+		error_min_abs = min([postdat[(m,s,f)]['errormap_raw'].min() for snum,(m,s,f) in enumerate(subcomp)])
 		error_max = error_max_abs
 		levels_abs = np.linspace(error_min,error_max,contour_nlevels)
 		for snum,(mapping,sn,fallback) in enumerate(subcomp):
@@ -531,14 +533,15 @@ if 'summary' in routine:
 		ax = axes[0][-1]
 		axins = inset_axes(ax,width="5%",height="100%",loc=3,bbox_to_anchor=(1.05,0.,1.,1.),
 			bbox_transform=ax.transAxes,borderpad=0)
+		#---plot the contour maps
+		error_max = error_max_abs if not error_ceiling else error_ceiling
+		error_min = error_min_abs if not error_floor else error_floor
 		level_ticks = np.linspace(error_min,error_max,cbar_nlevels)
 		powlev = int(('%.2e'%level_ticks[-1]).split('e')[1])
 		cbar = plt.colorbar(im,cax=axins,orientation="vertical",ticks=level_ticks) 
 		cbar.ax.set_yticklabels(['%.1f'%(i/10**powlev) for i in level_ticks])
 		axins.set_ylabel(r'MSE '+r'$\times 10^{%d}$'%(-1*powlev),rotation=270,labelpad=20)
-		#---plot the contour maps
-		error_max = error_max_abs if not error_ceiling else error_ceiling
-		if error_ceiling < error_min: 
+		if error_max < error_min: 
 			print '[WARNING] error_ceiling<error_min'
 			error_min = error_ceiling
 			error_max = error_max_abs
@@ -629,7 +632,7 @@ if 'summary' in routine:
 				subsel = np.where(np.all([np.array(errors)<=error_max,np.array(errors)>=error_min],axis=0))
 				errors,params = np.array(errors)[subsel],np.array(params)[subsel]
 				if len(params)==0:
-					print 'filter is too strong on params'
+					print('filter is too strong on params')
 					import pdb;pdb.set_trace()
 				param_lims[pnum] = [min([param_lims[pnum][0],min(params)]),
 					max([param_lims[pnum][1],max(params)])]

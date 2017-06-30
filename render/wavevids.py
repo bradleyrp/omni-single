@@ -53,6 +53,7 @@ def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
 		ax.set_xlim(extent[0],extent[1])
 		ax.set_ylim(extent[2],extent[3])
 		if titles: ax.set_title(titles[ni])
+	for i in range(len(axes)-npanels): fig.delaxes(axes[-1])
 	#---colorbar for the last axis	
 	axins = inset_axes(ax,width="5%",height="100%",loc=3,
 		bbox_to_anchor=(1.06,0.,1.,1.),
