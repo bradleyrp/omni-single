@@ -21,12 +21,14 @@ kwargs_vmdmake = {'CGBONDSPATH':'~/libs/cg_bonds.tcl','GMXDUMP':'~/libs/gmxdump'
 routine = [
 	#---head_snaps_detail depends on head_angle_snaps
 	'head_angle_snaps','head_angle_snaps_detail',
-	'common_hydrogen_bonding_original','common_hydrogen_bonding'][2:3]
+	'common_hydrogen_bonding'][-1:]
 
 if 'data_tilt' not in globals(): 
 	sns,(data_tilt,calc) = work.sns(),plotload('head_angle',work)
 	sns,(data_hbonds,calc) = work.sns(),plotload('hydrogen_bonding',work)
 	data_salt,calc_salt = plotload('salt_bridges',work)
+	#---! was thinking of checking proximity to box
+	#---! ...with the lipid abstractor: data_points,calc_points = plotload('lipid_abstractor',work)
 
 if 'head_angle_snaps' in routine:
 
@@ -111,7 +113,7 @@ if 'head_angle_snaps' in routine:
 
 				#---run VMD to make the snapshots via vmdmake
 				view = vmdmake.VMDWrap(site=tempdir,gro=gro,xtc=xtc,tpr=tpr,
-					frames='',xres=2000,yres=2000,**kwargs_vmdmake)
+					frames='',res=(2000,2000),**kwargs_vmdmake)
 				view.do('load_dynamic','standard','bonder')
 
 				val = reps[key]
@@ -258,6 +260,8 @@ def render_lipid_pair(**kwargs):
 	"""
 	Abstracted the vmdmake routine for looping.
 	"""
+	#---default settings
+	hbond_style = 'dashed'
 	#---unpack the kwargs
 	sn = kwargs.pop('sn')
 	frame = kwargs.pop('frame')
@@ -283,15 +287,38 @@ def render_lipid_pair(**kwargs):
 	view = vmdmake.VMDWrap(site=tempdir,gro=gro,xtc=xtc,tpr=tpr,
 		frames='',res=(4000,4000),**kwargs_vmdmake)
 	view.do('load_dynamic','standard','bonder')
-	view.command("animate goto %d"%frame)
-	#---show both lipids
+	view.command("animate goto %d"%(frame))
 	selections = []
+	#---show both lipids
 	selections.append("(resname %s and resid %s) and not hydrogen"%(pair['resname_1'],pair['resid_1']))
 	view.select(**{'partner_1':selections[-1],'style':
 		'Licorice 0.200000 12.000000 12.000000','goodsell':True})
 	selections.append("(resname %s and resid %s) and not hydrogen"%(pair['resname_2'],pair['resid_2']))
 	view.select(**{'partner_2':selections[-1],
 		'style':'Licorice 0.200000 12.000000 12.000000','goodsell':True})
+	#---for each hydrogen bond, show the lipids with the hydrogen (both are plotted to include the bond)
+	this_style = {'style':'Licorice 0.200000 12.000000 12.000000','goodsell':True}
+	for hnum,hbond in enumerate(hydrogen_bonds):
+		#---the first residue in the pair is the donor and we draw it here
+		selstring = "(resname %s and resid %s)"%(hbond['resname_1'],hbond['resid_1'])
+		selections.append('(%s and not hydrogen) or (%s and name %s)'%(selstring,selstring,hbond['name_h']))
+		select_args = dict(**{'partner_1_hbond_%d'%hnum:selections[-1]})
+		select_args.update(**this_style)
+		view.select(**select_args)
+		#---also set the endpoints for the bond itself
+		#---! currently set for heavy-heavy dashed line below
+		#view.select(**{'partner_1_hbond_%d_ref'%hnum:'(%s and name %s)'%(selstring,hbond['name_h'])})
+		view.command('set partner_1_hbond_%d_ref [atomselect top "%s"]'%(
+			hnum,'(%s and name %s)'%(selstring,hbond['name_1'])))
+		#---draw the other lipid
+		selstring = "(resname %s and resid %s)"%(hbond['resname_2'],hbond['resid_2'])
+		selections.append('(%s and not hydrogen)'%selstring)
+		select_args = dict(**{'partner_2_hbond_%d'%hnum:selections[-1]})
+		select_args.update(**this_style)
+		view.select(**select_args)
+		#view.select(**{'partner_2_hbond_%d_ref'%hnum:'(%s and name %s)'%(selstring,hbond['name_2'])})
+		view.command('set partner_2_hbond_%d_ref [atomselect top "%s"]'%(
+			hnum,'(%s and name %s)'%(selstring,hbond['name_2'])))
 	#---beads for the acceptor/donor
 	if False:
 		selections.append("((resname %s and resid %s and name %s) and not hydrogen)"%(rn1,ri1,an1))
@@ -326,11 +353,11 @@ def render_lipid_pair(**kwargs):
 			(rn1,ri1,rn2,ri2))
 		view.command("mol modstyle 2 0 HBonds 3.000000 20.000000 4.000000")
 		view.command("mol modcolor 2 top ColorID 16")
-	#---set selections for the good side method over a bond (or at least two points)
-	### representative_atom_name = "C14" ### switching to the first (random) bond
+	#---set selections for the vmd_render_good_side_bond method over a bond (or at least two points)
+	#---we could use representative points like "C14" or "P" but the conformations are too dynamic
 	for resid_ind in [1,2]:
 		view.command("set %s [atomselect top \"(resname %s and resid %s and name %s)\"]"%(
-			'partner_%s_bead',pair['resname_%d'%resid_ind],
+			'partner_%d_bead'%resid_ind,pair['resname_%d'%resid_ind],
 			pair['resid_%d'%resid_ind],pair['name_%d'%resid_ind]))
 	#---show the good side
 	view.command(vmd_render_good_side_bond)
@@ -343,14 +370,19 @@ def render_lipid_pair(**kwargs):
 			"name %s and within 4.6 of (resname %s and resid %s)"%(
 			work.meta[sn]['cation'],work.meta[sn]['ptdins_resname'],pair['resid_%d'%resid_ind]),
 			'smooth':False,'style':'VDW 0.4 12.0','goodsell':True,'color_specific':True})
+	for hnum,hbond in enumerate(hydrogen_bonds):
+		if hbond_style=='cylinder':
+			view.command(("draw cylinder [expr [$partner_1_hbond_%d_ref get {x y z}]] "+
+				"[expr [$partner_2_hbond_%d_ref get {x y z}]] radius 0.1")%(hnum,hnum))
+		elif hbond_style=='dashed':
+			view.command(("draw line [expr [$partner_1_hbond_%d_ref get {x y z}]] "+
+				"[expr [$partner_2_hbond_%d_ref get {x y z}]] style dashed")%(hnum,hnum))
 	#---render to disk
 	view['snapshot_filename'] = snapshot_fn
-	view.command("draw cylinder [expr [$partner_2_bead get {x y z}]] "+
-		"[expr [$partner_1_bead get {x y z}]] radius 0.1")
 	view.do('snapshot')
 	view.show(quit=True)
 
-if 'common_hydrogen_bonding_original' in routine:
+if 'common_hydrogen_bonding' in routine:
 
 	#---settings
 	tag_hbonds = 'v5'
@@ -361,7 +393,9 @@ if 'common_hydrogen_bonding_original' in routine:
 	n_most_popped_bonds = 3
 	#---number of snapshots to do. we walk down the list of ranked commonest bonds, which is 
 	#---...partly arbitrary (see notes below) hence  this just gives us more snapshots more or less
-	nranked = 5
+	#---you can specify explicit nranked list to debug things very carefully
+	nranked = 10
+	# nranked = [0]
 
 	#---store the snapshots in the post_plot_spot according to the tag
 	tempdir = os.path.join(work.paths['post_plot_spot'],'fig.hydrogen_bonding.%s'%tag_hbonds)
@@ -370,12 +404,9 @@ if 'common_hydrogen_bonding_original' in routine:
 	else:
 		try: os.mkdir(tempdir)
 		except: status('directory exists so we are overwriting')
-		status('snapshots dropping to %s (delete them if you want to re-make them)'%tempdir,tag='note')
-
-		#---precache identities in case they are already rendered
-		#if 'snap_plan' not in globals():
-		#	snap_plan = {}
-
+		status('snapshots dropping to %s'%tempdir,tag='note')
+		if not overwrite_snaps: status('delete the snapshot directory to rebuild them')
+		#---we no longer precache identities here
 		#---note that this section has been ported in from plot-hydrogen_bonding.py from legacy
 		#---...omnicalc however the underlying hydrogen bond data structure changed a lot since it was
 		#---...written so we collect the most populated hydrogen bonds using some new code below.
@@ -384,12 +415,15 @@ if 'common_hydrogen_bonding_original' in routine:
 		#---...something similar to the original snapshotter, however it is also not composition-
 		#---...weighted, and in later sections we will use better selection criteria
 		#---the original code was from plot-hydrogen_bonds.py and plot-head_angle_contours.py in legacy
-
+		snapshot_catalog = {}
 		#---get the top three hydrogen bonds from each simulation
 		for sn in sns_group:
-			bonds,obs = [data_hbonds[sn]['data'][i] for i in ['bonds','observations']]
+			bonds,obs,valid_frames = [data_hbonds[sn]['data'][i] 
+				for i in ['bonds','observations','valid_frames']]
 			#---discard atom names
 			bonds_red = bonds[:,np.array([0,1,3,4])]
+			#---this step induces a sort of sorts, so that actually the line where we define the ranking
+			#---...ends up being in order over the mean of the sum of observations
 			bonds_inds,bonds_counts = uniquify(bonds_red)
 			#---subselect lipids and filter out intramolecular bonds
 			lipid_resnames = np.array(work.vars['selectors']['resnames_lipid_chol'])
@@ -408,7 +442,8 @@ if 'common_hydrogen_bonding_original' in routine:
 				for i in bonds_red[bonds_inds][subsel]]
 			#---loop over rankings. these are somewhat arbitrary because we have subselected so hard
 			ranking = np.argsort([obs.T[i].sum(axis=0).mean() for i in map_red_to_obs])[::-1]
-			for rank_num in range(nranked):
+			nranked = range(nranked) if type(nranked)==int else nranked
+			for rank_num in nranked:
 				#---now we have the commonest bonds so we can find the most-representative frame
 				#---the ranking is over the map_red_to_obs which indexes the whole list
 				#---...so we consult the whole obs list to get the particular bonds that have the reduced
@@ -416,6 +451,10 @@ if 'common_hydrogen_bonding_original' in routine:
 				#---...will probably have the max since our unique residue-residue bond probably only has
 				#---...a handful of different unique bonds over the atoms
 				fr = np.argmax(obs.T[map_red_to_obs[ranking[rank_num]]].sum(axis=0))
+
+				#---! wow. where to begin. this frame is wrong and it was really tough to figure out why
+				frame_actual = valid_frames[fr]
+
 				#---for each of the observed hydrogen bonds at this frame we save instructions to render it
 				#---first we get the handful of bonds that for our resid-resid pair
 				bonds_by_pair = bonds[map_red_to_obs[ranking[rank_num]]][
@@ -425,7 +464,7 @@ if 'common_hydrogen_bonding_original' in routine:
 				bonds_in_frame = np.where(obs.T[map_red_to_obs[ranking[rank_num]]].T[fr])
 				bond_spec_keys = 'resname_1 resid_1 name_1 resname_2 resid_2 name_2 name_h'
 				bond_spec = dict(hydrogen_bonds=[
-					dict([(bond[ii],i) for ii,i in enumerate(bond_spec_keys.split())]) 
+					dict([(i,bond[ii]) for ii,i in enumerate(bond_spec_keys.split())]) 
 					for bond in bonds_by_pair[bonds_in_frame]])
 				#---construct a description of the lipid pair, first checking that there is only one pair
 				inds,counts = uniquify(bonds_by_pair[bonds_in_frame][:,np.array([0,1,3,4])])
@@ -433,22 +472,17 @@ if 'common_hydrogen_bonding_original' in routine:
 					bonds_by_pair[bonds_in_frame])
 				lipid_pair_spec = dict([(i,bonds_by_pair[bonds_in_frame][inds[0]][ii]) 
 					for ii,i in enumerate(bond_spec_keys.split())])
-
 				#---now that we have all of the instructions we render it		
-				filetag = 'snap.%s.fr%d.%s_%s_o%d'%(sn,fr,
+				filetag = 'fig.snapshot.%s.fr%d.%s_%s_o%d'%(sn,fr,
 					lipid_pair_spec['resid_1'],lipid_pair_spec['resid_2'],rank_num)
-				render_spec = dict(sn=sn,pair=lipid_pair_spec,frame=fr,tempdir=tempdir,fn=filetag)
+				render_spec = dict(sn=sn,pair=lipid_pair_spec,frame=frame_actual,tempdir=tempdir,fn=filetag)
 				render_spec.update(**work.get_gmx_sources(sn=sn,calc=calc))
 				render_spec.update(**bond_spec)
 				render_lipid_pair(**render_spec)
-				status('done rendering simulation %s'%sn,i=rank_num,looplen=nranked,tag='render')
+				status('done rendering simulation %s'%sn,i=rank_num,looplen=len(nranked),tag='render')
+				snapshot_catalog[(sn,rank_num)] = render_spec
 
-				#---! dev
-				#break
-			#---! dev
-			# break
-
-if 'common_hydrogen_bonding' in routine:
+if 'common_hydrogen_bonding_new_development' in routine:
 
 	sn = 'membrane-v532'
 

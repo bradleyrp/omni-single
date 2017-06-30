@@ -117,6 +117,11 @@ variables:
     steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
     current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
     current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
+  hydration_cutoffs: 
+    NA: 3.05
+    MG: 2.3
+    Cal: 2.6
+    K: 3.0
   names:
     proper_residue_names_long:
       CHL1: Cholesterol
@@ -279,6 +284,7 @@ meta:
     ion_label:          "$\\mathrm{{Na}^{+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ptdins_resname:      PI2P
+    hydration_cutoff:    2.6
   membrane-v531:
     composition_name:    asymmetric
     cation:              MG
@@ -325,6 +331,7 @@ meta:
     composition_name:    asymmetric
     cation:              "Na,Cal"
     cations:            ['NA','Cal']
+    cation_relevant:     Cal
     anion:               CL
     ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
@@ -333,6 +340,7 @@ meta:
     composition_name:    symmetric
     cation:              "Na,Cal"
     cations:            ['NA','Cal']
+    cation_relevant:     Cal
     anion:               CL
     ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
@@ -460,6 +468,11 @@ calculations:
       upstream: 
         lipid_abstractor:
           selector: lipid_chol_com
+  hydration:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
 
 # set aside
 calculations_aside:
@@ -525,7 +538,7 @@ plots:
       ion_binding: {}
       ion_binding_combinator:
         zonecut: 2.2
-      ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
+      #ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
   hydrogen_bonding:
     calculation: hydrogen_bonding
     collections: all
@@ -540,3 +553,13 @@ plots:
     calculation:
       lipid_areas2d:
         selector: lipid_com
+  hydration:
+    calculation: hydration
+    collections: all
+  head_angle_contour:
+    calculation: head_angle
+  ptdins_snapshots:
+    calculation:
+      # are these necessary? you are plotloading tilt without adding it here
+      hydrogen_bonding: {}
+      salt_bridges: {}
