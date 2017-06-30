@@ -27,13 +27,13 @@ def lipid_mesh(**kwargs):
 	nframes = dat['nframes']
 
 	#---parallel
-	start = time.time()
 	mesh = [[],[]]
 	if debug: 
 		mn,fr = 0,10
 		makemesh(dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr],debug=True)
 		sys.exit(1)
 	for mn in range(2):
+		start = time.time()
 		mesh[mn] = Parallel(n_jobs=work.nprocs,verbose=0)(
 			delayed(makemesh)(
 				dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr])
@@ -46,8 +46,6 @@ def lipid_mesh(**kwargs):
 	result['vecs'] = dat['vecs']
 	result['resnames'] = resnames
 	result['monolayer_indices'] = monolayer_indices
-	#result['timeseries'] = array(work.slice(sn)[kwargs['slice_name']][
-	#	'all' if not kwargs['group'] else kwargs['group']]['timeseries'])
 		
 	#---pack mesh objects
 	#---keys include: vertnorms simplices nmol facenorms gauss points vec ghost_ids mean principals areas
@@ -58,4 +56,3 @@ def lipid_mesh(**kwargs):
 				result['%d.%d.%s'%(mn,fr,key)] = mesh[mn][fr][key]		
 				
 	return result,attrs	
-

@@ -2,6 +2,7 @@
 
 """
 PLOT hydrogen bonding
+Tested by rpb on ptdins on dark on 2017.07.15 at the terminal and in jupyter.
 """
 
 import copy
@@ -133,12 +134,20 @@ def make_bar_formats(sns,style):
 def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None):
 	barspecs = bar_formats
-	ion_names = ['K','NA','Na,Cal','MG','Cal']
-	ptdins_names = ['PI2P','P35P','SAPI']
+	global comparison
+	#---custom items in the legend based on the comparison
+	if comparison=='asymmetric_all':
+		ion_names = ['K','NA','Na,Cal','MG','Cal']
+		ptdins_names = ['PI2P','P35P','SAPI']
+	elif comparison=='symmetric_all':
+		ion_names = ['NA','MG','Cal']
+		ptdins_names = ['PI2P','PIPU','PIPP']
+	else: raise Exception('add comparison to legend maker: %s'%comparison)
 	rectangle_specs,patches,labels = {},[],[]
 	for name,group in [('cation',ion_names),('ptdins_resname',ptdins_names)]:
 		for item in group:
-			sn = next(sn for sn in sns if work.meta[sn][name]==item)
+			tru: sn = next(sn for sn in sns if work.meta[sn][name]==item)
+			except: raise Exception('cannot get a simulation for %s,%s'%(name,item))
 			if sn not in sns_this: continue
 			rectangle_specs[sn] = {}
 			if name=='cation':
@@ -199,9 +208,9 @@ def hbonds_bardat(format_name=None,ion_order=None,**kwargs):
 #---block: plot settings
 bar_style = ['original','candy'][-1]
 live_plot_style = ['outline','reveal'][-1]
-show_static,press = True,is_live
+show_static,press = True,not is_live
 #---choices
-comparison = ['asymmetric_all','symmetric_all'][0]
+comparison = ['asymmetric_all','symmetric_all'][-1]
 sns = work.specs['collections'][comparison]
 ion_order = ['K','NA','Na,Cal','MG','Cal']
 sns = reorder_by_ion(sns,ion_order)
@@ -253,7 +262,7 @@ for upkey in ['both','salt']:
 			posts[upkey][sn][measure] = dict([(p,posts[upkey][sn][measure][p]) for p in pairs])
 
 #---select the plotting target
-post = posts['both']
+post,title = posts['both'],'hydrogen bonding + salt bridges'
 #---prepare the data
 bardat = hbonds_bardat(sns=sns,post=post)
 bars_premade = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
@@ -274,9 +283,10 @@ def hbonds_plotter(bars=None,**checks):
 			else: bars.off(*[(key,sn) for (key,sn) in bars.names if sn==sn_checked])
 	#---no incoming bars tells us to recompute the bar object for the bars that we want
 	else:
+		global post
 		keys = reorder_by_ion([k for k,v in checks.items() if v],ion_order)
 		empty = not keys
-		bardat = hbonds_bardat(sns=checks.keys()[:1] if empty else keys)
+		bardat = hbonds_bardat(sns=checks.keys()[:1] if empty else keys,post=post)
 		bars = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
 			dimmer=dimmer,namer=namer,show_xticks=False,empty=empty,**bardat)
 	#---additional 
@@ -285,7 +295,7 @@ def hbonds_plotter(bars=None,**checks):
 	bars.ax.set_ylabel(r'$\frac{\langle {N}_{bonds} \rangle}{{N}_{donor}{N}_{acceptor}}$',fontsize=26)
 	bars.ax.yaxis.grid(which="minor",color='k',linewidth=0.5,alpha=0.5,zorder=0)
 	bars.ax.tick_params(axis=u'both', which=u'both',length=0)
-	bars.ax.set_title('hydrogen bonding',fontsize=40)
+	bars.ax.set_title(checks.get('title','hydrogen bonds'),fontsize=40)
 	legend,patches = legend_maker_stylized(bars.ax,sns_this=sns)
 	return legend
 
@@ -294,26 +304,30 @@ if is_live: checks = dict([(sn,widgets.ToggleButton(value=False,description=sns_
 else: checks = dict([(sn,True) for sn in sns])
 #---show a static version of the plot
 if show_static and is_live:
-	hbonds_plotter(bars_premade,extras=bars_premade['extras'],**checks)
+	hbonds_plotter(bars_premade,extras=bars_premade.extras,**checks)
 	plt.show()
 #---batch plot several version of the data
 if press:
 	#---which figures to make
 	press_specs = {
-		'hydrogen_bonding.salt':{'posts_subkey':'salt'},
-		'hydrogen_bonding.hbonds':{'posts_subkey':'hbonds'},
-		'hydrogen_bonding.both_hbonds_salt':{'posts_subkey':'both'},}
+		'hydrogen_bonding.salt':{'posts_subkey':'salt','title':'salt bridges'},
+		'hydrogen_bonding.hbonds':{'posts_subkey':'hbonds','title':'hydrogen bonds'},
+		'hydrogen_bonding.both_hbonds_salt':{
+			'posts_subkey':'both','title':'hydrogen bonds + salt bridges'},}
 	#---batch of figures
 	for tag,spec in press_specs.items():
 		bars_premade = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
 			dimmer=dimmer,namer=namer,show_xticks=False,
 			**hbonds_bardat(sns=sns,post=posts[spec['posts_subkey']]))
-		legend = hbonds_plotter(bars_premade,**checks)
-		picturesave('fig.%s'%(tag),work.plotdir,
+		legend = hbonds_plotter(bars_premade,title=spec['title'],**checks)
+		picturesave('fig.%s.%s'%(tag,comparison),work.plotdir,
 			backup=False,version=True,meta={},extras=[legend])
 
 #---block: interactive plot
 if is_live:
+	#---! sometimes this throws an annoying "widget javascript not enabled" warning
+	#---! ...which you can eliminate by running "jupyter nbextension enable --py widgetsnbextension"
+	#---! ...followed by a full shutdown/run of the factory
 	def hbonds_plotter_interactive(**checks): 
 		hbonds_plotter(bars={'outline':bars_premade,'reveal':None}[live_plot_style],**checks)
 		plt.show()

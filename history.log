@@ -1,1 +1,4 @@
-2017.04.27.1015 project: ocean plot-undulations.py: pass
+2017.04.27.1015 {'project':'ocean','script':'plot-undulations.py','pass':True}
+2017.05.26.1245 {'project':'banana','script':'plot-undulations.py','pass':True,'notes':'dump-xyz works for exporting data to text for matching to other codes'}
+2017.06.07.0815 {'project':'banana':'script':'pipeline-curvature_coupling.py','pass':True,'notes':'tentative pass for the curvature coupling test with several minor issues to be addressed including incorrect reported kappa values and counterintuitive results. this script works in tandem with pipeline-curvature_coupling_plot.py which is automatically called. requires manual deletion to recompute.'}
+2017.06.15.1700 {'project':'ptdins','script':'plot-hydrogen_bonding.py','pass':True,'notes':'tested this plot at the terminal and also in the interactive mode. plot works great and the factory serves it pretty easily.'}

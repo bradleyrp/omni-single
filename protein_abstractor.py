@@ -27,7 +27,7 @@ def protein_abstractor(grofile,trajfile,**kwargs):
 	uni = MDAnalysis.Universe(grofile,trajfile)
 	#---! cgmd removed here sel = uni.select_atoms(work.vars['selectors']['protein_selection'])
 	sel = uni.select_atoms('protein')
-	nprots = work.meta[sn]['nprots']
+	nprots = work.meta[sn].get('nprots',1)
 	beads_per_protein = len(sel.resids)/nprots
 	nframes = len(uni.trajectory)
 	inds = [arange(i*beads_per_protein,(i+1)*beads_per_protein) for i in range(nprots)]
