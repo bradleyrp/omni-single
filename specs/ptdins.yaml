@@ -432,6 +432,34 @@ calculations:
     specs:
       distance_cutoff: 
         loop: [2.2,3.4,4.6]
+  # note in the lab notebook taht running the plot without this tells you that it's missing pretty clearly...
+  lipid_areas2d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  head_angle:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections:
+      - asymmetric
+      - position
+      #---hacked for simple overlay
+      - dilute
+      - all
+    specs:
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_chol_com
 
 # set aside
 calculations_aside:
@@ -471,20 +499,6 @@ calculations_aside:
                 loop:
                   - lipid_com
                   - lipid_chol_com
-  head_angle:
-    uptype: simulation
-    slice_name: current
-    group: all
-    collections:
-      - asymmetric
-      - position
-      #---hacked for simple overlay
-      - dilute
-      - all
-    specs:
-      upstream: 
-        lipid_abstractor:
-          selector: lipid_chol_com
   electron_density_profile:
     group: all
     uptype: simulation
@@ -514,10 +528,15 @@ plots:
       ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
   hydrogen_bonding:
     calculation: hydrogen_bonding
-    collections: asymmetric_all
+    collections: all
+  # no plot but hydrogen_bonding uses these data via plotload to plot everything
   salt_bridges:
     calculation: 
       salt_bridges:
         # RYAN DO NOT USE SPECS HERE THIS IS VERY COUNTERINTUITIVE
         distance_cutoff: 2.2
-    collections: asymmetric_all
+    collections: all
+  lipid_areas2d:
+    calculation:
+      lipid_areas2d:
+        selector: lipid_com

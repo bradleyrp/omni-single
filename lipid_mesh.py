@@ -56,4 +56,3 @@ def lipid_mesh(**kwargs):
 				result['%d.%d.%s'%(mn,fr,key)] = mesh[mn][fr][key]		
 				
 	return result,attrs	
-
