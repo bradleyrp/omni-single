@@ -100,7 +100,7 @@ variables:
         psf: "1protein_again_autopsf-v2.psf"
         dcds: ['repetitive.dcd']
 meta:
-  short_namer: "lambda s : ('v'+re.match('^simulation-v(\\d+)',s).group(1) if re.match('^simulation-v(\\d+)',s) else s)"
+  short_namer: "lambda s,spot : ('v'+re.match('^simulation-v(\\d+)',s).group(1) if re.match('^simulation-v(\\d+)',s) else s)"
   mk001: 
     label: "v1"
     nprots: 1
