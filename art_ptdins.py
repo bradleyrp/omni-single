@@ -53,13 +53,14 @@ def colorize(metadat,comparison='',resname=''):
 				('Na,Cal','PI2P',):'blue',
 				('K','PI2P'):'grey',
 
-
 				('MG','PI2P'):'red',
 				('Cal','PI2P'):'blue',
 				('MG','P35P'):'purple',
 				('Cal','P35P'):'orange',
 				('NA','PI2P'):'green',
 				('NA','PIPU'):'brown',
+				#---hackish
+				('NA','SAPI'):'brown',
 				('NA','PIPP'):'grey',},}
 		compare_to_value = {
 			'symmetric':['cation'],	
@@ -336,3 +337,55 @@ def delveset_list(o,value,*k):
     else:
         if k[0] not in range(len(o)): raise Exception('invalid delveset_list path: o="%s", k="%s"'%(o,k))
         delveset_list(o[k[0]],value,*k[1:])
+        
+"""
+Common figures specifications.
+"""
+
+_art_words += ['figplacer','figlayout','figplace','blank_unused_axes']
+
+def figplacer(sn,figplace):
+	"""
+	Return the outer and inner axes indices for a particular simulation given a figplace.
+	"""
+	rown = next(row for row,i in enumerate(figplace) if sn in i)
+	coln = next(i.index(sn) for row,i in enumerate(figplace) if sn in i)
+	return rown,coln
+
+figlayout = {}
+figlayout['4x4'] = {'out':{'grid':[1,1]},'ins':[{'grid':[2,2]}]}
+figlayout['summary1'] = {'out':{'grid':[4,1]},'ins':[
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},]}
+
+figlayout['summary2'] = {'out':{'grid':[5,1]},'ins':[
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},
+	{'grid':[1,3],'wspace':0.5},]}
+	
+#---FIGURE PLACEMENTS	
+
+figplace = {}
+figplace['summary1'] = [
+	['membrane-v509','membrane-v510','membrane-v511'],
+	['membrane-v530','membrane-v531','membrane-v532'],
+	['membrane-v536','membrane-v533','membrane-v534'],
+	['membrane-v538','membrane-v514','membrane-v515'],]	
+
+figplace['summary2'] = [
+	['membrane-v509','membrane-v510','membrane-v511'],
+	['membrane-v530','membrane-v531','membrane-v532'],
+	['membrane-v536','membrane-v533','membrane-v534'],
+	['membrane-v538','membrane-v514','membrane-v515'],
+	['membrane-v543','membrane-v542',None],]	
+
+def blank_unused_axes(axes,fig,figplace):
+	"""Remove blank figures."""
+	for rr,cc in [(ii,jj) for ii,i in enumerate(figplace) 
+		for jj,j in enumerate(i) if j==None]:
+		fig.delaxes(axes[rr][cc])
+

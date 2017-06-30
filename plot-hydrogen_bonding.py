@@ -146,7 +146,7 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	rectangle_specs,patches,labels = {},[],[]
 	for name,group in [('cation',ion_names),('ptdins_resname',ptdins_names)]:
 		for item in group:
-			tru: sn = next(sn for sn in sns if work.meta[sn][name]==item)
+			try: sn = next(sn for sn in sns if work.meta[sn][name]==item)
 			except: raise Exception('cannot get a simulation for %s,%s'%(name,item))
 			if sn not in sns_this: continue
 			rectangle_specs[sn] = {}
@@ -210,7 +210,7 @@ bar_style = ['original','candy'][-1]
 live_plot_style = ['outline','reveal'][-1]
 show_static,press = True,not is_live
 #---choices
-comparison = ['asymmetric_all','symmetric_all'][-1]
+comparison = ['asymmetric_all','symmetric_all'][0]
 sns = work.specs['collections'][comparison]
 ion_order = ['K','NA','Na,Cal','MG','Cal']
 sns = reorder_by_ion(sns,ion_order)
