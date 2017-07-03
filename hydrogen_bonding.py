@@ -327,7 +327,11 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 		
 	#---debug
 	if debug:
-		fr = 36
+		hbonds.donors_side = donors_side
+		hbonds.donors_inds = donors_inds
+		hbonds.donors_inds = donors_inds
+		hbonds.acceptors_side = acceptors_side
+		fr = 686 #---careful debugging at this frame
 		incoming = hbonds.hbonder_framewise(fr,distance_cutoff=distance_cutoff,angle_cutoff=angle_cutoff)
 		sys.quit()
 
@@ -345,9 +349,8 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	#---get valid frames
 	valid_frames = np.where([len(i['donors'])>0 for i in incoming])[0]
 	#---concatenate the donor/acceptor indices across all frames
-	if False:
-		donor_cat = np.concatenate([donors_inds[0][incoming[i]['donors']] for i in valid_frames]).astype(int)
-	donor_cat = np.concatenate([donors_reindex[:,0][incoming[i]['donors']] for i in valid_frames]).astype(int)
+	donor_cat,donor_cat_h = [np.concatenate([donors_inds[j][incoming[i]['donors']] 
+		for i in valid_frames]).astype(int) for j in range(2)]
 	acceptor_cat = np.concatenate([incoming[i]['acceptors'] for i in valid_frames]).astype(int)
 	obs_by_frames = np.array([len(incoming[i]['acceptors']) for i in valid_frames]).astype(int)
 
@@ -378,7 +381,10 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	status('tabulating all distinct hydrogen bonds',tag='compute')
 	tabulation = np.transpose((donors_side.resnames[donor_cat],donors_side.resids[donor_cat],
 		donors_side.names[donor_cat],acceptors_side.resnames[acceptor_cat],
-		acceptors_side.resids[acceptor_cat],acceptors_side.names[acceptor_cat],))
+		acceptors_side.resids[acceptor_cat],acceptors_side.names[acceptor_cat],
+		#---include the hydrogen identity here in the tabulation (note this might make things larger?)
+		#---also note that the hydrogen atom name should be enough because we already have the donor resid
+		donors_side.names[donor_cat_h],))
 	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
 
 	#---reduce tabulation by discarding all SOL-SOL bonds
@@ -415,7 +421,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	bonds_to_idx = dict([(tuple(b),bb) for bb,b in enumerate(bonds)])
 	frame_lims = np.concatenate(([0],np.cumsum(obs_by_frames)))
 	for fr,i in enumerate(frame_lims[:-1]):
-		status('counting observations per frame',i=fr,looplen=len(valid_frames),
+		status('counting observations',i=fr,looplen=len(valid_frames),
 			tag='compute',start=start_time)
 		obs = tabulation[frame_lims[fr]:frame_lims[fr+1]]
 		counts_per_frame[fr][np.array([bonds_to_idx[tuple(o)] for o in obs])] += 1

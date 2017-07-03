@@ -76,9 +76,10 @@ def fft_field(dat):
 	#---take the norm of the FFT
 	factor = np.product(dat.shape[1:])
 	hqs_complex = np.array([fftwrap(i)/factor for i in dat])
-	if tweak['fft_flag'] == 'real': hqs = np.real(hqs_complex)
-	elif tweak['fft_flag'] == 'absolute': hqs = np.absolute(hqs_complex)
-	elif tweak['fft_flag'] in ['complex','complex_real']: hqs = hqs_complex
+	fft_flag = tweak.get('fft_flag','complex')
+	if fft_flag == 'real': hqs = np.real(hqs_complex)
+	elif fft_flag == 'absolute': hqs = np.absolute(hqs_complex)
+	elif fft_flag in ['complex','complex_real']: hqs = hqs_complex
 	else: raise
 	return hqs
 
@@ -144,7 +145,7 @@ def couplecalc(hqs,vecs,**kwargs):
 		assert len(hqs)==len(cqs)
 
 	#---crucial steps
-	if tweak['fft_flag'] == 'complex': 
+	if tweak.get('fft_flag','complex')=='complex': 
 		def multipliers(x,y):
 			#---use the fact that all real-valued functions are symmetric under FFT
 			return x*np.conjugate(y)
@@ -166,7 +167,7 @@ def couplecalc(hqs,vecs,**kwargs):
 		Should the function be generic, or is it necessary to pack it up to optimize it later?
 		"""
 
-		signterm = tweak['inner_sign']
+		signterm = tweak.get('inner_sign',-1.0)
 		#---included the half-factor for hcv3 v28,29 and removed for v30
 		curv = (kappa*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
 			+signterm*termlist[2]*q_raw**2+termlist[3])
@@ -219,7 +220,7 @@ def residual(energy,*args,**kwargs):
 	band = kwargs.get('band',slice(None,None))
 	#---default form comes from "tweak" in globals 
 	#---overrides are possible during debugging/comparison in pipeline_curvature_coupling_single.py
-	residual_form = kwargs.get('residual_form',tweak['residual_form'])
+	residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
 	if residual_form == 'log':
 		def residual_banded(arguments):
 			energies = energy(*arguments)[band]

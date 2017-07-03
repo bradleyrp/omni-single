@@ -105,7 +105,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 				divider.append(np.arange(counter,counter+atoms_per_residue[this_resname]))
 				counter += atoms_per_residue[this_resname]
 		else: raise Exception('residues have redundant resids and selection is not the easy one')
-		
+
 	#---load trajectory into memory	
 	trajectory,vecs = [],[]
 	for fr in range(nframes):

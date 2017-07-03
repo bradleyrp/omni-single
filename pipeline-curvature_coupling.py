@@ -11,7 +11,7 @@ import scipy
 do_single = False
 do_strict = False
 show_optimization_log = False
-do_next = 'plotting'
+do_next = ['plotting',None][-1]
 eps = np.finfo(np.float32).eps
 huge_number = 1./eps
 
@@ -35,50 +35,8 @@ def optimize_hypothesis(energy,residual,band,init_cond):
 	result = {'kappa':fit[0],'gamma':fit[1],'vibe':fit[2],'error':error}
 	return result
 
-###
-
 #---hard-coded version controls
-roundsig = 'hcv3'
-tweak_menu = []
-#---wish fulfillment? (note that 40 is the original 29)
-#---turned out to be correct (thank the optimizer)
-tweak_menu += [('v41',{
-	'residual_form':'log',
-	'sweep_code':'sweep-v1',
-	'energy_form':energy_form,
-	'curvature_field_spec':'cfv5',
-	'inner_sign':-1.0,'fft_flag':'complex',
-	'init':[20,0.0,2.0],'hicut':2.0,'opt':optimize_hypothesis,
-	'cut_curve':(0.0,0.032),'error_ceiling':0.0012,
-	'kappa_gamma_prefactor':{'kappa':1/2.0,'gamma':1/2.0,'vibe':1.0}})]
-tweak_menu += [('v42',{
-	'residual_form':'log',
-	'sweep_code':'sweep-v2',
-	'energy_form':energy_form,
-	'curvature_field_spec':'cfv5',
-	'inner_sign':-1.0,'fft_flag':'complex',
-	'init':[20,0.0,2.0],'hicut':1.0,'opt':optimize_hypothesis,
-	'cut_curve':(0.0,0.032),'error_ceiling':0.0014,
-	'kappa_gamma_prefactor':{'kappa':1/2.0,'gamma':1/2.0,'vibe':1.0}})]
-#---! THIS IS THE CURRENT CALCULATION FOR THE PNAS DRAFT
-tweak_menu += [('v40',)]
-
-#---select a hard-coded version
-re_hcv = '^hcv=(.+)$'
-if False: hcv_flags = [i for i in sys.argv if re.match(re_hcv,i)]
-#---reworking the code with the "good" version
-else: hcv_flags = ['hcv=v40']
-hcv_index = zip(*tweak_menu)[0].index(re.findall(re_hcv,hcv_flags[0])[0])
-hcv,tweak = tweak_menu[hcv_index]
-
-#---curvature field dataset is specified by the tweak
-cfsig = tweak['curvature_field_spec']
-tweak_cf = {
-	#---the cfv4 was first generated with hcv2 and linked in to the following codes because it is 32GB
-	'cfv4':[{'motion':j,'mapping':i} for i in ['single','protein'] for j in ['static','dynamic']],
-	#---ignore static for now despite the cost of dynamic
-	'cfv5':[{'motion':j,'mapping':i} for i in ['single','protein'] for j in ['static','dynamic'][1:]],
-}[cfsig]
+roundsig,cfsig,hcv = 'hcv3','v5','v40'
 
 #---set the motion of the curvature fields
 tweak_cf = [{'motion':j,'mapping':i} 
@@ -90,7 +48,9 @@ tweak = {
 	'sweep_code':'sweep-v1',
 	'energy_form':energy_form,
 	'init':[20,0.0,10.0],
-	'hicut':1.0,'opt':optimize_hypothesis,
+	'opt':optimize_hypothesis,
+	'hicut':1.0,
+	'cut_curve':(0.0,0.032),
 	'kappa_gamma_prefactor':{
 		'kappa':1/2.0,'gamma':1/2.0,'vibe':1.0}}
 
@@ -201,7 +161,7 @@ database['field'] = dict(
 		lambda x:{'sigma_a':1.0,'sigma_b':1.0,'isotropy':1.0,'mapping':'single','curvature':0.0} 
 			if (x['curvature']==0.0  or (x['sigma_a']==0.0 and x['sigma_b']==0.0)) else {},
 		lambda x:{'curvature':1.0} if x['curvature']!=0.0 else {},
-		lambda x:{'sn':x['fallback'],'fallback':'none'} if work.meta[x['sn']]['nprots']==0 
+		lambda x:{'sn':x['fallback'],'fallback':'none'} if work.meta[x['sn']].get('nprots',1)==0 
 			and x['curvature'] != 0.0 and x['mapping']=='protein' else {},
 		#---test specs throw errors when the fail but change specs simply "reduce" like hypotheses
 		#---incorrect: lambda x:{'mapping':'single'} if work.meta[x['sn']]['nprots']==0 else {},
@@ -227,6 +187,8 @@ if tweak['sweep_code'] == 'sweep-v1':
 	#---define sweeps
 	hypotheses = []
 	#---HACKING FOR A NEGATIVE CURVATURE INDUCER
+	extent_sweep_key = ['sigma_a','sigma_b'][0]
+	isotropy_sweep = [1.0,2.0,4.0,8.0]
 	base_range_sweep = [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
 	base_range = [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
 	curvature_sweep = np.sort(np.concatenate((-1.0*np.array(base_range),1.0*np.array(base_range),)))
@@ -237,19 +199,20 @@ if tweak['sweep_code'] == 'sweep-v1':
 	elif 'extended_curvatures' in tweak and tweak['extended_curvatures'] == 'v3':
 		curvature_sweep += [0.1]
 	sweep_curvatures_single = dict(route=['curvature'],values=curvature_sweep)
-	sweep_extents_single = dict(route=['sigma_a'],values=[float(j) for j in base_range_sweep])
+	sweep_extents_single = dict(route=[extent_sweep_key],values=[float(j) for j in base_range_sweep])
 	sweep_curvatures_pd = dict(route=['curvature'],values=curvature_sweep)
 	#---! beefed up the dynamic since it should match the single
-	sweep_extents_pd = dict(route=['sigma_a'],values=[float(j) for j in base_range_sweep])
+	sweep_extents_pd = dict(route=[extent_sweep_key],values=[float(j) for j in base_range_sweep])
+	#---sweep over isotropic
+	sweep_isotropy = dict(route=['isotropy'],values=[float(j) for j in isotropy_sweep])
 
 	#---complete the hypotheses with further sweep specification
 	#---outer loop over motions and inner if-loop over mappings
-	#sns = data.keys()
 	sns = work.sns()
-	if len(set(v['specs']['slice_name'] for k,v in calc.items()))!=1:
+	if len(set(v['specs']['slice_name'] for k,v in calc['calcs'].items()))!=1:
 		raise Exception('inconsistent slice names in upstream data from: %s'%calc.keys())
-	slice_name = [calc['undulations']['specs']['slice_name']]
-	sns_unfree = [s for s in sns if work.meta[s]['nprots']>0]
+	slice_name = [calc['calcs']['undulations']['specs']['slice_name']]
+	sns_unfree = [s for s in sns if work.meta[s].get('nprots',1)>0]
 	#---also save some of these hypotheses in groups according to the tweak_cf
 	hypo_groups = {i:[] for i in range(len(tweak_cf))}
 	for tweak_cf_subset in tweak_cf:
@@ -268,8 +231,8 @@ if tweak['sweep_code'] == 'sweep-v1':
 					hypo_groups[group_key].append(hypo_new)
 		if tweak_cf_subset['mapping'] == 'protein':
 			#---loop over simulations with "fallback" for free bilayer
-			hypotheses_pd = couplecalc.hypothesizer(sweep_curvatures_pd,sweep_extents_pd,
-				default={'mapping':'protein','isotropy':1.0,'fallback':'none','motion':motion,'theta':0.0})
+			hypotheses_pd = couplecalc.hypothesizer(sweep_curvatures_pd,sweep_extents_pd,sweep_isotropy,
+				default={'mapping':'protein','fallback':'none','motion':motion,'theta':np.pi})
 			for hypo in hypotheses_pd:
 				for sn in sns:
 					if sn not in sns_unfree:
