@@ -61,7 +61,7 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	sn = kwargs['sn']
 	work = kwargs['workspace']
 	calc = kwargs['calc']
-	debug = kwargs.get('debug',True)
+	debug = kwargs.get('debug',False)
 	run_parallel = kwargs.get('run_parallel',True)
 
 	#---settings. distance cutoff is larger for salt bridges than hydrogen bonds
@@ -187,7 +187,8 @@ def salt_bridges(grofile,trajfile,**kwargs):
 
 	#---extend to include salt bridges
 	#---some systems have two types of cations
-	cation_names = work.meta[sn].get('cations',work.meta[sn]['cation'])
+	cation_names = work.meta[sn].get('cations',work.meta[sn].get('cation',None))
+	if not cation_names: raise Exception('add "cations" to the meta dictionary for %s'%sn)
 	if type(cation_names)!=list: cation_names = [cation_names]
 	multiple_cations = len(cation_names)>1
 	cations_side = uni.select_atoms(' or '.join(['name %s'%i for i in cation_names]))
@@ -269,8 +270,6 @@ def salt_bridges(grofile,trajfile,**kwargs):
 
 		#---!!! development note. data are too big so we discard cation data in the tabulation
 		#---!!! ...which means that 
-
-	import ipdb;ipdb.set_trace()
 
 	#---package the dataset
 	result,attrs = {},{}
