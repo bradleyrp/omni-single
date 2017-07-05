@@ -8,8 +8,8 @@ collections:
     - sv005
     - sv006
   big: 
-    - v005
     - v007
+    - v005
     - v008
   small:
     - sv003
@@ -18,6 +18,7 @@ collections:
     - sv006
   one: 
     - v008
+
 slices:
   # BIG SIMULATIONS
   v005:
@@ -67,6 +68,36 @@ slices:
     slices:
       current: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':2000}
 
+variables:
+  force_field: martini
+  selectors:
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+    protein_backbone: name BB
+    resnames_lipid: ['DOPC','DOPS','POP2','POPC']
+  common_slices:
+    v1: {'pbc':'mol','groups':['all','proteins'],'start':200000,'end':700000,'skip':1000}
+  lipid_names:
+    POP2: "$\\mathrm{{PIP}_{2}}$"
+
+meta:
+  short_namer: "lambda sn,spot: sn"
+  v005:
+    label: IRSp53 (upside-down)
+  v007:
+    label: endophilin
+  v008:
+    label: IRSp53
+  extrana: >
+    Note that simulations "simulation-v004-IRSp53-PIP2-bilayer-large" and "simulation-v006-endophilin-A1-PIP2-bilayer-large" have a minimal amount of water in them, and as a result, a few lipids broke the boundary. This is corrected by the "nojumps" flag.
+  sv003:
+    label: "IRSp53 (PC,PS)"
+  sv004:
+    label: "IRSp53"
+  sv005:
+    label: "endophilin (PC,PS)"
+  sv006:
+    label: "endophilin"
+
 calculations:
   protein_abstractor:
     uptype: simulation
@@ -106,6 +137,16 @@ calculations:
       upstream:
         lipid_abstractor:
           selector: lipid_com
+  contacts:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: big
+    specs:
+      subject: protein
+      object: lipid
+      cutoff:
+        loop: [10.0,20.0]
 
 off calculations:
   curvature_coupling:
@@ -121,31 +162,6 @@ off calculations:
     collections: all
     specs:
       upstream: protein_abstractor
-variables:
-  selectors:
-    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
-    protein_backbone: name BB
-    resnames_lipid: ['DOPC','DOPS','POP2','POPC']
-  common_slices:
-    v1: {'pbc':'mol','groups':['all','proteins'],'start':200000,'end':700000,'skip':1000}
-meta:
-  short_namer: "lambda sn,spot: sn"
-  v005:
-    label: IRSp53 (upside-down)
-  v007:
-    label: endophilin
-  v008:
-    label: IRSp53
-  extrana: >
-    Note that simulations "simulation-v004-IRSp53-PIP2-bilayer-large" and "simulation-v006-endophilin-A1-PIP2-bilayer-large" have a minimal amount of water in them, and as a result, a few lipids broke the boundary. This is corrected by the "nojumps" flag.
-  sv003:
-    label: "IRSp53 (PC,PS)"
-  sv004:
-    label: "IRSp53"
-  sv005:
-    label: "endophilin (PC,PS)"
-  sv006:
-    label: "endophilin"
 
 plots:
   undulations:
@@ -164,3 +180,9 @@ plots:
       - undulations
       - protein_abstractor
     collections: big
+  contacts:
+    calculation:
+      contacts:
+        cutoff: 20.0
+    settings: 
+      show_residue_names: False
