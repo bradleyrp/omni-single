@@ -4,7 +4,7 @@
 """
 
 routine = ['contact_map','contact_by_lipid','contact_by_lipid_by_restype',
-	'lipid_capture'][-1:]
+	'lipid_capture'][:1]
 mode_list = ['explicit','reduced']
 if is_live: 
 	from ipywidgets import *
@@ -30,10 +30,12 @@ residue_type_colors = {'basic':'Blues','acidic':'Reds','hydrophobic':'Greens',
 
 #---common colors
 import brewer2mpl
-colors = {'DOPC':'blue','DOPS':'red','POP2':'magenta','all lipids':'black'}
+colors = {'DOPC':'blue','DOPS':'red','POP2':'magenta','PI2P':'magenta',
+	'all lipids':'black','DOPE':(0.0,1.0,1.0)}
 colors.update(**dict([(sn,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[sns.index(sn)]) 
 	for sn in sns]))
-lipid_label = lambda x: {'POP2':'$$\mathrm{{PIP}_{2}}$$'}.get(x,x)
+lipid_label = lambda x: dict([(i,'$$\mathrm{{PIP}_{2}}$$') 
+	for i in work.vars['selectors']['resnames_PIP2']]).get(x,x)
 
 #---block: transform incoming data
 if any([i in routine for i in ['contact_map','contact_by_lipid','contact_by_lipid_by_restype']]):
@@ -124,8 +126,9 @@ if 'contact_map' in routine:
 				xtick_interval = work.plots[plotname].get('settings',{}).get('xtick_interval',100.0)
 				ax.set_xticks(np.arange(xtick_interval,duration,xtick_interval))
 				ax.set_xlabel('time (ns)',fontsize=plotspec['fs_xlabel'])
-				im = ax.imshow(image_data/({'explicit':1.0,
-					'reduced':plotspec['binary_color_intensity']}[mode]),
+				#---! removed division by the following, designed to make things lighter when reduced
+				#---! ...{'explicit':1.0,'reduced':plotspec['binary_color_intensity']}[mode]
+				im = ax.imshow(image_data,
 					origin='lower',interpolation='nearest',extent=[0,duration,0,len(resids)],
 					aspect=float(duration)/len(resids),
 					vmax=ceiling,vmin=0,cmap=mpl.cm.__dict__[cmap])
@@ -284,7 +287,8 @@ if 'contact_by_lipid_by_restype' in routine:
 				ax.set_xticks(np.arange(len(kinds)))
 				ax.set_xticklabels(kinds,rotation=90)
 				ax.set_yticks(np.arange(len(lipid_resnames)))
-				ax.set_yticklabels([work.vars['lipid_names'].get(l,l) for l in lipid_resnames])
+				ax.set_yticklabels([work.vars['names']['proper_residue_names_long'].get(l,l) 
+					for l in lipid_resnames])
 				ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 				ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
 				if snum==len(sns)-1:
