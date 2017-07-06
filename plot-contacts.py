@@ -304,6 +304,10 @@ if 'lipid_capture' in routine:
 	the protein residue type (contact_by_lipid_by_restype). In this section 
 	"""
 
+	specs = {
+		'fig.contact_time_distributions.normed':{'normed':True},
+		'fig.contact_time_distributions.abs':{'normed':False}}
+
 	def duration_of_stay(series):
 		"""
 		"""
@@ -317,43 +321,49 @@ if 'lipid_capture' in routine:
 
 	plotspec = {'fs_legend':14,'figsize':(10,6)}
 
-	axes,fig = panelplot(
-		layout={'out':{'grid':[1,1]},'ins':[
-		{'hspace':0.2,'wspace':0.2,'grid':[1,len(sns)]}]},figsize=plotspec['figsize'])
+	for specname,spec in specs.items():
 
-	for snum,sn in enumerate(sns):
-		ax = axes[snum]
-		dat = data[sn]['data']
-		bonds,obs = [dat[i] for i in ['bonds','observations']]
-		lipids,idx = np.unique(bonds[:,rowspec.index('target_resid')],return_index=True)
-		lipid_resnames = bonds[:,rowspec.index('target_resname')][idx]
-		resnames = np.unique(lipid_resnames)
-		resnames_index = dict([(i,ii) for ii,i in enumerate(resnames)])
-		#---get the rows in the bond list that apply to each distinct lipid that participates in a bond
-		rows_by_lipids = [np.where(bonds[:,rowspec.index('target_resid')]==l)[0] for l in lipids]
-		traj = np.array([(obs.T[r].sum(axis=0)>0.)*1 for r in rows_by_lipids])
-		intermediate = []
-		for this_traj,resname in zip(traj,lipid_resnames):
-			dist,duration = duration_of_stay(this_traj)
-			intermediate.append(dict(dist=dist,duration=duration,resname=resname))
-		durations = [i['duration'] for i in intermediate]
-		times = np.arange(1,max([i.max() for i in durations])+1)
-		counts = [np.zeros((len(times))) for kind in resnames]
-		for result in intermediate:
-			#---! sloppy
-			resname,dist,duration = [result[j] for j in ['resname','dist','duration']]
-			counts[resnames_index[resname]][duration[:-1]-1] += dist
-		for resname,count in zip(resnames,counts):
-			ax.plot(times[:len(count)][np.where(count>0)],count[np.where(count>0)]/count.max(),
-				marker='.',lw=0,label=lipid_label(resname),color=colors[resname])
-			unbroken = range(0,np.where(count==0)[0][0])
-			ax.plot(times[unbroken],count[unbroken]/count.max(),color=colors[resname])
-		if snum==len(sns)-1:
-			legend = ax.legend(loc='upper left',fontsize=plotspec['fs_legend'],
-				bbox_to_anchor=(1.05,0.0,1.,1.),shadow=True,fancybox=True)	
-		ax.set_title(work.meta[sn].get('label',sn))
-		ax.set_yscale('log')
-		ax.set_xscale('log')
+		axes,fig = panelplot(
+			layout={'out':{'grid':[1,1]},'ins':[
+			{'hspace':0.2,'wspace':0.2,'grid':[1,len(sns)]}]},figsize=plotspec['figsize'])
 
-	picturesave('fig.contact_time_distributions.cutoff_%.1f'%(cutoff),work.plotdir,
-		backup=False,version=True,meta={},extras=[legend])
+		for snum,sn in enumerate(sns):
+			ax = axes[snum]
+			dat = data[sn]['data']
+			bonds,obs = [dat[i] for i in ['bonds','observations']]
+			lipids,idx = np.unique(bonds[:,rowspec.index('target_resid')],return_index=True)
+			lipid_resnames = bonds[:,rowspec.index('target_resname')][idx]
+			resnames = np.unique(lipid_resnames)
+			resnames_index = dict([(i,ii) for ii,i in enumerate(resnames)])
+			#---get the rows in the bond list that apply to each distinct lipid that participates in a bond
+			rows_by_lipids = [np.where(bonds[:,rowspec.index('target_resid')]==l)[0] for l in lipids]
+			traj = np.array([(obs.T[r].sum(axis=0)>0.)*1 for r in rows_by_lipids])
+			intermediate = []
+			for this_traj,resname in zip(traj,lipid_resnames):
+				dist,duration = duration_of_stay(this_traj)
+				intermediate.append(dict(dist=dist,duration=duration,resname=resname))
+			durations = [i['duration'] for i in intermediate]
+			times = np.arange(1,max([i.max() for i in durations])+1)
+			counts = [np.zeros((len(times))) for kind in resnames]
+			for result in intermediate:
+				#---! sloppy
+				resname,dist,duration = [result[j] for j in ['resname','dist','duration']]
+				counts[resnames_index[resname]][duration[:-1]-1] += dist
+			for resname,count in zip(resnames,counts):
+				ax.plot(times[:len(count)][np.where(count>0)],count[np.where(count>0)]/count.max(),
+					marker='.',lw=0,label=lipid_label(resname),color=colors[resname])
+				unbroken = range(0,np.where(count==0)[0][0])
+				ax.plot(times[unbroken],count[unbroken]/(count.max() if spec['normed'] else 1.0),
+					color=colors[resname])
+			if snum==len(sns)-1:
+				legend = ax.legend(loc='upper left',fontsize=plotspec['fs_legend'],
+					bbox_to_anchor=(1.05,0.0,1.,1.),shadow=True,fancybox=True,
+					title=r'residence time $\mathrm{(\tau)}$'+'\n'+r'$\mathrm{r\leq%.1f\AA}$'%cutoff)	
+			ax.set_title(work.meta[sn].get('label',sn))
+			ax.set_yscale('log')
+			ax.set_xscale('log')
+			ax.set_xlabel(r'$\mathrm{\tau}$ (ns)')
+			if snum==0: ax.set_ylabel(r'$\mathrm{{N(\tau)}/{N}_{total}}$')
+
+		picturesave('%s.cutoff_%.1f'%(specname,cutoff),work.plotdir,
+			backup=False,version=True,meta={},extras=[legend])
