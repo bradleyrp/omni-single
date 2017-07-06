@@ -397,4 +397,3 @@ if 'simple_detailed' in routine:
 	picturesave('fig.head_angle_detail',work.plotdir,backup=False,version=True,
 		meta={'tag':tag,'exemplar_rank':exemplar_rank},extras=patches)
 	plt.close()
-

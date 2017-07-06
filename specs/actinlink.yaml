@@ -1,5 +1,6 @@
 
 variables:
+  force_field: charmm
   art_director: art_ptdins.py
   composition_names:
     symmetric: symmetric
@@ -242,6 +243,12 @@ plots:
   actinlink_contacts:
     calculation:
       contacts:
-        # cutoffs from above are [2.2,3.4,5.0,10.0]
         cutoff: 10.0
-
+  actinlink_videos:
+    calculation:
+      contacts:
+        cutoff: 10.0
+  contacts:
+    calculation:
+      contacts:
+        cutoff: 2.2
