@@ -11,7 +11,7 @@ from codes.undulate_plot import undulation_panel
 import numpy as np
 
 #---block: what to plot
-routine = ['spectra','height','height_videos','dump_xyz'][2:3]
+routine = ['spectra','height','dump_xyz'][:-1]
 sns = work.sns()
 
 #---block: load the calculation data
@@ -39,6 +39,7 @@ if 'spectra' in routine:
 			keys = None
 			#---plotter
 			undulation_panel(ax,data,
+				#---! note that labels,colors comes from art
 				keys=keys,art=art,title=title,labels=labels,colors=colors,
 				lims=(0,wavevector_limit))
 		#---metadata and file tag
@@ -175,3 +176,4 @@ if 'height' in routine:
 		extrema=extrema,fs=fs,titles=titles,cmap_mpl_name=cmap_mpl_name,
 		cbar_label_specs=dict(rotation=0,labelpad=-20,y=1.1),
 		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
+		**({} if is_live else dict(outdir=work.paths['post_plot_spot'],fn='fig.average_height')))

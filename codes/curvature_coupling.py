@@ -425,7 +425,8 @@ class SpecialClass(object):
 			def dict(self):
 				return {key:self.__dict__[key] for key in self.order}
 			def present(self):
-				return {key:self.__dict__[key] for key in self.order if self.__dict__[key]}
+				#---! recent modification here !!!!!!! 2017.07.19
+				return {key:self.__dict__[key] for key in self.order if self.__dict__[key]!=None}
 		return Wrapped
 
 def magic_data(database,engine,Session):

@@ -1,6 +1,6 @@
 collections:
   all:
-    - mk004
+    - mk005
 slices:
   mk001:
     readymade_namd:
@@ -15,6 +15,11 @@ slices:
     readymade_namd:
       current:
         psf: "1protein_again_autopsf.pdb"
+        dcds: ['BMEM_sample.dcd']
+  mk005:
+    readymade_namd:
+      current:
+        psf: "1protein_again2_autopsf.psf"
         dcds: ['BMEM_sample.dcd']
 calculations:
   protein_abstractor:
@@ -47,7 +52,6 @@ calculations:
       grid_spacing:
         loop:
           - 0.5
-          - 0.25
       upstream: lipid_abstractor
   lipid_mesh:
     uptype: post
@@ -113,6 +117,9 @@ meta:
   mk004: 
     label: "example"
     nprots: 1
+  mk005: 
+    label: "example mk5"
+    nprots: 1
 plots:
   undulations:
     calculation: 
@@ -149,3 +156,14 @@ plots:
           upstream:
             lipid_abstractor:
               selector: lipid_com
+  curvature_coupling:
+    slices: current
+    calculation: 
+      - undulations
+      - protein_abstractor
+    collections: all
+    specs:
+      # last of the sweeps is  the active one
+      sweeps:
+        - {'cfsig':'hcv3','roundsig':'v5','base_range_sweep':[0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64],'base_range':[0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
+        - {'cfsig':'hcv3b','roundsig':'v5b','base_range_sweep':[0,1,2,3,4,5],'base_range':[0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}

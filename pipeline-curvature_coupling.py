@@ -11,7 +11,7 @@ import scipy
 do_single = False
 do_strict = False
 show_optimization_log = False
-do_next = ['plotting',None][-1]
+do_next = ['plotting',None][0]
 eps = np.finfo(np.float32).eps
 huge_number = 1./eps
 
@@ -36,11 +36,18 @@ def optimize_hypothesis(energy,residual,band,init_cond):
 	return result
 
 #---hard-coded version controls
-roundsig,cfsig,hcv = 'hcv3','v5','v40'
+#---! consult the metadata instead
+if False:
+	roundsig,cfsig = 'hcv3','v5'
+#---the last of the sweeps is the active one
+sweepspec = work.plots['curvature_coupling']['specs']['sweeps'][-1]
+roundsig,cfsig = sweepspec['cfsig'],sweepspec['roundsig']
+#---hard-coded master version control
+hcv = 'v40'
 
 #---set the motion of the curvature fields
 tweak_cf = [{'motion':j,'mapping':i} 
-	for i in ['single','protein'] for j in ['static','dynamic'][1:]]
+	for i in ['single','protein'][-1:] for j in ['static','dynamic'][1:]]
 
 #---specify the energy function, prefactors, and default behaviors
 tweak = {
@@ -188,9 +195,13 @@ if tweak['sweep_code'] == 'sweep-v1':
 	hypotheses = []
 	#---HACKING FOR A NEGATIVE CURVATURE INDUCER
 	extent_sweep_key = ['sigma_a','sigma_b'][0]
-	isotropy_sweep = [1.0,2.0,4.0,8.0]
-	base_range_sweep = [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
-	base_range = [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+	isotropy_sweep = [1.0,2.0,4.0,8.0][:1]
+	#---! hiding these 
+	if False:
+		base_range_sweep = [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
+		base_range = [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+	base_range_sweep = sweepspec['base_range_sweep']
+	base_range = sweepspec['base_range']
 	curvature_sweep = np.sort(np.concatenate((-1.0*np.array(base_range),1.0*np.array(base_range),)))
 	if 'extended_curvatures' in tweak and tweak['extended_curvatures'] == 'v1':
 		curvature_sweep += [0.06,0.07,0.08,0.09,0.1,0.2]+[0.4,0.6,0.8,1.0]
@@ -232,7 +243,7 @@ if tweak['sweep_code'] == 'sweep-v1':
 		if tweak_cf_subset['mapping'] == 'protein':
 			#---loop over simulations with "fallback" for free bilayer
 			hypotheses_pd = couplecalc.hypothesizer(sweep_curvatures_pd,sweep_extents_pd,sweep_isotropy,
-				default={'mapping':'protein','fallback':'none','motion':motion,'theta':np.pi})
+				default={'mapping':'protein','fallback':'none','motion':motion,'theta':0.0})
 			for hypo in hypotheses_pd:
 				for sn in sns:
 					if sn not in sns_unfree:

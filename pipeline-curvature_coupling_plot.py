@@ -110,7 +110,9 @@ def prepare_postdat(hypo_groups,**kwargs):
 				#---rhymes with the preparation of the errormap_raw above
 				subset = [h for hh,h in enumerate(hypo_groups_sub) 
 					if h['sn']==sn and h['curvature']==c and h['sigma_a']==e]
-				hypo, = subset
+				try: hypo, = subset
+				except:
+					import ipdb;ipdb.set_trace()
 				reduced = Hypothesis(**hypo).base()
 				row = sessions['hypothesis'].query(Hypothesis).filter_by(**reduced).one()
 				pk,error = row.id,row.error
@@ -660,7 +662,7 @@ if 'summary' in routine:
 			best_curvature = curvatures[np.abs(best[0]-curvatures).argmin()]
 			best_extent = extents[np.abs(best[1]-extents).argmin()]
 			lookup = {'mapping':tweak_cf_spec['mapping'],'motion':tweak_cf_spec['motion'],'isotropy':1.0,
-				'sigma_a':best_extent,'sn':sn,'fallback':fallback}
+				'sigma_a':best_extent,'sn':sn,'fallback':fallback,'curvature':1.0}
 			pk = sessions['field'].query(Field).filter_by(**Field(**(lookup)).present()).one().id
 			key_cf = ('curvature',pk)
 			if key_cf not in memory: 
