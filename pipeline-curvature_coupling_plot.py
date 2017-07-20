@@ -565,7 +565,8 @@ if 'summary' in routine:
 				vmin=error_min,levels=levels[::contour_lineskip],
 				extend='both',origin='lower',linewidths=0.5,colors='k',zorder=4)
 			this_cut_extent = 0,min([cut_extent[1],max(extents)])
-			ax.set_aspect((cut_curve[1]-cut_curve[0])/(this_cut_extent[1]-this_cut_extent[0]))
+			#---warnings are errors and set_aspect has trouble with unicode if the following is a float
+			ax.set_aspect(str((cut_curve[1]-cut_curve[0])/(this_cut_extent[1]-this_cut_extent[0])))
 			ax.set_xlim(cut_curve)
 			ax.set_ylim(0,min([cut_extent[1],max(extents)]))
 			ax.set_xticklabels(ax.get_xticks(),rotation=-90)

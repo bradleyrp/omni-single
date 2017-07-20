@@ -52,6 +52,7 @@ calculations:
       grid_spacing:
         loop:
           - 0.5
+          - 0.25
       upstream: lipid_abstractor
   lipid_mesh:
     uptype: post
@@ -159,8 +160,9 @@ plots:
   curvature_coupling:
     slices: current
     calculation: 
-      - undulations
-      - protein_abstractor
+      protein_abstractor: {}
+      undulations:
+        grid_spacing: 0.5
     collections: all
     specs:
       # last of the sweeps is  the active one

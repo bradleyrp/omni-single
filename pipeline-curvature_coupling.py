@@ -9,14 +9,14 @@ import scipy
 
 #---switches
 do_single = False
-do_strict = False
+do_strict = True
 show_optimization_log = False
 do_next = ['plotting',None][0]
 eps = np.finfo(np.float32).eps
 huge_number = 1./eps
 
 #---everything must be perfect (avoid division-by-zero errors)
-#---! this is too strict. fails on sphinx.
+#---...if you get import failures on some packages you can usually just touch __init__.py to continue
 if do_strict:
 	import warnings
 	warnings.filterwarnings('error')
