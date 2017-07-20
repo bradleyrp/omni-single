@@ -74,6 +74,7 @@ variables:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
     protein_backbone: name BB
     resnames_lipid: ['DOPC','DOPS','POP2','POPC']
+    resnames_PIP2: ['POP2','PIP2']
   common_slices:
     v1: {'pbc':'mol','groups':['all','proteins'],'start':200000,'end':700000,'skip':1000}
   lipid_names:
@@ -146,7 +147,7 @@ calculations:
       subject: protein
       object: lipid
       cutoff:
-        loop: [10.0,20.0]
+        loop: [5.0,10.0,20.0]
 
 off calculations:
   curvature_coupling:
@@ -183,6 +184,6 @@ plots:
   contacts:
     calculation:
       contacts:
-        cutoff: 20.0
+        cutoff: 5.0
     settings: 
       show_residue_names: False

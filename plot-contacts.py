@@ -3,8 +3,11 @@
 """
 """
 
+import scipy.optimize
+import scipy.stats
+
 routine = ['contact_map','contact_by_lipid','contact_by_lipid_by_restype',
-	'lipid_capture'][:1]
+	'lipid_capture'][-1:]
 mode_list = ['explicit','reduced']
 if is_live: 
 	from ipywidgets import *
@@ -34,7 +37,7 @@ colors = {'DOPC':'blue','DOPS':'red','POP2':'magenta','PI2P':'magenta',
 	'all lipids':'black','DOPE':(0.0,1.0,1.0)}
 colors.update(**dict([(sn,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[sns.index(sn)]) 
 	for sn in sns]))
-lipid_label = lambda x: dict([(i,'$$\mathrm{{PIP}_{2}}$$') 
+lipid_label = lambda x: dict([(i,'$\mathrm{{PIP}_{2}}$') 
 	for i in work.vars['selectors']['resnames_PIP2']]).get(x,x)
 
 #---block: transform incoming data
@@ -300,7 +303,7 @@ if 'contact_by_lipid_by_restype' in routine:
 				backup=False,version=True,meta={},extras=[])
 
 #---block: transform incoming data
-if 'lipid_capture' in routine:
+if 'lipid_capture_original' in routine:
 
 	"""
 	The above methods consider the total number of bonds or bound lipids (explicit vs reduced) for either 
@@ -309,8 +312,9 @@ if 'lipid_capture' in routine:
 	"""
 
 	specs = {
-		'fig.contact_time_distributions.normed':{'normed':True},
-		'fig.contact_time_distributions.abs':{'normed':False}}
+		#'fig.contact_time_distributions.normed':{'normed':True},
+		'fig.contact_time_distributions.abs':{'normed':False},
+		}
 
 	def duration_of_stay(series):
 		"""
@@ -323,13 +327,33 @@ if 'lipid_capture' in routine:
 		counts,run = np.histogram(runs,bins=np.arange(1,runs.max()+2))
 		return counts,run
 
-	plotspec = {'fs_legend':14,'figsize':(10,6)}
+	plotspec = {'fs_legend':14,'figsize':(6,10)}
+
+	funcs = {
+		'exponential':{
+			'nargs':2,
+			'f':lambda t,a,b: a*np.exp(b*t),
+			'plotspec':{'linestyle':'--'},
+			},
+		'power':{
+			'nargs':2,
+			'f':lambda x,amp,index: amp*(x**index),
+			'plotspec':{'linestyle':':'},
+			},
+		#'stretched':{'nargs':4,'f':lambda t,a,b,c,d: a*np.exp(-b*t)**(c)+d,'plotspec':{'linestyle':'-.'},},
+		}
 
 	for specname,spec in specs.items():
 
+		#---breakdown by lipid type in columns
+		resnames = list(set([tuple(np.unique(data[sn]['data']['bonds'][:,
+			rowspec.index('target_resname')])) for sn in sns]))
+		if len(resnames)!=1: raise Exception('non-unique resnames')
+		#---show the lipids separately, then together
+
 		axes,fig = panelplot(
 			layout={'out':{'grid':[1,1]},'ins':[
-			{'hspace':0.2,'wspace':0.2,'grid':[1,len(sns)]}]},figsize=plotspec['figsize'])
+			{'hspace':0.4,'wspace':0.2,'grid':[1,len(sns),1]}]},figsize=plotspec['figsize'])
 
 		for snum,sn in enumerate(sns):
 			ax = axes[snum]
@@ -357,17 +381,202 @@ if 'lipid_capture' in routine:
 				ax.plot(times[:len(count)][np.where(count>0)],count[np.where(count>0)]/count.max(),
 					marker='.',lw=0,label=lipid_label(resname),color=colors[resname])
 				unbroken = range(0,np.where(count==0)[0][0])
+				ys = count[unbroken]/(count.max() if spec['normed'] else 1.0)
 				ax.plot(times[unbroken],count[unbroken]/(count.max() if spec['normed'] else 1.0),
 					color=colors[resname])
+				ax.set_ylim((ys.min(),ys.max()))
+				#---curve fitting
+				for func,funcspec in funcs.items():
+					consts,well = scipy.optimize.curve_fit(funcspec['f'],
+						times[unbroken],count[unbroken]/(count.max() if spec['normed'] else 1.0),
+						p0=tuple([4,0.1,1.0,1.0,1.0,1.0][:funcspec['nargs']]))
+					ax.plot(times[unbroken],funcspec['f'](times[unbroken],*consts),
+						color=colors[resname],**funcspec['plotspec'])
 			if snum==len(sns)-1:
 				legend = ax.legend(loc='upper left',fontsize=plotspec['fs_legend'],
 					bbox_to_anchor=(1.05,0.0,1.,1.),shadow=True,fancybox=True,
 					title=r'residence time $\mathrm{(\tau)}$'+'\n'+r'$\mathrm{r\leq%.1f\AA}$'%cutoff)	
 			ax.set_title(work.meta[sn].get('label',sn))
 			ax.set_yscale('log')
-			ax.set_xscale('log')
+			#ax.set_xscale('log')
 			ax.set_xlabel(r'$\mathrm{\tau}$ (ns)')
 			if snum==0: ax.set_ylabel(r'$\mathrm{{N(\tau)}/{N}_{total}}$')
 
 		picturesave('%s.cutoff_%.1f'%(specname,cutoff),work.plotdir,
 			backup=False,version=True,meta={},extras=[legend])
+
+
+#---block: transform incoming data
+if 'lipid_capture' in routine:
+
+	"""
+	The above methods consider the total number of bonds or bound lipids (explicit vs reduced) for either 
+	specific protein residues (contact maps) or for all residues (contact_by_lipid) or for all residues by
+	the protein residue type (contact_by_lipid_by_restype). In this section 
+	"""
+
+	#---! normalization happens on one plot
+	plotspec = {'fs_legend':14,'figsize':(16,10)}
+
+	def duration_of_stay(series):
+		"""
+		"""
+		zeros = np.concatenate(([False],series==1,[False]))
+		diffs = np.diff(zeros*1.0)
+		starts, = np.where(diffs==1)
+		ends, = np.where(diffs==-1)
+		runs = ends - starts
+		counts,run = np.histogram(runs,bins=np.arange(1,runs.max()+2))
+		return counts,run
+
+	funcs = {
+		'exponential':{
+			'p0':[100.,-1.0],
+			'f':lambda t,a,b: a*np.exp(b*t),
+			'plotspec':{'linestyle':'--'},
+			},
+		'power':{
+			'p0':[100.,-1.0],
+			'f':lambda x,amp,index: amp*(x**index),
+			'plotspec':{'linestyle':':'},
+			},
+		'power_on_logs':{
+			'p0':[100.,-1.0],
+			'f':lambda x,amp,index: index*x+amp,
+			'plotspec':{'linestyle':':','alpha':0.5},
+			'ywrap':np.log10,'xwrap':np.log10,
+			'fplot':lambda x,amp,index: 10.0**amp*x**index,
+			},
+		'poisson':{
+			'p0':[100.,1.],
+			'f':lambda x,amp,mu: amp*scipy.stats.poisson.pmf(x,mu),
+			'plotspec':{'linestyle':'-.'},
+			},
+		'stretched':{
+			'p0':[500.0,0.05,1.0,0.0],
+			'f':lambda t,a,b,c,d: a*np.exp(-b*t)*t**(-c)+d,'plotspec':{'linestyle':'--'},},
+		}
+
+	#---breakdown by lipid type in columns
+	resnames = list(set([tuple(np.unique(data[sn]['data']['bonds'][:,
+		rowspec.index('target_resname')])) for sn in sns]))
+	if len(resnames)!=1: raise Exception('non-unique resnames')
+	else: resnames = resnames[0]
+	#---show the lipids separately, then together twice (once more for normalize)
+	combos = [[r] for r in resnames]+[list(resnames) for j in range(2)]
+	norm_styles = [None for r in resnames]+[None,'by_contact_lipids']
+	do_curve_fits = [True for r in resnames]+[False for j in range(2)]
+	nstyles = 4
+
+	overspecs = {
+		'.nobreak':{'unbroken':True},
+		'.strays':{'unbroken':False},
+		#'.cutoff10.0ns_all':{'high_pass_time_filter':10.0,'unbroken':False},
+		#'.cutoff10.0ns_nobreak':{'high_pass_time_filter':10.0,'unbroken':True},
+		#'.cutoff5.0ns_all':{'high_pass_time_filter':5.0,'unbroken':False},
+		#'.cutoff5.0ns_nobreak':{'high_pass_time_filter':5.0,'unbroken':True},
+		}
+
+	#---overall plot definitions
+	for overtag,overspec in overspecs.items():
+
+		legends = []
+		axes,fig = panelplot(
+			layout={'out':{'grid':[1,1]},'ins':[
+			{'hspace':0.2,'wspace':0.2,'grid':[len(sns),nstyles]}]},figsize=plotspec['figsize'])
+
+		#---precompute
+		postdat = {}
+		for sn in sns:
+			dat = data[sn]['data']
+			bonds,obs = [dat[i] for i in ['bonds','observations']]
+			lipids,idx = np.unique(bonds[:,rowspec.index('target_resid')],return_index=True)
+			lipid_resnames = bonds[:,rowspec.index('target_resname')][idx]
+			resnames = np.unique(lipid_resnames)
+			resnames_index = dict([(i,ii) for ii,i in enumerate(resnames)])
+			#---get the rows in the bond list that apply to each distinct 
+			#---...lipid that participates in a bond
+			rows_by_lipids = [np.where(bonds[:,rowspec.index('target_resid')]==l)[0] for l in lipids]
+			traj = np.array([(obs.T[r].sum(axis=0)>0.)*1 for r in rows_by_lipids])
+			intermediate = []
+			for this_traj,resname in zip(traj,lipid_resnames):
+				dist,duration = duration_of_stay(this_traj)
+				intermediate.append(dict(dist=dist,duration=duration,resname=resname))
+			durations = [i['duration'] for i in intermediate]
+			times = np.arange(1,max([i.max() for i in durations])+1)
+			counts = dict([(kind,np.zeros((len(times)))) for kind in resnames])
+			for result in intermediate:
+				#---! sloppy
+				resname,dist,duration = [result[j] for j in ['resname','dist','duration']]
+				counts[resname][duration[:-1]-1] += dist
+			contact_lipid_counts = dict([(r,np.sum(lipid_resnames==r)) for r in np.unique(lipid_resnames)])
+			postdat[sn] = dict(times=times,counts=counts,contact_lipid_counts=contact_lipid_counts)
+
+		fitted_consts = dict([(sn,dict()) for sn in sns])
+		#---combinations of lipids over the columns
+		for cnum,(combo,norm_style,do_curve_fit) in enumerate(
+			list(zip(combos,norm_styles,do_curve_fits))[:nstyles]):
+			#---simulations in the rows
+			for snum,sn in enumerate(sns):
+				ax = axes[snum*nstyles+cnum]
+				times,counts = [postdat[sn][i] for i in ['times','counts']]
+				contact_lipid_counts = postdat[sn]['contact_lipid_counts']
+				for resname in combo:
+					count = counts[resname]
+					if not norm_style: ys = count
+					elif norm_style=='by_contact_lipids':
+						ys = count/float(contact_lipid_counts[resname])
+					else: raise Exception('norm_style? %s'%norm_style)
+					ax.plot(times[:len(count)][np.where(count>0)],ys[np.where(count>0)],
+						marker='.',lw=0,color=colors[resname])
+					unbroken = range(0,np.where(count==0)[0][0])
+					ax.plot(times[unbroken],ys[unbroken],color=colors[resname],alpha=0.35)
+					ax.set_ylim((0.5*ys[np.where(count>0)].min(),2.0*ys[np.where(count>0)].max()))
+
+					if overspec.get('unbroken',True): utimes,uys = times[unbroken],ys[unbroken]
+					else: utimes,uys = times,ys
+					if not overspec.get('high_pass_time_filter',False): ftimes,fys = utimes,uys
+					else: 
+						subsel = np.where(times>=overspec['high_pass_time_filter'])
+						ftimes,fys = times[subsel],ys[subsel]
+					ax.set_xlim(times.min(),times.max())
+					#---curve fitting
+					if do_curve_fit:
+						fitted_consts[sn][resname] = {}
+						for func,funcspec in funcs.items():
+							try:
+								if not 'ywrap' in funcspec and not 'xwrap' in funcspec:
+									consts,well = scipy.optimize.curve_fit(
+										funcspec['f'],ftimes,fys,
+										p0=funcspec['p0'])
+									fitted_consts[sn][resname][func] = consts
+									#---don't plot stretched exponential if it sucks
+									#if func=='stretched' and fitted_consts[-1]>100.0: continue
+									ax.plot(ftimes,funcspec['f'](ftimes,*consts),
+										color='k',lw=1.0,label=func,**funcspec['plotspec'])
+								elif 'ywrap' in funcspec and 'xwrap' in funcspec:
+									consts,well = scipy.optimize.curve_fit(
+										funcspec['f'],funcspec['ywrap'](ftimes[fys>0]),
+										#---! no zeros if wrapping
+										funcspec['ywrap'](fys[fys>0]),
+										p0=funcspec['p0'])
+									fitted_consts[sn][resname][func] = consts
+									ax.plot(ftimes,funcspec['fplot'](ftimes,*consts),
+										color='k',lw=1.0,label=func,**funcspec['plotspec'])
+								else: raise Exception('dev')
+							except: print('[WARNING] failed on function %s on resname %s on simulation %s'%(
+								func,resname,sn))
+				if (snum,cnum)==(len(sns)-1,nstyles-1) and False:
+					legends.append(ax.legend(loc='upper left',fontsize=plotspec['fs_legend'],
+						bbox_to_anchor=(1.05,0.0,1.,1.),shadow=True,fancybox=True,
+						title=r'residence time $\mathrm{(\tau)}$'+'\n'+r'$\mathrm{r\leq%.1f\AA}$'%cutoff))
+				ax.set_title('%s%s'%(work.meta[sn].get('label',sn),
+					', %s'%lipid_label(resname) if len(combo)==1 else ''))
+				ax.set_yscale('log')
+				ax.set_xscale('log')
+				if snum==len(sns)-1:
+					ax.set_xlabel(r'$\mathrm{\tau}$ (ns)')
+				if cnum==0: 
+					ax.set_ylabel(r'$\mathrm{{N(\tau)}}$')
+		picturesave('%s.cutoff_%.1f%s'%('fig.contact_time_distributions_summary',cutoff,overtag),
+			work.plotdir,backup=False,version=True,meta={},extras=legends)
