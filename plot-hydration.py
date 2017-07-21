@@ -7,27 +7,66 @@ Requires standard plots.
 
 #---block: what to plot
 do_strict = False
-routine = ['basic','heatmap'][-1:]
+routine = ['basic','heatmap'][:1]
 sns = work.sns()
 #---choosing a scanning range
-hydration_scan_plot = np.sort(np.concatenate((np.arange(1.2,4.0,0.2),
-	np.arange(4.0,30.0,4.0)),np.array([2.2,4.6])))
-hydration_scan_plot = np.sort(np.concatenate((np.arange(1.2,4.0,0.2),
-	np.arange(4.0,30.0,4.0))))
+roundlev = 4  
+
+#---! remove the old "confidence" style which is deprecated
+plotspecs = [
+	{'errorbar_style':'confidence_bars','interval':0.05,'xmin':1.2,'xmax':4.0},
+	{'errorbar_style':'confidence_bars','interval':1.0,'xmin':0.0,'xmax':80.0},
+	{'errorbar_style':'confidence_bars','interval':2.0,'xmin':0.0,'xmax':50.0},][-1:]
+
+#---one plot per group of simulations set in the metadata
+sns_groups = work.plots.get('hydration',{}).get('specs',{}).get('sns',{})
+#---only load what we need
+sns = list(set([i for j in sns_groups.values() for i in j]))
+if not sns_groups: raise Exception('please set plots (hydration), specs, sns '
+	'to set simulation groups for each plot')
+#---we discard the key in the sns groups set in the metadata
+plotspecs = [dict(sns=sns_groups[key],**spec) for spec in plotspecs for key in sns_groups]
+
+hydration_scan = np.unique(np.concatenate([
+	np.arange(plotspec['xmin'],plotspec['xmax']+plotspec['interval'],plotspec['interval']).round(roundlev)
+	for plotspec in plotspecs]))
+#---cutoff sweep in angstroms
+lenscale = 10.0
+#---use reduced keys
+key_pack = lambda *args: tuple([('%0.0'+'%d'%roundlev+'f')%float(k) for k in args])
+key_unpack = lambda arg: [float(i) for i in arg.split('_')]
 
 #---block: load the calculation data
 if 'data' not in globals(): 
 	data,calc = plotload(plotname,work)
+	#---!
+	atom_filter = calc['calcs']['specs']['atom_filter']
+	distance_metric = calc['calcs']['specs']['distance_metric']
+
+#---block: remote work!
+if 'postdat' in globals():
+
+	#---unpack a transmitted postdat
+	postdat_in = postdat
+	postdat = {}
+	for key,val in postdat_in.items():
+		try: sn,lims = re.match('^(.*?)_(.*?)$',key).groups()
+		except: 
+			postdat[key] = val
+			continue
+		if sn not in postdat: postdat[sn] = {}
+		#---reduced keys
+		postdat[sn][key_pack(*key_unpack(lims))] = val
 
 #---block: organize the data by cutoffs
-if 'counts_by_zone_all' not in globals():
+if 'postdat' not in globals():
 
 	#---warnings are errors
 	if do_strict:
 		import warnings
 		warnings.filterwarnings('error')
 
-	counts_by_zone_all = {}
+	postdat = {}
 	for sn in sns:
 		dat = data[sn]['data']
 		nframes = dat['nframes']
@@ -43,11 +82,9 @@ if 'counts_by_zone_all' not in globals():
 		nears = near_lipids[ind_map_near_lipids]
 		counts = shell_counts[ind_map_shell_counts]
 
-		#---cutoff sweep in angstroms
-		lenscale = 10.0
 		#---loop over pairs (wrote this hasty)
 		pair_inds = (np.arange(0,2*len(hydration_scan))/2)[1:-1].reshape((-1,2))
-		counts_by_zone = {}
+		dat = {}
 		for ii,i in enumerate(pair_inds):
 			status('correlating hydration by distance for %s'%sn,i=ii,looplen=len(pair_inds),tag='compute')
 			lims = tuple([hydration_scan[j]/lenscale for j in i])
@@ -57,62 +94,31 @@ if 'counts_by_zone_all' not in globals():
 			for fr in range(nframes_eff):
 				counts_this = counts[fr][np.where(np.all((nears[fr]>=lims[0],nears[fr]<lims[1]),axis=0))[0]]
 				counts_by_frame.extend(counts_this)
-			counts_by_zone[lims] = np.array(counts_by_frame)
-		counts_by_zone_all[sn] = counts_by_zone
+			dat[key_pack(*lims)] = np.array(counts_by_frame)
+		postdat[sn] = dat
 
-#---block: plot the hydration versus distance
-if 'basic' in routine:
-
-	plotspecs = [{'show_errorbars':False},{'show_errorbars':True}]
-
-	#---plot schemes
-	for spec in plotspecs: 
-		symbols = {}
-		for sn in sns:
-			if work.meta[sn]['ptdins_resname']=='P35P': symbols[sn] = 's'
-			elif work.meta[sn]['cation']=="Na,Cal": symbols[sn] = 'x'
-			else: symbols[sn] = 'o'
-		figsize=(5,5)
-		layout = {'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]}
-		axes,fig = panelplot(layout,figsize=figsize)
-		ax = axes[0]
-		for sn in sns:
-			counts_by_zone = counts_by_zone_all[sn]
-			keys = np.array([key for key,val in counts_by_zone.items()])
-			keys = keys[np.argsort(keys[:,0])]
-			x_all = keys[:,1]
-			y = np.array([counts_by_zone[tuple(key)].mean() for key in keys])
-			y_err = np.array([counts_by_zone[tuple(key)].std() for key in keys])
-			y_valid = np.where(~np.isnan(y))
-			x,y,y_err = lenscale*keys[:,1][y_valid],y[y_valid],y_err[y_valid]
-			x_spots = np.arange(len(x))
-			color = colorize(work.meta[sn],comparison='protonation')
-			if spec['show_errorbars']: ax.errorbar(x_spots+0.1*sns.index(sn),y,yerr=y_err,fmt='--o',color=color)
-			else: ax.plot(x_spots,y,'-%s'%symbols[sn],ms=5,
-				color=color,label='%s, %s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label']))
-		fn_fig = 'fig.hydration%s'%('.error_bars' if spec['show_errorbars'] else '')
-		ax.set_ylabel('waters in the hydration shell')
-		ax.set_xlabel('distance to lipids')
-		ax.set_xticks(np.arange(keys[:,1].shape[0]))
-		ax.set_xticklabels(keys[:,1],rotation=90)
-		legend = ax.legend()
-		picturesave(fn_fig,work.plotdir,backup=False,version=True,meta=spec)
-
+	#---make a copy for transmission
+	#---! make this systematic
+	reform = dict([('%s_%s_%s'%(sn,i[0],i[1]),j) 
+		for sn in postdat for i,j in postdat[sn].items()])
+	attrs = dict(sns=sns,meta=work.meta,vars=work.vars)
+	if False: work.store(reform,'hydration.dat','~',attrs=attrs)
+	
 #---block: plot heat maps of the hydration versus distance
 if 'heatmap' in routine:
 
 	#---reformulate the counts by zone
 	reform = {}
 	for sn in sns:
-		counts_by_zone = counts_by_zone_all[sn]
-		keys = np.array([key for key,val in counts_by_zone.items()])
+		dat = postdat[sn]
+		keys = np.array([key for key,val in dat.items()])
 		keys = keys[np.argsort(keys[:,0])]
 		max_hydration = 10.0
 		xvals = keys[:,1]
 		yvals = np.arange(0,max_hydration)
 		heat = np.zeros((len(keys),len(yvals)-1))
 		for keynum,key in enumerate(keys):
-			counts,bins = np.histogram(counts_by_zone[tuple(key)],bins=yvals)
+			counts,bins = np.histogram(dat[tuple(key)],bins=yvals)
 			heat[keynum] = counts#/counts.sum().astype(float)
 		heat[np.isnan(heat)] = 0
 		reform[sn] = {'heat':heat,'r':xvals}
@@ -173,3 +179,194 @@ if 'heatmap' in routine:
 	blank_unused_axes(axes,fig,figplace[layout_name])
 	fn_fig = 'fig.hydration_review'
 	picturesave(fn_fig,work.plotdir,backup=False,version=True,meta={})
+
+
+#---block: plot the hydration versus distance
+if 'basic' in routine:
+
+	def stepper(x,y):
+		"""Turn a plot into a step plot."""
+		#---! decided not to use this function
+		inds_y = np.arange(0,x.shape[0],0.5).astype(int)[1:-1]
+		inds_x = np.arange(0,x.shape[0],0.5).astype(int)[:-2]
+		return x[inds_x],y[inds_y]
+
+	def slatplot(x,y,y_err,ax,color,w,thick_data,plus_off,basic_bar=False,**kwargs):
+		"""Custom "slat" plots plot a line on top of an opaque confidence interval."""
+		if basic_bar and thick_data!=None: raise Exception('cannot use basic_bar with thick_data')
+		#---independent variables are given by steps that reach out from the midpoint according to width (w)
+		xs = [x-w/2.,x+w/2.]
+		#---check overlapping points from other timeseries
+		global point_registry
+		#---rounding tolerance level for identifying overlapping points
+		roundlev = kwargs.get('roundlev',4)
+		#---the reduced point is used for checking for overlaps with a tolerance given by roundlev
+		pts_red = [np.round(x,roundlev),np.round(y,roundlev)]
+		#---if points are (even nearly) overlapping, we offset the height slightly
+		if thick_data!=None and pts_red in point_registry: 
+			#---note that we never offset without thick_data
+			off = 2*thick_data*sum([i==pts_red for i in point_registry ])
+		else: off = 0.0
+		if thick_data==None:
+			ax.plot(xs,[y+off,y+off],solid_capstyle='butt',lw=2,color=color)
+			if basic_bar:
+				ax.fill_between(xs,[0,0],[y+off,y+off],color=color,alpha=0.35,lw=0,zorder=2)
+		else:
+			#---the thicknesss of the step lines in the y-direction is given in data units
+			yt = thick_data
+			#---plot the horizontal step lines
+			ax.fill_between(xs,y+off-yt,y+off+yt,color=color,zorder=4,lw=0)
+		#---remember this point for checking overlaps later
+		point_registry.append([np.round(x,roundlev),np.round(y,roundlev)])
+		#---for hydration, there may be some points with no variance
+		if y_err==0.0 and not y_err==None:
+			#---! previously plotted these points via: ax.scatter(x,y,marker='+',color=color,zorder=3)
+			#---make a custom plus sign with a height equal to thrice the height of the steps
+			#---...and a width which is inset from the edges of the step by the plus_off flag
+			#---...which we recommend setting as some proportion of the width of the bin/interval
+			#---note that we only plot the special signs if there is no confidence interval i.e. if y_err is
+			#---...zero because otherwise the viewer would identify the overlap by the color, which is 
+			#---...darkened by layering opaque panels (note that more than two colors makes this ugly though)
+			ax.fill_between(
+				[xs[0]+plus_off,xs[1]-plus_off],
+				[y+off-yt*3,y+off-yt*3],
+				[y+off+yt*3,y+off+yt*3],
+				#---to debug the plus offsets, try adding "color if not off else 'k'"
+				color=color,zorder=4,lw=0)
+		#---make the confidence interval plot
+		elif y_err!=None:
+			ys1,ys2 = [y-y_err for j in range(2)],[y+y_err for j in range(2)]
+			ax.fill_between(xs,ys1,ys2,color=color,alpha=0.35,lw=0,zorder=2)
+			#---lay down some white so that gridlines cannot be seen behind the opaque panels
+			ax.fill_between(xs,ys1,ys2,color='w',alpha=1.0,lw=0,zorder=1)
+	
+	figspecs = {'fs_ticks':16,'fs_ylabel':20,'fs_xlabel':20,'fs_legend':14}
+
+	#---plot schemes
+	for spec in plotspecs:
+		symbols = {}
+		sns_this = [sn for sn in work.sns() if sn in spec['sns']]
+		for sn in sns_this:
+			if work.meta[sn]['ptdins_resname']=='P35P': symbols[sn] = 's'
+			elif work.meta[sn]['cation']=="Na,Cal": symbols[sn] = 'x'
+			else: symbols[sn] = 'o'
+		#---track overlapping points
+		point_registry = []
+		legendspec = []
+		figsize=(10,10)
+		layout = {'out':{'grid':[1,1]},'ins':[{'grid':[2,1],'hratios':[1,4],'hspace':0.02}]}
+		axes,fig = panelplot(layout,figsize=figsize)
+		#---the main plot lies below
+		ax,axtop = axes[1],axes[0]
+		x_collects,maxcount = [],0
+
+		do_alt_colors = len(set([work.meta[s]['cation'] for s in sns_this]))==1
+
+		for sn in sns_this:
+			dat = postdat[sn]
+			hydration_scan_plot = np.arange(plotspec['xmin'],plotspec['xmax']+
+				plotspec['interval'],plotspec['interval']).round(roundlev)
+			#---reference x values in angstroms
+			x = hydration_scan_plot[1:]
+			x_pairs = np.array([(hydration_scan_plot[i:i+2]/lenscale) 
+				for i in range(len(hydration_scan_plot)-1)]).round(roundlev)
+			y = np.array([dat[key_pack(*xp)].mean() 
+				if len(dat[key_pack(*xp)])>0 
+				else -1 for xp in x_pairs])
+			#---! repetitive
+			yn = np.array([dat[key_pack(*xp)].shape[0]/float(data[sn]['data']['nframes'])
+				if len(dat[key_pack(*xp)])>0 
+				else -1 for xp in x_pairs])
+			#---! handling alternate compositions here
+			if work.meta[sn]['composition_name']=='symmetric': yn = yn/2.0
+			maxcount = max([yn.max(),maxcount])
+			y_err = np.array([dat[key_pack(*xp)].std() 
+				if len(dat[key_pack(*xp)])>0 
+				else -1 for xp in x_pairs])
+			valid = np.where(y!=-1.0)[0]
+			#---use alternate colors if the ions are the same
+			#---! currently hard-coded
+			if do_alt_colors:
+				color = {'membrane-v509':'r','membrane-v530':'b'}[sn]
+			else: color = colorize(work.meta[sn],comparison='protonation')
+			if spec['errorbar_style']=='confidence':
+				raise Exception('deprecated')
+				kwargs = dict(ms=5,color=color,
+					label='%s, %s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label']))
+				ax.plot(x[valid],y[valid],'.',**kwargs)
+				kwargs.pop('ms')
+				kwargs.update(alpha=0.2,lw=0)
+				ax.fill_between(x[valid],y[valid]-y_err[valid],y[valid]+y_err[valid],**kwargs)
+				x_collects.extend(x[valid])
+				ax.set_xticks(x)
+				ax.set_xticklabels(['%.1f'%i for i in x],rotation=90)
+			elif spec['errorbar_style']=='confidence_bars':
+				kwargs = dict(ms=5,color=color,
+					label='%s, %s%s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'],
+						'(%s)'%work.meta[sn]['composition_name'] if do_alt_colors else ''))
+				#---for each valid point we plot a "slat" showing the confidence interval or a plus sign
+				for v in valid:
+					slatplot(x[v],y[v],y_err=y_err[v],ax=ax,
+						#---the width of the bin is the sampling interval in the lipid-ion cutoff distance
+						w=spec['interval'],color=color,
+						#---set the linewidth of the steps in data units, a (small) fraction of a water
+						thick_data=0.02,
+						#---set the inset trim of the zero-variance plus sign
+						plus_off=spec['interval']/3.)
+				x_collects.extend(x[valid])
+				minor_xticks = np.unique(np.reshape([[i+spec['interval']/2.,
+					i-spec['interval']/2.] for i in x],-1))
+				#---plot the normalization constants above ...!!!
+				for v in valid:
+					slatplot(x[v],yn[v],y_err=None,ax=axtop,
+						#---the width of the bin is the sampling interval in the lipid-ion cutoff distance
+						w=spec['interval'],color=color,thick_data=None,plus_off=None,basic_bar=True)
+				#---identical tick-mark formatting
+				for ax_this in [ax,axtop]:
+					ax_this.set_xticks(minor_xticks,minor=True)
+					ax_this.set_xticks(minor_xticks,minor=True)
+					ax_this.set_axisbelow(True)
+					ax_this.xaxis.grid(True,which='minor',zorder=0)
+				#---major ticks are set automatically and just enlarged a bit here
+				ax.set_yticklabels(['%d'%i for i in ax.get_yticks()],
+					fontsize=figspecs['fs_ticks'])
+				axtop.set_xticklabels([])
+				#---major ticks are set automatically and just enlarged a bit here
+				ax.set_xticklabels(['%.1f'%i for i in ax.get_xticks()],
+					fontsize=figspecs['fs_ticks'])
+				ax.yaxis.grid(True,which='major',zorder=0)
+				#---! should we match the opacity with slatplot?
+				legendspec.append(dict(name='%s\n%s%s'%(
+					work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'],
+					'\n(%s)'%work.meta[sn]['composition_name'] if do_alt_colors else ''),
+					patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=color,alpha=0.5)))
+			else: raise Exception('unknown errorbar style: %s'%spec['errorbar_style'])
+		axtop.set_ylim((0,maxcount*1.1))
+		#---dislike tick marks
+		axtop.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
+		axtop.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
+		for ax_this in [ax,axtop]:
+			ax_this.set_xlim(np.array(x_collects).min()-spec['interval'],np.array(x_collects).max())
+		error_bar_tag = {None:'.no_error_bars','basic':'.error_bars',
+			'confidence':'.interval','confidence_bars':'.interval_bars'}[
+			spec['errorbar_style']]
+		fn_fig = 'fig.hydration'
+		axtop.set_ylabel(r'$\mathrm{\langle N_{ions}(x) \rangle}$',fontsize=figspecs['fs_ylabel'])
+		ax.set_ylabel(r'$\mathrm{N_{waters}(x,t)}$',fontsize=figspecs['fs_ylabel'])
+		ax.set_xlabel('cation-lipid distance ($\mathrm{\AA}$)',fontsize=figspecs['fs_xlabel'])
+		#if atom_filter: axtop.set_title({'^O':'oxygen'}[atom_filter])
+		#---! not prepared for the old style
+		patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
+		patch = mpl.lines.Line2D([],[],color='k',marker='+',markersize=30,lw=0,mew=4)
+		patches.extend([
+			mpl.lines.Line2D([],[],color='k',lw=4),
+			mpl.lines.Line2D([],[],color='k',marker='+',markersize=30,lw=0,mew=4)])
+		labels.extend([r'$\mathrm{\langle N_{waters}(x,t) \rangle}$','zero\nvariance'])
+		legend = ax.legend(patches,labels,loc='upper left',fontsize=figspecs['fs_legend'],
+			#---no more than 8 items in a column
+			bbox_to_anchor=(1.05,0.0,1.,1.),labelspacing=1.2,ncol=int(np.ceil(len(sns_this)/8.)),
+			handleheight=2.0,markerscale=0.5,shadow=True,fancybox=True)
+		#---we must pass-through
+		#---! note this in the lab notebook!
+		picturesave(fn_fig,work.plotdir,backup=False,version=True,
+			meta=dict(atom_filter=atom_filter,distance_metric=distance_metric,**spec),extras=[legend])
