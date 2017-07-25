@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import time
-from codes import curvature_coupling as couplecalc
+from codes import curvature_coupling2 as couplecalc
 #---we manually store/load data instead of using omnicalc
 from omnicalc import store,load
 import multiprocessing as mp
@@ -333,7 +333,7 @@ couplecalc.work = work
 #---POOL and MULTIPROCESS
 #-------------------------------------------------------------------------------------------------------------
 
-from codes.curvature_coupling import construct_curvature_fields_trajectory
+from codes.curvature_coupling2 import construct_curvature_fields_trajectory
 #---compute pending fields according to populated rows
 fns = [(i.id,namer_cf(i.id)) for i in sessions['field'].query(Field).all()]
 pending = [(pk,fn) for pk,fn in fns if not os.path.isfile(fn)]
