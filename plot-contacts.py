@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 
 """
+MASTER CONTACTS CODE.
 """
 
-import scipy.optimize
-import scipy.stats
-
-routine = ['contact_map','contact_by_lipid','contact_by_lipid_by_restype',
-	'lipid_capture'][-1:]
+#---block: what to plot
+routine = [
+	'contact_map',
+	'contact_by_lipid',
+	'contact_by_lipid_by_restype',
+	'lipid_capture'][:]
 mode_list = ['explicit','reduced']
-if is_live: 
-	from ipywidgets import *
-	from IPython.display import display
 
 #---block: import the post-processed data	
 if 'data' not in globals(): 

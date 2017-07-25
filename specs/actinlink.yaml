@@ -251,4 +251,7 @@ plots:
   contacts:
     calculation:
       contacts:
-        cutoff: 2.2
+        cutoff: 3.4
+  actinlink_bonds:
+    calculation: contacts
+
