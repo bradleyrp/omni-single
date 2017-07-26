@@ -19,8 +19,6 @@ str_types = [str,unicode] if sys.version_info<(3,0) else [str]
 vecnorm = lambda vec: vec/np.linalg.norm(vec)
 vecangle = lambda v1,v2 : np.arccos(np.dot(vecnorm(v1),vecnorm(v2)))*(180./np.pi)
 
-from art_ptdins import uniquify
-
 #---define the columns for a row in the master dataset
 global bonds,obs,bonds_red
 rowspec = ['subject_resname','subject_resid','subject_atom',

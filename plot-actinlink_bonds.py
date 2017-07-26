@@ -13,7 +13,7 @@ from base.tools import status,framelooper
 #---block: what to plot
 routine = [
 	'contact_map',
-	'histograms','bars'][-1:]
+	'histograms','bars'][:]
 residue_types = {'ARG':'basic','HIS':'basic','LYS':'basic',
 	'ASP':'acidic','GLU':'acidic','SER':'polar','THR':'polar','ASN':'polar','GLN':'polar',
 	'ALA':'hydrophobic','VAL':'hydrophobic','ILE':'hydrophobic','LEU':'hydrophobic',
@@ -57,9 +57,9 @@ def hydrogen_bond_compactor():
 
 #---block: post-post processing
 def make_postdat():
-	global sns,data_hbonds,data_salt,data_contacts,bond_mappings
+	global sns,data_hbonds,data_contacts,bond_mappings
 	#---easy lookup for multiple upstream data types
-	pointers = {'hbonds':data_hbonds,'contacts':data_contacts,'salt':data_salt}
+	pointers = {'hbonds':data_hbonds,'contacts':data_contacts}
 	#---postdat is indexed by simulation, then bond type
 	postdat = dict([(sn,{}) for sn in sns])
 	#---loop over simulations
@@ -274,7 +274,8 @@ def bond_counter(resid,resname_set):
 	global bonds,obs,rowspec
 	#---filter the observations by the protein residue (subject_resid) and target resname
 	#---...providing a result
-	which = np.where(np.all((bonds[:,rowspec.index('subject_resid')].astype(int)==resid,np.in1d(bonds[:,rowspec.index('target_resname')],resname_set)),axis=0))
+	which = np.where(np.all((bonds[:,rowspec.index('subject_resid')].astype(int)==resid,
+		np.in1d(bonds[:,rowspec.index('target_resname')],resname_set)),axis=0))
 	result = obs.T[which].sum(axis=0)
 	return result
 
@@ -294,12 +295,14 @@ def basic_compute_loop(compute_function,looper,run_parallel=True,debug=False):
 
 #---block: import the post-processed data	
 if 'data' not in globals(): 
-	sns,(data_contacts,calc) = work.sns(),plotload('contacts',work)
-	_,(data_hbonds,_) = work.sns(),plotload('hydrogen_bonding',work)
-	_,(data_salt,_) = work.sns(),plotload('salt_bridges',work)
+	sns_contacts,(data_contacts,calc_contacts) = work.sns(),plotload('contacts',work)
+	sns_hbonds,(data_hbonds,calc_hbonds) = work.sns(),plotload('hydrogen_bonding',work)
+	if sns_hbonds!=sns_contacts: 
+		raise Exception('collections for hydrogen_bonding and contacts are not equal')
+	else: sns = sns_hbonds
 	
 	#---set the cutoff in the yaml file to make this plot because we pull from multiple upstream sources
-	cutoff = calc['calcs']['specs']['cutoff']
+	cutoff = calc_contacts['calcs']['specs']['cutoff']
 	#---map data type onto keys
 	bond_mappings = [
 		{'name':'explicit','post_key':'counts_resid_resname','upstream':'contacts'},
@@ -344,7 +347,7 @@ for bond in bond_mappings:
 		kwargs = dict(postdat=postdat,bond_name=bond['name'],plotspec=this_plotspec)
 		kwargs.update(sns=spec.get('sns',sns))
 		kwargs.update(lipid_resnames=spec.get('lipid_resnames',None))
-		figname = {'explicit':'contacts','reduced':'contacts','hbonds':'hbonds'}[bond['name']]
+		figname = {'explicit':'contacts','reduced':'contacts','hbonds':'hbonds','salt':'salt'}[bond['name']]
 		if 'contact_map' in routine: 
 			fn = 'fig.%s.%s%s.%s%s'%(figname,specname,spec.get('tag',''),bond['name'],
 				'.cutoff_%.1f'%cutoff if bond['name'] in ['explicit','reduced'] else '')
