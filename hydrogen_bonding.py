@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os,sys,glob,re,time
+import os,sys,glob,re,time,importlib
 import numpy as np
 import sklearn
 import sklearn.neighbors
@@ -23,6 +23,20 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	calc = kwargs['calc']
 	debug = kwargs.get('debug',False)
 	run_parallel = kwargs.get('run_parallel',True)
+
+	#---prototyping an external module import to replace the sometimes tedious addition of 
+	#---... many metadata to the meta dictionary in your YAML files.
+	protein_itp_loader = work.vars.get('protein_itp_loader',None)
+	#---default ITP paths are set for each simulation in the metadata
+	if protein_itp_loader==None: 
+		def protein_itp_loader(sn):
+			itp = work.meta.get('sn',{}).get('protein_itp',None)
+			if not itp: raise Exception('cannot find protein_itp in meta dictionary for %s '%sn+
+				'note that you can also use the protein_itp_loader functionality to get the ITP file')
+	else: 
+		#---alternate systematic way to find ITP files with an external module specified in the vars
+		mod = importlib.import_module(protein_itp_loader['module'])
+		protein_itp_loader = mod.__dict__.get(protein_itp_loader['function'],None)
 
 	#---settings
 	distance_cutoff,angle_cutoff = [calc['specs'][i] for i in ['distance_cutoff','angle_cutoff']]
@@ -68,7 +82,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	#---include any proteins as participants in the bonding
 	if kwargs['calc']['specs'].get('protein',False):
 		#---get the protein ITP from metadata
-		itp_fn = work.meta[sn].get('protein_itp')
+		itp_fn = work.meta[sn].get('protein_itp',protein_itp_loader(sn,work=work))
 		if not itp_fn: raise Exception('add protein_itp to the meta for %s'%sn)
 		#---get the sims spot path systematically
 		rootdir = work.raw.spots[(work.raw.spotname_lookup(sn),'structure')]['rootdir']
