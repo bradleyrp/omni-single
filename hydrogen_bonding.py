@@ -85,10 +85,13 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 		itp_fn = work.meta[sn].get('protein_itp',protein_itp_loader(sn,work=work))
 		if not itp_fn: raise Exception('add protein_itp to the meta for %s'%sn)
 		#---get the sims spot path systematically
-		rootdir = work.raw.spots[(work.raw.spotname_lookup(sn),'structure')]['rootdir']
-		sn_dir = os.path.join(rootdir,sn)
-		#---user supplies step folder and path to the reference structure
-		itp_fn_abs = os.path.join(sn_dir,itp_fn)
+		if os.path.isfile(itp_fn): itp_fn = itp_fn_abs
+		#---if path is relative then we consult the spots
+		else:
+			rootdir = work.raw.spots[(work.raw.spotname_lookup(sn),'structure')]['rootdir']
+			sn_dir = os.path.join(rootdir,sn)
+			#---user supplies step folder and path to the reference structure
+			itp_fn_abs = os.path.join(sn_dir,itp_fn)
 		protein_itp = mod['GMXTopology'](itp_fn_abs)
 		for molname in protein_itp.molecules:
 			#---mimic the procedure above for lipids
