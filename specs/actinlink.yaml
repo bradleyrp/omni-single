@@ -30,6 +30,9 @@ variables:
       P35P: "PtdIns(3,5)P$_2$"
       PIPP: "PtdIns(4,5)P$_2^{-3}$"
       PIPU: "PtdIns(4,5)P$_2^{-5}$"
+  protein_itp_loader_hidden: 
+    module: "codes.protein_itp_loader"
+    variable: "protein_itp_loader"
 
 collections:
   cursor:
@@ -37,6 +40,7 @@ collections:
     - mdia2bilayerphys
     - gelbilayerphys
     - gelbilayer_nochl
+    - nwasppeptide2
   one:
     - mdia2bilayer_nochl2
 
@@ -88,6 +92,17 @@ meta:
     cation:              NA
     label:              "mDia2"
     cholesterol:         True
+  nwasppeptide2:
+    name:               "nwasppeptide2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide (2)"
+    cholesterol:         True
 
 slices:
   mdia2bilayer_nochl2:
@@ -119,6 +134,12 @@ slices:
     slices:
       current_v2: {'pbc':'mol','groups':['all','protein'],'start':0,'end':20000,'skip':100}
       current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':70000,'skip':100}
+  nwasppeptide2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':180000,'skip':100}
 
 calculations:
   lipid_abstractor:
@@ -228,11 +249,11 @@ plots:
           resnames: +selectors/resnames_lipid
           type: com
     slices: current
-    collections: all
+    collections: cursor
   protein_rmsd:
     calculation: protein_rmsd
     slices: current
-    collections: all
+    collections: cursor
   # no plot but hydrogen_bonding uses these data via plotload to plot everything
   salt_bridges:
     collections: cursor

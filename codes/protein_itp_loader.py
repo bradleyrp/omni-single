@@ -21,4 +21,6 @@ def protein_itp_loader(sn,**kwargs):
 	work = kwargs.get('work')
 	last_start = work.raw.get_last_structure(sn)
 	fns = glob.glob(os.path.join(os.path.dirname(last_start),'*.itp'))
+	#---! currently set to use protein_abstractor as an example, but you can pull in any custom data here
+	upstream = work.plotload('protein_abstractor',status_override=True)
 	return sorted(fns,key=lambda x:os.path.getmtime(x))[-1]

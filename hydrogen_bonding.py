@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os,sys,glob,re,time,importlib
+import os,sys,glob,re,time
 import numpy as np
 import sklearn
 import sklearn.neighbors
@@ -33,10 +33,8 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 			itp = work.meta.get('sn',{}).get('protein_itp',None)
 			if not itp: raise Exception('cannot find protein_itp in meta dictionary for %s '%sn+
 				'note that you can also use the protein_itp_loader functionality to get the ITP file')
-	else: 
-		#---alternate systematic way to find ITP files with an external module specified in the vars
-		mod = importlib.import_module(protein_itp_loader['module'])
-		protein_itp_loader = mod.__dict__.get(protein_itp_loader['function'],None)
+	#---custom ITP loader specified as an alternate_module
+	else: protein_itp_loader = alternate_module(**protein_itp_loader)
 
 	#---settings
 	distance_cutoff,angle_cutoff = [calc['specs'][i] for i in ['distance_cutoff','angle_cutoff']]
