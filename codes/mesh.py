@@ -14,6 +14,7 @@ from numpy import linalg
 
 #---import from omni.base
 from base.tools import status
+from base.timer import time_limit,TimeoutException
 
 _not_reported = ['triarea','vecnorm','facenorm','torusnorm','reclock','beyonder','makemesh','rotation_matrix']
 _shared_extensions = ['vecnorm','rotation_matrix','makemesh']
@@ -193,14 +194,19 @@ def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	monolayer_cutoff_retry=True,max_count_asymmetry=0.05,pbc_rewrap=True,
 	topologize_tolerance=None):
-
 	"""
 	Identify leaflets in a bilayer by consensus.
 	"""
-	
-	#---! note that topologize sometimes gets stuck. needs a timer
-	wrapper = topologize(pts,vec,
-		**({'tol':topologize_tolerance} if topologize_tolerance else {}))
+	#---time limit on the tolerance checker
+	try:
+		with time_limit(10): 
+			wrapper = topologize(pts,vec,
+				**({'tol':topologize_tolerance} if topologize_tolerance else {}))
+	except TimeoutException, msg: 
+		status('topologize failed to join the bilayer. '
+			'if it is broken over PBCs e.g. a saddle, this is a serious error which may go undetected. '
+			'make sure you always inspect the topology later.',tag='error')
+		wrapper = np.zeros((len(pts),3))
 	findframe = pts + wrapper*np.array(vec)
 	pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(findframe[:,d:d+1])) 
 		for d in range(3)]
