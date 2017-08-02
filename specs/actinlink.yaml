@@ -151,6 +151,7 @@ calculations:
       separator: 
         lipid_tip: "name P"
         monolayer_cutoff: 1.4
+        topologize_tolerance: 0.07
       selector:
         loop:
           lipid_com:
@@ -275,4 +276,6 @@ plots:
         cutoff: 3.4
   actinlink_bonds:
     calculation: contacts
+  actinlink_leaflet_checker:
+    calculation: lipid_abstractor
 

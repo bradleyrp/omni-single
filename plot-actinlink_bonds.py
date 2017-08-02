@@ -318,7 +318,7 @@ if 'data' not in globals():
 	colors.update(**dict([(sn,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[sns.index(sn)]) 
 		for sn in sns]))
 	lipid_label = lambda x: dict([(i,'$$\mathrm{{PIP}_{2}}$$') 
-		for i in work.vars['selectors']['resnames_PIP2']]).get(x,x)
+		for i in work.vars.get('selectors',{}).get('resnames_PIP2',{})]).get(x,x)
 	sn_title = lambda sn: '%s%s'%(work.meta[sn].get('label',re.sub('_','-',sn)),
 		'' if not work.meta[sn].get('cholesterol',False) else '\n(cholesterol)')
 
