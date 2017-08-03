@@ -39,6 +39,7 @@ if 'curvature_field_review' in routine:
 
 if 'individual_reviews' in routine:
 	tag = datas.keys()[0]
+	tag = 'v8'
 	sn = work.sns()[0]
 	figsize = (10,10)
 	cmap_name = 'RdBu_r'	
@@ -52,7 +53,7 @@ if 'individual_reviews' in routine:
 		vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name])
 	#---plot the points for the gaussians
 	ax = axes[1]
-	pts = np.concatenate(dat[sn]['data']['drop_gaussians_points'].transpose(1,0,2)[::10])
+	pts = np.concatenate(datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)[::10])
 	ax.scatter(*pts.T,c='k')
 	#---! set axis limits here
 	plt.show()

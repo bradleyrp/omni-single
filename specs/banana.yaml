@@ -158,30 +158,24 @@ calculations:
         protein_abstractor: {}
         undulations: {}
       design:
-        loop:
-          v7:
-            style: wilderness
-            curvature_positions: 
-              method: protein_subselection
-              selections:
-                - [109]
-                - [330]
-                - [660]
-                - [878]
-            extents:
-              method: fixed_isotropic
-              extent: 4.0
-            curvature_sum: mean
-          v8:
-            style: wilderness
-            curvature_positions: 
-              method: neighborhood
-              distance_cutoff: 5.0
-              spacer: 2.5
-            extents:
-              method: fixed_isotropic
-              extent: 4.0
-            curvature_sum: mean
+        style: wilderness
+        curvature_positions: 
+          method: neighborhood
+          distance_cutoff: 
+            loop:
+              - 5.0
+              - 10.0
+          spacer:
+            loop:
+              - 4.0
+              - 2.0
+        extents:
+          method: fixed_isotropic
+          extent: 
+            loop:
+              - 4.0
+              - 2.0
+        curvature_sum: mean
 off calculations:
   curvature_coupling:
     uptype: post
@@ -252,18 +246,9 @@ plots:
           C_0: [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
           isotropy: [1.0,2.0,4.0,8.0,16.0]
           theta: [0,90]
-        v2:
-          style: manual
-          mapping: protein
-          motion: dynamic
-          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
-          C_0: [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.032,-0.028,-0.024,-0.02,-0.018,-0.014,-0.01,-0.005,0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
-          isotropy: [1.0,2.0,4.0,8.0,16.0]
-          theta: [0,90]
         v3:
           style: gridded
           spacer: 5.0
-      attempts:
         v4:
           style: wilderness
           curvature_positions: 
@@ -279,6 +264,15 @@ plots:
             method: fixed_isotropic
             extent: 4.0
           curvature_sum: mean
+      attempts:
+        v2:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
+          C_0: [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.032,-0.028,-0.024,-0.02,-0.018,-0.014,-0.01,-0.005,0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
       plot_specs:
         v1:
           style: manual
@@ -340,6 +334,19 @@ aside:
       method: neighborhood
       distance_cutoff: 5.0
       spacer: 5.0
+    extents:
+      method: fixed_isotropic
+      extent: 4.0
+    curvature_sum: mean
+  v7:
+    style: wilderness
+    curvature_positions: 
+      method: protein_subselection
+      selections:
+        - [109]
+        - [330]
+        - [660]
+        - [878]
     extents:
       method: fixed_isotropic
       extent: 4.0
