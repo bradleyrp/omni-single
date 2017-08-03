@@ -120,7 +120,8 @@ class InvestigateCurvature:
 			plot_specs = curvature_specs['plot_specs'].get(plot_cursor,
 				curvature_specs['attempts'][plot_cursor])
 			#!!! check if dat is here for opt...
-			#self.attempt(signifier=plot_cursor,**plot_specs)
+			self.signifier = plot_cursor
+			self.attempt(signifier=plot_cursor,**plot_specs)
 		elif self.mode=='compute': self.main()
 		else: raise Exception('unclear mode %s'%self.mode)
 		if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
@@ -604,7 +605,6 @@ class InvestigateCurvature:
 		#return np.array([np.transpose(cfs,(1,0,2,3))[cc]*c 
 		#	for cc,c in enumerate(curvatures)]).max(axis=0)
 
-
 	def wilderness(self,**kwargs):
 		"""
 		Wandering on the error landscape to optimize the curvature coupling hypothesis.
@@ -704,5 +704,3 @@ class InvestigateCurvature:
 			import ipdb;ipdb.set_trace()
 
 #import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(np.array(self.curvature_sum(cfs,fit.x[3:]).mean(axis=0)).T,interpolation='nearest',origin='lower');plt.show()
-
-

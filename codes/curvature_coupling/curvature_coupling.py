@@ -84,7 +84,7 @@ class InvestigateCurvature:
 			self.data_prot = {self.sns[0]:{'data':self.data_prot}}
 			self.data = {self.sns[0]:{'data':self.data}}
 		#---get FFT data the usual way
-		self.loader_spec = kwargs.get('loader',
+		self.loader_spec = self.design.get('loader',
 			{'module':'codes.membrane_importer_gromacs','function':'curvature_coupling_loader'})
 		self.loader_func = self.gopher(self.loader_spec,module_name='module',variable_name='function')
 		self.memory = self.loader_func(data=dict(undulations=self.data))
