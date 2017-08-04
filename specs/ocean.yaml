@@ -87,6 +87,29 @@ calculations:
               selector:
                 loop:
                   - lipid_com
+  curvature_undulation_coupling:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        protein_abstractor: {}
+        undulations:
+          grid_spacing: 0.05
+      design:
+        style: wilderness
+        curvature_positions: 
+          method: neighborhood
+          distance_cutoff: 5.0
+          spacer: 2.5
+        extents:
+          method: fixed_isotropic
+          extent: 
+            loop:
+              - 2.0
+              - 4.0
+        curvature_sum: mean
 variables:
   #---protected
   art_director: art_ocean.py

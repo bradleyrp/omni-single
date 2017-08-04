@@ -101,7 +101,7 @@ def gauss2d(grid,**kwargs):
 	c0 = kwargs['curvature']
 	sx = kwargs['sigma_a']
 	sy = kwargs['sigma_b']
-	z0 = kwargs.get('z0',0)
+	z0 = kwargs.get('z0',0.0)
 	x0,y0 = kwargs['x0'],kwargs['y0']
 	x,y = np.transpose(np.reshape(grid,(np.product(np.shape(grid)[:2]),2)))
 	if c0=='0': return zeros(np.shape(grid)[:2])
