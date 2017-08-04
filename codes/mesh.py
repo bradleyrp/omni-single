@@ -246,13 +246,15 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	else: status('[STATUS] some lipids might be flipped %d %.2f'%(np.sum(imono),np.mean(imono)))
 	return imono
 
-def topologize(pos,vecs,tol=0.05):
+def topologize(pos,vecs,tol=0.07):
 
 	"""
 	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
 	of length equal to the box vectors so that there is a maximum amount of connectivity between adjacent
 	points. This method decides how to move the points by a consensus heuristic.
 	This function is necessary only if the bilayer breaks over a third spatial dimension.
+	Note that we changed tol from 0.05 to 0.07 on 2017.08.02. We also added a timer and pass-through for 
+	belligerent systems. See RPB notes for more details.
 	"""
 
 	step = 0

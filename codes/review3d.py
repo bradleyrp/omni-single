@@ -9,6 +9,8 @@ def review3d(**kwargs):
 	Review things in 3D. Originally developed for coiled coils.
 	!Consolidate from structural_biology.py to a central location with a standard interface. 
 	Note that scaling factors assume nanometers.
+	Note that you may get VTK/TVTK version warnings that tell you to rebuild the classes.
+	Note that you cannot drop ipdb.set_trace when vTK assumes the streams because of text colors.
 	"""
 	def pointplot(x,y,z,colormap='Spectral',r=1.0,color=(0,0,0)):
 		return mlab.points3d(x,y,z,colormap=colormap,scale_factor=r,color=color)
@@ -46,3 +48,4 @@ def pbcbox(vecs):
 		np.array([0.,0.,0.,0.,0.,mv[2],mv[2],mv[2],mv[2],mv[2]]))
 	mlab.plot3d(np.array([0,0,mv[0],mv[0],mv[0],mv[0]]),
 		np.array([mv[1],mv[1],mv[1],mv[1],0,0]),np.array([0,mv[2],mv[2],0,0,mv[2]]))
+
