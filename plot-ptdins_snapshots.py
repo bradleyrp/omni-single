@@ -522,35 +522,6 @@ if 'common_hydrogen_bonding_specific' in routine:
 			resnames = dict(zip(dat['resnames'],dat['resnames']))
 			resnames['ptdins'] = work.meta[sn]['ptdins_resname']
 			resname_pair = [resnames[j] for j in trawler]
-			#---see the note below for why this was discarded
-			if False:
-				these_bonds = np.where(np.any([np.all((
-					dat['bonds'][:,i]==resname_pair[0],dat['bonds'][:,j]==resname_pair[1]),axis=0) 
-					for i,j in [(0,3),(3,0)]],axis=0))[0]
-				#---filter for the resnames in trawler without regard to order
-				these_bonds = np.where(np.any([np.all((
-					dat['bonds'][:,i]==resname_pair[0],dat['bonds'][:,j]==resname_pair[1]),axis=0) 
-					for i,j in [(0,3),(3,0)]],axis=0))[0]
-				modal_bond = np.argsort(dat['observations'].sum(axis=0)[these_bonds])[-1]
-				#---the modal bond is currently given over the unique bonds
-				#---...however we actually want it to happen over bond-atom pairs while ignoring the resid
-				#---...so in the next part we will reduce the bond list to find the most common bonds
-				#---the following bondlist discards the residue indices and retain the lipid, atom names
-				bondlist = dat['bonds'][:,np.array([0,2,3,5])]
-				bondlist_inds,bondlist_counts = uniquify(bondlist)
-				subsel = np.where(np.any([np.all((
-					bondlist[bondlist_inds][:,np.array([0,2])]==resname_pair[::i]),axis=1) 
-					for i in [1,-1]],axis=0))[0]
-				#---the bonds are already sorted
-				modal_bond_ind = bondlist_inds[subsel][0]
-				modal_bond = bondlist[modal_bond_ind]
-				#---now that we have the modal bond we find the modal instance of the bond in the whole list
-				modal_bond_pair = modal_bond[:2],modal_bond[2:]
-				matched_bonds = np.where(np.any([np.all([np.all(
-					dat['bonds'][:,np.array(i)]==modal_bond_pair[::k][j],axis=1) 
-					for i,j in [([0,2],0),([3,5],1)]],axis=0) for k in [1,-1]],axis=0))[0]
-				modal_matched_bonds_ind = np.argsort(dat['observations'].sum(axis=0)[matched_bonds])[-1]
-				#---! realized here that the modal bond is intramolecular because we did not filter those
 			#---start with the complete set of bonds
 			bonds = dat['bonds']
 			obs = dat['observations']
