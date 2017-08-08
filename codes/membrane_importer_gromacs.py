@@ -8,6 +8,7 @@ This function is alone so it can be swapped out with other importers.
 import numpy as np
 from base.tools import status
 from curvature_coupling.tools import fft_field
+from base.store import plotload
 
 def curvature_coupling_loader(data): 
 	"""
@@ -27,4 +28,14 @@ def curvature_coupling_loader(data):
 			hqs = fft_field(midplane)
 			memory[(sn,'hqs')] = hqs
 			memory[(sn,'vecs')] = vecs
+
 	return memory
+
+def curvature_coupling_loader_protein(data): 
+	"""
+	Receive the undulation data and prepare the meshes for the curvature coupling calculation.
+	"""
+	#---note that you can load other upstream data with the following command:
+	#---... data_other,calc_other = work.plotload('undulations',status_override=True,
+	#---...     sns=data['protein_abstractor'].keys())
+	return data['protein_abstractor']

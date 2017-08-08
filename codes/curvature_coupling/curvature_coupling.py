@@ -71,18 +71,24 @@ class InvestigateCurvature:
 		if not self.work: raise Exception('we require an instance of the omnicalc workspace')
 		self.data = kwargs.pop('undulations',None)
 		if not self.data: raise Exception('send upstream undulations data')
-		self.data_prot = kwargs.pop('protein_abstractor',None)
-		if not self.data_prot: raise Exception('send upstream protein_abstractor data')
 		self.design = kwargs.pop('design',{})
 		self.style = self.design.get('style',None)
 		self.single_mode = kwargs.pop('single_mode',True)
 		if not self.style: raise Exception('invalid style %s'%self.style)
+		self.data_prot_incoming = kwargs.pop('protein_abstractor',None)
+		if not self.data_prot_incoming: raise Exception('send upstream protein_abstractor data')
 		if kwargs: raise Exception('unprocessed arguments %s'%kwargs)
 		#---reformat some data if only one simulation
 		if self.single_mode:
 			if not len(self.sns)==1: raise Exception('you can only have one simulation name in single_mode')
-			self.data_prot = {self.sns[0]:{'data':self.data_prot}}
+			self.data_prot_incoming = {self.sns[0]:{'data':self.data_prot_incoming}}
 			self.data = {self.sns[0]:{'data':self.data}}
+		#---get the "protein" positions
+		self.loader_spec_protein = self.design.get('loader_protein',
+			{'module':'codes.membrane_importer_gromacs','function':'curvature_coupling_loader_protein'})
+		self.loader_func_protein = self.gopher(
+			self.loader_spec_protein,module_name='module',variable_name='function')
+		self.data_prot = self.loader_func_protein(data=dict(protein_abstractor=self.data_prot_incoming))
 		#---get FFT data the usual way
 		self.loader_spec = self.design.get('loader',
 			{'module':'codes.membrane_importer_gromacs','function':'curvature_coupling_loader'})
