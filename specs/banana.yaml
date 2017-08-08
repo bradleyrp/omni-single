@@ -9,8 +9,8 @@ collections:
     - sv006
   big: 
     - v007
-    #- v005
-    #- v008
+    - v005
+    - v008
   small:
     - sv003
     - sv004
@@ -34,7 +34,9 @@ slices:
       proteins: +selectors/protein_selection
     slices:
       current_v0: {'pbc':'mol','groups':['all','proteins'],'start':240000,'end':590000,'skip':500}
-      current: +common_slices/v1
+      current_v1: +common_slices/v1
+      # note that this is a special slice designed to disambiguate wrong-structure (i.e. mistaken) runs
+      current: {'pbc':'mol','groups':['all','proteins'],'start':231000,'end':591000,'skip':500}
   v008:
     groups:
       all: all
@@ -158,24 +160,17 @@ calculations:
         protein_abstractor: {}
         undulations: {}
       design:
-        style: wilderness
-        curvature_positions: 
-          method: neighborhood
-          distance_cutoff: 
-            loop:
-              - 5.0
-              - 10.0
-          spacer:
-            loop:
-              - 4.0
-              - 2.0
-        extents:
-          method: fixed_isotropic
-          extent: 
-            loop:
-              - 4.0
-              - 2.0
-        curvature_sum: mean
+        loop:
+          v9:
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 5.0
+              spacer: 5.0
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+            curvature_sum: mean
 off calculations:
   curvature_coupling:
     uptype: post
@@ -225,6 +220,7 @@ plots:
         cutoff: 5.0
     settings: 
       show_residue_names: False
+  ### deprecated !
   curvature:
     collections: big
     calculation:
@@ -304,9 +300,12 @@ plots:
   curvature_undulation_coupling:
     calculation: 
       - curvature_undulation_coupling
+      - protein_abstractor
+      - undulations
       # use the following to get a single entry, above to sweep them
       #curvature_undulation_coupling:
       #  design: v7
+    collections: big
     specs: 
       routine:
         #- curvature_field_review
@@ -350,5 +349,24 @@ aside:
     extents:
       method: fixed_isotropic
       extent: 4.0
+    curvature_sum: mean
+  also:
+    style: wilderness
+    curvature_positions: 
+      method: neighborhood
+      distance_cutoff: 
+        loop:
+          - 5.0
+          - 10.0
+      spacer:
+        loop:
+          - 4.0
+          - 2.0
+    extents:
+      method: fixed_isotropic
+      extent: 
+        loop:
+          - 4.0
+          - 2.0
     curvature_sum: mean
 

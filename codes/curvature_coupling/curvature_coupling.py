@@ -158,11 +158,14 @@ class InvestigateCurvature:
 				average_pts -= average_pts.mean(axis=0)
 				average_axis = principal_axis(average_pts)
 				angle = np.arccos(np.dot(vecnorm(average_axis),[1.0,0.0]))
-				rot = rotate2d(average_pts,-1*angle)
+				direction = 1.0-2.0*(np.cross(vecnorm(average_axis),[1.0,0.0])<0)
+				rot = rotate2d(average_pts,direction*angle)
 				#---get the span of the points plus the extra distance in each direction
 				span_x,span_y = np.abs(rot).max(axis=0) + extra_distance
 				ref_grid = np.concatenate(np.transpose(np.meshgrid(
 					arange_symmetric(0,span_x,spacer),arange_symmetric(0,span_y,spacer))))
+				#import matplotlib as mpl;import matplotlib.pyplot as plt;ax = plt.subplot(111);ax.scatter(*average_pts.T);plt.show()
+				#import ipdb;ipdb.set_trace()
 				#---for each frame, map the ref_grid onto the principal axis
 				self.nframes = len(points_all)
 				points = np.zeros((len(ref_grid),self.nframes,2))
@@ -171,7 +174,8 @@ class InvestigateCurvature:
 					offset = pts.mean(axis=0)
 					average_axis = principal_axis(pts-offset)
 					angle = np.arccos(np.dot(vecnorm(average_axis),[1.0,0.0]))
-					ref_grid_rot = rotate2d(ref_grid,-1*angle)+offset
+					direction = 1.0-2.0*(np.cross(vecnorm(average_axis),[1.0,0.0])<0)
+					ref_grid_rot = rotate2d(ref_grid,direction*angle)+offset
 					points[:,fr] = ref_grid_rot
 				#---save the position of the curvature fields for later
 				self.memory[(sn,'drop_gaussians_points')] = points

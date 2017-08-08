@@ -208,6 +208,7 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 			'make sure you always inspect the topology later.',tag='error')
 		wrapper = np.zeros((len(pts),3))
 	findframe = pts + wrapper*np.array(vec)
+	status('this step is somewhat slow. it uses scipy.spatial.pdist.',tag='warning')
 	pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(findframe[:,d:d+1])) 
 		for d in range(3)]
 	if pbc_rewrap:
@@ -217,11 +218,13 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	nbors = np.transpose(np.where(pd3pbc<monolayer_cutoff))
 	nlipids = len(pts)
 	imono = np.zeros(nlipids)
-	nlist = [nbors[np.where(nbors[:,0]==i)[0],1] for i in range(nlipids)]
+	nlist = []
+	for i in range(nlipids):
+		status('cataloging lipids',i=i,looplen=nlipids)
+		nlist.append(nbors[np.where(nbors[:,0]==i)[0],1])
 	iref = 0
 	mono = np.zeros(nlipids)
 	searched = np.zeros(nlipids)
-	
 	imono[iref],searched[iref] = 1,1
 	imono[nlist[iref]] = 1
 	while np.any(np.all((imono==1,searched==0),axis=0)):
@@ -243,7 +246,7 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 		status('[WARNING] new monolayer_cutoff = '+str(monolayer_cutoff))
 		if monolayer_cutoff < 0: raise Exception('[ERROR] cutoff failure')
 		imono = identify_lipid_leaflets(pts,vec,monolayer_cutoff=monolayer_cutoff)
-	else: status('[STATUS] some lipids might be flipped %d %.2f'%(np.sum(imono),np.mean(imono)))
+	else: status('[STATUS] some lipids might be flipped %d %.5f'%(np.sum(imono),np.mean(imono)))
 	return imono
 
 def topologize(pos,vecs,tol=0.05):
