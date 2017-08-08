@@ -49,10 +49,8 @@ calculations:
     slice_name: current
     collections: all
     specs:
-      grid_spacing:
-        loop:
-          - 0.5
-          - 0.25
+      # note that downstream looping over 0.5,0.25 is broken
+      grid_spacing: 0.5
       upstream: lipid_abstractor
   lipid_mesh:
     uptype: post
@@ -87,6 +85,7 @@ calculations:
               selector:
                 loop:
                   - lipid_com
+  # under development/testing
   curvature_undulation_coupling:
     uptype: post
     group: all
@@ -96,7 +95,7 @@ calculations:
       upstream:
         protein_abstractor: {}
         undulations:
-          grid_spacing: 0.05
+          grid_spacing: 0.5
       design:
         style: wilderness
         curvature_positions: 
@@ -105,15 +104,15 @@ calculations:
           spacer: 2.5
         extents:
           method: fixed_isotropic
-          extent: 
-            loop:
-              - 2.0
-              - 4.0
+          extent:
+            loop: 
+              - 2.5
+              - 1.0
         curvature_sum: mean
 variables:
-  #---protected
+  # protected
   art_director: art_ocean.py
-  #---unprotected
+  # unprotected
   selectors:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
     resnames_lipid: ['DOPC','DOPS','PIP2','POPC']
@@ -180,6 +179,7 @@ plots:
           upstream:
             lipid_abstractor:
               selector: lipid_com
+  # deprecated
   curvature_coupling:
     slices: current
     calculation: 
@@ -192,3 +192,17 @@ plots:
       sweeps:
         - {'cfsig':'hcv3','roundsig':'v5','base_range_sweep':[0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64],'base_range':[0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
         - {'cfsig':'hcv3b','roundsig':'v5b','base_range_sweep':[0,1,2,3,4,5],'base_range':[0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
+  # under development
+  curvature_undulation_coupling:
+    calculation: 
+      - protein_abstractor
+      - undulations
+    collections: all
+    specs: 
+      routine:
+        - individual_reviews
+    notes:
+      curvature_undulation_coupling_notes: |
+        Note that we have to check the following features of this calculation:
+          1. are curvature fields wrapping over PBCs?
+          2. is the average field a faithful depiction of the field i.e. what do instantaneous fields look like when the protein is on either side? and why is the top part of the box completely zeroed out even though the bottom part has some intensity at the edge? it is likely that the reference grid is not wrapping.

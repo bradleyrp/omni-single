@@ -166,6 +166,8 @@ class InvestigateCurvature:
 					arange_symmetric(0,span_x,spacer),arange_symmetric(0,span_y,spacer))))
 				#import matplotlib as mpl;import matplotlib.pyplot as plt;ax = plt.subplot(111);ax.scatter(*average_pts.T);plt.show()
 				#import ipdb;ipdb.set_trace()
+				vecs = self.memory[(sn,'vecs')]
+				vecs_mean = np.mean(vecs,axis=0)
 				#---for each frame, map the ref_grid onto the principal axis
 				self.nframes = len(points_all)
 				points = np.zeros((len(ref_grid),self.nframes,2))
@@ -176,7 +178,10 @@ class InvestigateCurvature:
 					angle = np.arccos(np.dot(vecnorm(average_axis),[1.0,0.0]))
 					direction = 1.0-2.0*(np.cross(vecnorm(average_axis),[1.0,0.0])<0)
 					ref_grid_rot = rotate2d(ref_grid,direction*angle)+offset
-					points[:,fr] = ref_grid_rot
+					#---handle PBCs by putting everything back in the box
+					ref_grid_rot_in_box = (ref_grid_rot + 
+						(ref_grid_rot<0)*vecs[fr,:2] - (ref_grid_rot>=vecs[fr,:2])*vecs[fr,:2])
+					points[:,fr] = ref_grid_rot_in_box
 				#---save the position of the curvature fields for later
 				self.memory[(sn,'drop_gaussians_points')] = points
 				ndrops = len(ref_grid)
@@ -184,8 +189,6 @@ class InvestigateCurvature:
 				#---get data from the memory
 				hqs = self.memory[(sn,'hqs')]
 				mn = hqs.shape[1:]
-				vecs = self.memory[(sn,'vecs')]
-				vecs_mean = np.mean(vecs,axis=0)
 				#---formulate the curvature request
 				curvature_request = dict(curvature=1.0,mn=mn,sigma_a=extent,sigma_b=extent,theta=0.0)
 				#---construct unity fields
@@ -274,7 +277,7 @@ class InvestigateCurvature:
 				status('searching! '+text,tag='optimize')
 				Nfeval += 1
 
-			def objective(args):
+			def objective(args,mode='residual'):
 				"""
 				Fit parameters are defined in sequence for the optimizer.
 				They are: kappa,gamma,vibe,*curvatures-per-dimple.
@@ -291,13 +294,15 @@ class InvestigateCurvature:
 					+signterm*termlist[2]*q_raw**2+termlist[3])
 					+gamma*area*(termlist[0]*q_raw**2))
 				ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
-				return residual(ratio[band])
+				if mode=='residual': return residual(ratio[band])
+				elif mode=='ratio': return ratio
+				else: raise Exception('invalid mode %s'%mode)
 
 			Nfeval = 0
 			initial_conditions = [25.0,0.0,-0.1]+[0+.0 for i in range(ndrops)]
 			test_ans = objective(initial_conditions)
 			if not isinstance(test_ans,np.floating): 
-				raise Exception('objective function must return a scalar')
+				raise Exception('objective_residual function must return a scalar')
 			fit = scipy.optimize.minimize(objective,
 				x0=tuple(initial_conditions),method='SLSQP',callback=callback)
 			#---package the result
@@ -306,9 +311,13 @@ class InvestigateCurvature:
 			solutions['jac'] = bundle[sn].pop('jac')
 			solutions['cf'] = np.array(self.curvature_sum(cfs,fit.x[3:],
 				method=curvature_sum_method).mean(axis=0))
+			solutions['cf_first'] = np.array(self.curvature_sum(cfs,fit.x[3:],
+				method=curvature_sum_method)[0])
 			#---we also save the dropped gaussian points here
 			if extents_method=='fixed_isotropic': 
 				solutions['drop_gaussians_points'] = self.memory[(sn,'drop_gaussians_points')]
 			else: raise Exception('invalid extents_method %s'%extents_method)
+			solutions['ratios'] = objective(fit.x,mode='ratio')
+			solutions['qs'] = q_raw
 		#---we return contributions to result,attrs for the calculation
 		return dict(result=solutions,attrs=dict(bundle=bundle,spec=spec))
