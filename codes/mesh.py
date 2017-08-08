@@ -14,6 +14,7 @@ from numpy import linalg
 
 #---import from omni.base
 from base.tools import status
+from base.timer import time_limit,TimeoutException
 
 _not_reported = ['triarea','vecnorm','facenorm','torusnorm','reclock','beyonder','makemesh','rotation_matrix']
 _shared_extensions = ['vecnorm','rotation_matrix','makemesh']
@@ -193,15 +194,21 @@ def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	monolayer_cutoff_retry=True,max_count_asymmetry=0.05,pbc_rewrap=True,
 	topologize_tolerance=None):
-
 	"""
 	Identify leaflets in a bilayer by consensus.
 	"""
-	
-	#---! note that topologize sometimes gets stuck. needs a timer
-	wrapper = topologize(pts,vec,
-		**({'tol':topologize_tolerance} if topologize_tolerance else {}))
+	#---time limit on the tolerance checker
+	try:
+		with time_limit(10): 
+			wrapper = topologize(pts,vec,
+				**({'tol':topologize_tolerance} if topologize_tolerance else {}))
+	except TimeoutException, msg: 
+		status('topologize failed to join the bilayer. '
+			'if it is broken over PBCs e.g. a saddle, this is a serious error which may go undetected. '
+			'make sure you always inspect the topology later.',tag='error')
+		wrapper = np.zeros((len(pts),3))
 	findframe = pts + wrapper*np.array(vec)
+	status('this step is somewhat slow. it uses scipy.spatial.pdist.',tag='warning')
 	pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(findframe[:,d:d+1])) 
 		for d in range(3)]
 	if pbc_rewrap:
@@ -211,11 +218,13 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	nbors = np.transpose(np.where(pd3pbc<monolayer_cutoff))
 	nlipids = len(pts)
 	imono = np.zeros(nlipids)
-	nlist = [nbors[np.where(nbors[:,0]==i)[0],1] for i in range(nlipids)]
+	nlist = []
+	for i in range(nlipids):
+		status('cataloging lipids',i=i,looplen=nlipids)
+		nlist.append(nbors[np.where(nbors[:,0]==i)[0],1])
 	iref = 0
 	mono = np.zeros(nlipids)
 	searched = np.zeros(nlipids)
-	
 	imono[iref],searched[iref] = 1,1
 	imono[nlist[iref]] = 1
 	while np.any(np.all((imono==1,searched==0),axis=0)):
@@ -237,16 +246,18 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 		status('[WARNING] new monolayer_cutoff = '+str(monolayer_cutoff))
 		if monolayer_cutoff < 0: raise Exception('[ERROR] cutoff failure')
 		imono = identify_lipid_leaflets(pts,vec,monolayer_cutoff=monolayer_cutoff)
-	else: status('[STATUS] some lipids might be flipped %d %.2f'%(np.sum(imono),np.mean(imono)))
+	else: status('[STATUS] some lipids might be flipped %d %.5f'%(np.sum(imono),np.mean(imono)))
 	return imono
 
-def topologize(pos,vecs,tol=0.05):
+def topologize(pos,vecs,tol=0.07):
 
 	"""
 	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
 	of length equal to the box vectors so that there is a maximum amount of connectivity between adjacent
 	points. This method decides how to move the points by a consensus heuristic.
 	This function is necessary only if the bilayer breaks over a third spatial dimension.
+	Note that we changed tol from 0.05 to 0.07 on 2017.08.02. We also added a timer and pass-through for 
+	belligerent systems. See RPB notes for more details.
 	"""
 
 	step = 0

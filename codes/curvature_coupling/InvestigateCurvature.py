@@ -4,17 +4,50 @@
 CURVATURE-UNDULATION COUPLING (version 3)
 """
 
-import copy,importlib,time,os
+import copy,importlib,time,os,re
 from codes.hypothesizer import hypothesizer
 from base.tools import status
 from omnicalc import store,load
 import numpy as np
+import scipy
+import scipy.optimize
 import multiprocessing as mp
+machine_eps = eps = np.finfo(float).eps
 import codes.curvature_coupling.tools as cctools
 from codes.curvature_coupling.tools import manyjob,manyjob_worker
 from codes.curvature_coupling.tools import construct_curvature_fields_trajectory
+global Nfeval
 
-###---CONTROLLER
+###---UTILITIES
+
+def make_fields(**kwargs):
+	return cctools.construct_curvature_field(**kwargs)
+def framelooper(total,start=None,text='frame'):
+	"""
+	When performing parallel calculations with joblib we pass a generator to count the number of 
+	tasks and report the time.
+	"""
+	for fr in range(total):
+		status(text,i=fr,looplen=total,tag='parallel',start=start)
+		yield fr
+from joblib import Parallel,delayed
+from joblib.pool import has_shareable_memory
+def basic_compute_loop(compute_function,looper,run_parallel=True,debug=False):
+	"""
+	Canonical form of the basic compute loop.
+	"""
+	start = time.time()
+	if run_parallel:
+		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
+			delayed(compute_function,has_shareable_memory)(**looper[ll]) 
+			for ll in framelooper(len(looper),start=start))
+	else: 
+		incoming = []
+		for ll in framelooper(len(looper)):
+			incoming.append(compute_function(**looper[ll]))
+	return incoming
+
+dotplace = lambda n : re.compile(r'(\d)0+$').sub(r'\1',"%3.5f"%float(n)).rjust(8)
 
 class SpecialClass(object):
 	"""
@@ -53,6 +86,19 @@ class SpecialClass(object):
 				return {key:self.__dict__[key] for key in self.order if self.__dict__[key]!=None}
 		return Wrapped
 
+if False:
+	def callback(args):
+		"""
+		Watch the optimization.
+		"""
+		global Nfeval,name_groups,objective
+		text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
+			for name,val in zip(name_groups,args)+[('error',objective(args))]])
+		status('searching! '+text,tag='optimize')
+		Nfeval += 1
+
+###---CONTROLLER
+
 class InvestigateCurvature:
 
 	"""
@@ -66,17 +112,41 @@ class InvestigateCurvature:
 		#---get the data according to instructions in the metadata
 		self.fetch_data_and_specs()
 		self.memory = self.loader_func(self.data)
+		self.attempts = work.plots.get('curvature',{}).get('specs',{}).get('attempts',{})
+		#---compute and plot modes
+		self.mode = kwargs.pop('mode','plot')
+		if self.mode=='plot': 
+			curvature_specs = work.plots.get('curvature',{}).get('specs',{})
+			plot_cursor = curvature_specs['plot_cursor']
+			plot_specs = curvature_specs['plot_specs'].get(plot_cursor,
+				curvature_specs['attempts'][plot_cursor])
+			#!!! check if dat is here for opt...
+			self.signifier = plot_cursor
+			self.attempt(signifier=plot_cursor,**plot_specs)
+		elif self.mode=='compute': self.main()
+		else: raise Exception('unclear mode %s'%self.mode)
+		if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
+
+	def main(self):
+		"""..."""
 		#---master loop over the attempts
-		global work
-		for signifier,attempt in work.plots.get(plotname,{}).get('specs',{}).get('attempts',{}).items():
+		for signifier,attempt in self.attempts.items():
+			self.signifier = signifier
+			self.attempt(signifier,**attempt)
+
+	def attempt(self,signifier,**attempt):
+		"""..."""
+		#---cursors
+		self.sig,self.spec = signifier,attempt
+		#---select the hypotheses
+		self.style = attempt.get('style',None)
+		if self.style=='manual': 
 			self.prepare_rootdir('curvature_%s'%signifier)
 			self.prepare_database()
-			#---cursors
-			self.sig,self.spec = signifier,attempt
-			#---select the hypotheses
-			self.style = attempt.get('style',None)
-			if self.style=='manual': self.manual()
-			else: raise Exception('unclear attempt style: %s'%self.style)
+			self.manual()
+		elif self.style=='gridded': self.gridded()
+		elif self.style=='wilderness': self.wilderness()
+		else: raise Exception('unclear attempt style: %s'%self.style)
 
 	def gopher(self,spec,module_name,variable_name):
 		"""..."""
@@ -361,3 +431,277 @@ class InvestigateCurvature:
 				**self.Hypothesis(**hypo).base()).one()
 			landscapes[row.sn][curvatures_inds[hypo['curvature']],extents_inds[hypo['sigma_a']]] = row.error
 		return landscapes
+
+	###---FIRST (FAILED!) GRIDDER ATTEMPT
+
+	def master_decorator(self,sn,extent,lenscale=1.0):
+		"""
+		Given the wavevectors, Fourier-transformed heights, and core curvature fields, we return
+		the master objective function.
+		"""
+		global nprots
+		#---prepare
+		hqs = self.memory[(sn,'hqs')]
+		vecs = self.memory[(sn,'vecs')]
+		vecs_mean = np.mean(vecs,axis=0)
+		#---! HACKING and hardcoding!
+		npts = (vecs_mean/self.spec['spacer']).round()[:2].astype(int)
+		np.meshgrid(*[np.linspace(0,i,npts[ii]) for ii,i in enumerate(vecs_mean[:2])])
+		centers = np.concatenate(np.transpose(np.meshgrid(*[np.linspace(0,i,npts[ii])[1:-1] 
+			for ii,i in enumerate(vecs_mean[:2])])))
+		nprots = len(centers)
+		#---! previously: centers = np.mean(data_prot[sn]['data']['trajectory_com'],axis=0)/vecs_mean
+		kwargs = dict(curvature=1.0,mn=hqs.shape[1:],theta=0.0,sigma_a=extent,sigma_b=extent)
+		core_cfs = np.array([cctools.construct_curvature_field(vecs=vecs_mean,
+			centers=[c],**kwargs) for c in centers])
+		nframes = len(vecs)
+		m,n = mn = np.shape(hqs)[1:]
+		Lx,Ly = np.mean(vecs,axis=0)[:2]
+		q2d = lenscale*np.array([[np.sqrt(
+			((i-m*(i>m/2))/((Lx)/1.)*2*np.pi)**2+
+			((j-n*(j>n/2))/((Ly)/1.)*2*np.pi)**2)
+			for j in range(0,n)] for i in range(0,m)])
+		q_raw = np.reshape(q2d,-1)[1:]
+		area = (Lx*Ly/lenscale**2)
+
+		#---! remove this eventually
+		tweak = {}
+		signterm = tweak.get('inner_sign',-1.0)
+		lowcut = kwargs.get('lowcut',tweak.get('lowcut',0.0))
+		band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('hicut',1.0))
+		residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
+		if residual_form == 'log':
+			def residual(values): return sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
+		elif residual_form == 'linear': 
+			def residual(values): return sum((values-1.0)**2)/float(len(values))
+		else: raise
+
+		def multipliers(x,y): return x*np.conjugate(y)
+
+		def master(args):
+			"""
+			Fit parameters are defined in sequence for the optimizer.
+			They are: kappa,gamma,vibe,*curvatures-per-dimple.
+			"""
+			kappa,gamma,vibe = args[:3]
+			curvatures = args[3:]
+			composite = np.sum(core_cfs.T*np.array(curvatures),axis=2)
+			cqs = np.tile(cctools.fft_field(np.array([composite])),(len(hqs),1,1))
+			termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
+			termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
+			#---skipping assertion and dropping imaginary
+			termlist = [np.real(k) for k in termlist]
+			hel = (kappa*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+			ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
+			return residual(ratio[band])
+
+		fit = scipy.optimize.minimize(objective,x0=tuple(initial_conditions),method=minmethod,
+			callback=callback)
+
+		return {'master':master,'core_cfs':core_cfs}
+
+	def gridded(self):
+		"""Probe curvature in a regular grid."""
+		global work,callback,Nfeval,name_groups,objective,nprots
+		sns = work.sns()
+		#---! still settling on the formation. previously swept extents here
+		extent = self.spec['spacer']/2.0
+		package = dict([(sn,{'data':self.master_decorator(sn,extent)}) for sn in work.sns()])
+		#---optimize for each simulation
+		for sn in sns:
+			###### nprots = work.meta[sn].get('nprots',1)
+			method = ['fmin','minimize','basinhopping','differential_evolution','brute'][1]
+			minmethod = ['L-BFGS-B','CG','COBYLA','dogleg','Nelder-Mead','SLSQP'][-1]
+			initial_conditions = [25.0*2,0.0,-0.1]+[0.0 for i in range(nprots)]
+			bounds_dict = {'kappa':(0.0,100.0),'gamma':(-10,10),'vibe':(-10,10),'curvature':(-0.05,0.05)}
+
+			#---run
+			Nfeval = 1
+			start_time = time.time()
+			name_groups = ['kappa','gamma','vibe']+['curve(%d)'%i for i in range(nprots)]
+			bounds = [bounds_dict[k] for k in ['kappa','gamma','vibe']]
+			bounds += [bounds_dict['curvature'] for k in range(nprots)]
+			objective = package[sn]['data']['master']
+
+			status('starting to optimize %s'%sn,tag='compute')
+			if method == 'fmin':
+				fit = scipy.optimize.fmin(objective,x0=tuple(initial_conditions),
+					disp=True,callback=callback,full_output=True,)
+			elif method == 'minimize':
+				fit = scipy.optimize.minimize(objective,x0=tuple(initial_conditions),method=minmethod,
+					callback=callback)
+				status('finished\n'+str(fit),tag='result')
+			elif method == 'basinhopping':
+				def callback(args): 
+					print "step = %d, args = %s"%(Nfeval,str(args))
+					Nfeval += 1
+				fit = scipy.optimize.basinhopping(objective,x0=tuple(initial_conditions),
+					disp=True,callback=callback)
+			elif method == 'differential_evolution':
+				fit = scipy.optimize.differential_evolution(objective,bounds=bounds,disp=True,
+					callback=callback)
+			elif method == 'brute':
+				fit = scipy.optimize.brute(objective,ranges=bounds,Ns=5,disp=True)
+			else: raise Exception()
+			status('%.1fmin elapsed'%((time.time()-start_time)/60.),tag='time')
+
+			#---!!!!!!!!!!!!!!!!!!!!!!!1
+			import ipdb;ipdb.set_trace()
+
+	###---OPTIMIZED SOLUTIONS
+
+	def drop_gaussians(self,**kwargs):
+		"""
+		Method for choosing the positions of Gaussians.
+		"""
+		pos_spec = kwargs.get('curvature_positions',{})
+		method = pos_spec.get('method',None)
+		extent = kwargs.get('extents',{}).get('extent',{})
+		if not method: raise Exception('need a method for setting the curvature fields')
+		elif method=='protein_subselection':
+			self.data_prot,_ = plotload('protein_abstractor')
+			for sn in work.sns():
+				selections = pos_spec.get('selections',None)
+				if not selections: raise Exception('need selections in protein_subselection')
+				#---determine the centers of the protein according to the selections
+				#---...noting that the protein_abstractor points are stored by the residue, not bead/atom 
+				points = np.array([np.transpose(self.data_prot[sn]['data']['points'],(1,0,2))[s] 
+					for s in selections])
+				#points = np.transpose(self.data_prot[sn]['data']['points'],(1,0,2))[selections]
+				points = points.mean(axis=1)[...,:2]
+				ndrops = len(points)
+				#---get data from the memory
+				hqs = self.memory[(sn,'hqs')]
+				self.nframes = len(hqs)
+				mn = hqs.shape[1:]
+				vecs = self.memory[(sn,'vecs')]
+				vecs_mean = np.mean(vecs,axis=0)
+				#---formulate the curvature request
+				curvature_request = dict(curvature=1.0,mn=mn,sigma_a=extent,sigma_b=extent,theta=0.0)
+				#---construct unity fields
+				fields_unity = np.zeros((self.nframes,ndrops,mn[0],mn[1]))
+				reindex,looper = zip(*[((fr,ndrop),
+					dict(vecs=vecs[fr],centers=[points[ndrop][fr]/vecs[fr][:2]],**curvature_request)) 
+					for fr in range(self.nframes) for ndrop in range(ndrops)])
+				status('computing curvature fields for %s'%sn)
+				incoming = basic_compute_loop(make_fields,looper=looper)
+				#---! inelegant
+				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
+				self.memory[(sn,'fields_unity')] = fields_unity
+
+	def curvature_sum(self,cfs,curvatures,**kwargs):
+		"""
+		Curvature fields are maxed not summed.
+		"""
+		method = kwargs.get('method')
+		if method=='mean':
+			combo = np.array([np.transpose(cfs,(1,0,2,3))[cc]*c 
+				for cc,c in enumerate(curvatures)]).mean(axis=0)
+		else: raise Exception('invalid method %s'%method)
+		return combo
+		#(1.0-2.0*(xxx<0.0))
+		#import ipdb;ipdb.set_trace()
+		#return np.array([np.transpose(cfs,(1,0,2,3))[cc]*c 
+		#	for cc,c in enumerate(curvatures)]).max(axis=0)
+
+	def wilderness(self,**kwargs):
+		"""
+		Wandering on the error landscape to optimize the curvature coupling hypothesis.
+		"""
+		bundle,solutions = {},{}
+		global Nfeval
+		spec = self.spec
+		extents = spec.get('extents',{})
+		extents_method = extents.get('method')
+		curvature_sum_method = self.spec['curvature_sum']
+		#---prepare curvature fields
+		if not extents_method: raise Exception('set extents method')
+		elif extents_method=='fixed_isotropic': self.drop_gaussians(**spec)
+		#---if the output file exists then the optimization is done and we just keep the curvature fields
+		out_fn_name = 'curvature_%s.dat'%self.signifier
+		if os.path.isfile(os.path.join(work.postdir,out_fn_name)): return
+
+		#---optimize over simulations
+		for snum,sn in enumerate(work.sns()):
+			status('starting optimization for %s %d/%d'%(sn,snum+1,len(work.sns())),tag='optimize')
+
+			#---load the source data
+			hqs = self.memory[(sn,'hqs')][:self.nframes]
+			cfs = self.memory[(sn,'fields_unity')][:self.nframes]
+			vecs = self.memory[(sn,'vecs')][:self.nframes]
+			ndrops = cfs.shape[1]
+
+			#---formulate the wavevectors
+			lenscale = 1.0
+			m,n = mn = np.shape(hqs)[1:]
+			Lx,Ly = np.mean(vecs,axis=0)[:2]
+			q2d = lenscale*np.array([[np.sqrt(
+				((i-m*(i>m/2))/((Lx)/1.)*2*np.pi)**2+
+				((j-n*(j>n/2))/((Ly)/1.)*2*np.pi)**2)
+				for j in range(0,n)] for i in range(0,m)])
+			q_raw = np.reshape(q2d,-1)[1:]
+			area = (Lx*Ly/lenscale**2)
+
+			tweak = {}
+			#---! remove this eventually
+			signterm = tweak.get('inner_sign',-1.0)
+			lowcut = kwargs.get('lowcut',tweak.get('lowcut',0.0))
+			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('hicut',1.0))
+			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
+			if residual_form == 'log':
+				def residual(values): 
+					return np.sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
+			elif residual_form == 'linear': 
+				def residual(values): 
+					return np.sum((values-1.0)**2)/float(len(values))
+			else: raise Exception('unclear residual form %s'%residual_form)
+
+			def multipliers(x,y): 
+				"""Multiplying complex matrices in the list of terms that contribute to the energy."""
+				return x*np.conjugate(y)
+
+			def callback(args):
+				"""Watch the optimization."""
+				global Nfeval
+				name_groups = ['kappa','gamma','vibe']+['curve(%d)'%i for i in range(ndrops)]
+				text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
+					for name,val in zip(name_groups,args)+[('error',objective(args))]])
+				status('searching! '+text,tag='optimize')
+				Nfeval += 1
+
+			def objective(args):
+				"""
+				Fit parameters are defined in sequence for the optimizer.
+				They are: kappa,gamma,vibe,*curvatures-per-dimple.
+				"""
+				kappa,gamma,vibe = args[:3]
+				curvatures = args[3:]
+				composite = self.curvature_sum(cfs,curvatures,method=curvature_sum_method)
+				cqs = cctools.fft_field(composite)
+				termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
+				termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
+				#---skipping assertion and dropping imaginary
+				termlist = [np.real(k) for k in termlist]
+				hel = (kappa*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma*area*(termlist[0]*q_raw**2))
+				ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
+				return residual(ratio[band])
+
+			Nfeval = 0
+			initial_conditions = [25.0*2,0.0,-0.1]+[0.0 for i in range(ndrops)]
+			fit = scipy.optimize.minimize(objective,
+				x0=tuple(initial_conditions),method='SLSQP',callback=callback)
+			#---package the result
+			bundle[sn] = dict(fit,success=str(fit.success))
+			solutions['%s_%s'%(sn,'x')] = bundle[sn].pop('x')
+			solutions['%s_%s'%(sn,'jac')] = bundle[sn].pop('jac')
+			solutions['%s_%s'%(sn,'cf')] = np.array(self.curvature_sum(cfs,fit.x[3:],
+				method=curvature_sum_method).mean(axis=0))
+		try: store(obj=solutions,name=out_fn_name,path=work.postdir,attrs=dict(bundle=bundle,spec=self.spec))
+		except: 
+			import ipdb;ipdb.set_trace()
+
+#import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(np.array(self.curvature_sum(cfs,fit.x[3:]).mean(axis=0)).T,interpolation='nearest',origin='lower');plt.show()
