@@ -41,6 +41,9 @@ collections:
     - gelbilayerphys
     - gelbilayer_nochl
     - nwasppeptide2
+    - nwaspbilayermut1
+    - nwaspbilayernochl
+    - nwasppeptideb
   one:
     - mdia2bilayer_nochl2
 
@@ -101,8 +104,41 @@ meta:
     protein_itp:         s01-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "N-WASP peptide (2)"
+    label:              "N-WASP peptide B"
     cholesterol:         True
+  nwaspbilayermut1:
+    name:               "nwaspbilayermut1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP mutation 1"
+    cholesterol:         True
+  nwasppeptideb:
+    name:               "nwasppeptideb"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide B"
+    cholesterol:         True
+  nwaspbilayernochl:
+    name:               "nwaspbilayernochl"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide (no CHOL)"
+    cholesterol:         False
 
 slices:
   mdia2bilayer_nochl2:
@@ -140,6 +176,24 @@ slices:
       protein: protein
     slices:
       current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':180000,'skip':100}
+  nwaspbilayermut1:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':47100,'skip':100}
+  nwasppeptideb:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':66100,'skip':100}
+  nwaspbilayernochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':79100,'skip':100}
 
 calculations:
   lipid_abstractor:
@@ -151,7 +205,10 @@ calculations:
       separator: 
         lipid_tip: "name P"
         monolayer_cutoff: 1.4
-        topologize_tolerance: 0.07
+        topologize_tolerance: 
+          loop:
+            - 0.07
+            - 0.05
       selector:
         loop:
           lipid_com:
@@ -176,6 +233,8 @@ calculations:
       upstream: 
         lipid_abstractor:
           selector: lipid_com
+          separator:
+            topologize_tolerance: 0.07
   protein_rmsd:
     uptype: simulation
     slice_name: current
@@ -276,6 +335,7 @@ plots:
         cutoff: 3.4
   actinlink_bonds:
     calculation: contacts
-  actinlink_leaflet_checker:
-    calculation: lipid_abstractor
-
+    routine:
+      - contact_map
+      - histograms
+      - bars
