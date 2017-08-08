@@ -159,7 +159,7 @@ def construct_curvature_fields_trajectory(**kwargs):
 		#---take the mean box vectors and draw a single dimple in the center 
 		#---the dimple is normalized to a peak of unity and can be rescaled
 		vecs_mean = np.mean(vecs,axis=0)
-		fields['fields'] = [construct_curvature_field(vecs=vecs_mean,**kwargs)]	
+		fields['fields'] = [construct_curvature_field(vecs=vecs_mean,**kwargs)]
 	elif mapping == 'protein' and motion == 'static':
 		vecs_mean = np.mean(vecs,axis=0)
 		#---protein_abstractor saves points_all which is frames by proteins by atoms by xyz
@@ -218,6 +218,9 @@ def evaluate_hypothesis(hypo,sessions,full_output=False,preloaded_curvature=Fals
 	sn = hypo['sn']
 	hypo_full = Hypothesis(**hypo)
 	match = sessions['hypothesis'].query(Hypothesis).filter_by(**hypo_full.base()).one()
+	#---get the heights and vectors from "memory"
+	hqs = memory[(sn,'hqs')]
+	nframes = len(hqs)
 	#---get the curvature fields
 	#---! later we will manage the memory externally?
 	hypo_cf = Field(**hypo)
@@ -229,10 +232,12 @@ def evaluate_hypothesis(hypo,sessions,full_output=False,preloaded_curvature=Fals
 	curvature_fields = memory[key_cf]['fields']
 	#---rescale the field to the right curvature
 	cfs = np.array([hypo['curvature']*c for c in curvature_fields])
-	#---get the heights and vectors from "memory"
-	hqs = memory[(sn,'hqs')]
+	#---for the "static" motion, we repeat the same curvature field over all frames
+	if hypo['motion']=='static':
+		if not len(cfs)==1: 
+			raise Exception('motion is static but the pre-computed curvature fields have %s'%len(cfs))
+		cfs = [cfs[0] for fr in range(nframes)]
 	vecs = memory[(sn,'vecs')]
-	nframes = len(hqs)
 	mn = hqs.shape[1:]
 	#---prepare the functions
 	kwargs = dict(cfs=cfs) 

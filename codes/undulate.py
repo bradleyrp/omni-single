@@ -97,6 +97,7 @@ def calculate_undulations(surf,vecs,chop_last=False,lims=(0,1.0),perfect=False,r
 	if not perfect: x2,y2 = blurry_binner(x,x)[1],blurry_binner(x,y)[1]
 	else: x2,y2 = perfect_collapser(x,x)[1],perfect_collapser(x,y)[1] 
 	x3,y3 = x2[1:(-1 if chop_last else None)],y2[1:(-1 if chop_last else None)]
-	goodslice = where(all((x3>lims[0],x3<lims[1]),axis=0))
+	if lims!=None: goodslice = where(all((x3>lims[0],x3<lims[1]),axis=0))
+	else: goodslice = arange(len(x3)).astype(int)
 	kappa = mean(1/((y2[1:]*x2[1:]**4)[goodslice]*Lx*Ly/lenscale**2))
 	return {'y':y3,'x':x3,'kappa':kappa}

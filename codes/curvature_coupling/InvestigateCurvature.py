@@ -61,13 +61,14 @@ class InvestigateCurvature:
 
 	def __init__(self,**kwargs):
 		"""Assemble the necessary modules and execute."""
+		self.plotloader = kwargs.pop('plotloader',plotload)
 		if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
 		#---get the data according to instructions in the metadata
 		self.fetch_data_and_specs()
 		self.memory = self.loader_func(self.data)
 		#---master loop over the attempts
 		global work
-		for signifier,attempt in work.plots.get('curvature',{}).get('specs',{}).get('attempts',{}).items():
+		for signifier,attempt in work.plots.get(plotname,{}).get('specs',{}).get('attempts',{}).items():
 			self.prepare_rootdir('curvature_%s'%signifier)
 			self.prepare_database()
 			#---cursors
@@ -90,15 +91,15 @@ class InvestigateCurvature:
 	def fetch_data_and_specs(self):
 		"""..."""
 		#---load the upstream data
-		self.data,self.calc = plotload('curvature')
-		self.meta_spec = work.plots.get('curvature',{}).get('specs',{})
+		self.data,self.calc = self.plotloader(plotname)
+		self.meta_spec = work.plots.get(plotname,{}).get('specs',{})
 		#---load the module responsible for packing the data
 		loader_spec = self.meta_spec.get('loader',None)
-		if not loader_spec: raise Exception('you must add specs,loader to the plot entry for cuvature')
+		if not loader_spec: raise Exception('you must add specs,loader to the plot entry for curvature')
 		self.loader_func = self.gopher(loader_spec,module_name='module',variable_name='function')
 		#---load the module responsible for packing the data
 		database_spec = self.meta_spec.get('design',None)
-		if not database_spec: raise Exception('you must add specs,loader to the plot entry for cuvature')
+		if not database_spec: raise Exception('you must add specs,design to the plot entry for curvature')
 		self.database = self.gopher(database_spec,module_name='module',variable_name='def')
 
 	def prepare_rootdir(self,dropname):
