@@ -84,6 +84,10 @@ class InvestigateCurvature:
 			if not len(self.sns)==1: raise Exception('you can only have one simulation name in single_mode')
 			self.data_prot_incoming = {self.sns[0]:{'data':self.data_prot_incoming}}
 			self.data = {self.sns[0]:{'data':self.data}}
+		#---the following loaders allow you to manipulate incoming data. defaults are provided however we 
+		#---...strongly recommend that you retain the specification in the yaml file in case you change it,
+		#---...so that omnicalc can distinguish different trials. obviously omnicalc cannot track changes
+		#---...to the loader codes, so you should soft-code those parameters via the yaml file
 		#---get the "protein" positions
 		self.loader_spec_protein = self.design.get('loader_protein',
 			{'module':'codes.curvature_coupling_loader','function':'curvature_coupling_loader_protein'})
@@ -91,7 +95,7 @@ class InvestigateCurvature:
 			self.loader_spec_protein,module_name='module',variable_name='function')
 		self.data_prot = self.loader_func_protein(data=dict(protein_abstractor=self.data_prot_incoming))
 		#---get the "membrane" positions and send them through the FFT in the loader function
-		self.loader_spec = self.design.get('loader',
+		self.loader_spec = self.design.get('loader_membrane',
 			{'module':'codes.curvature_coupling_loader','function':'curvature_coupling_loader_membrane'})
 		self.loader_func = self.gopher(self.loader_spec,module_name='module',variable_name='function')
 		self.memory = self.loader_func(data=dict(undulations=self.data))

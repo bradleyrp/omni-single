@@ -92,6 +92,12 @@ calculations:
     slice_name: current
     collections: all
     specs:
+      loader_membrane:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_membrane
+      loader_protein:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_protein
       upstream:
         protein_abstractor: {}
         undulations:
