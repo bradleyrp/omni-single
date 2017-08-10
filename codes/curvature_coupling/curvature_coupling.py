@@ -78,20 +78,21 @@ class InvestigateCurvature:
 		self.data_prot_incoming = kwargs.pop('protein_abstractor',None)
 		if not self.data_prot_incoming: raise Exception('send upstream protein_abstractor data')
 		if kwargs: raise Exception('unprocessed arguments %s'%kwargs)
-		#---reformat some data if only one simulation
+		#---reformat some data if only one simulation. legacy versions of this code analyzed multiple 
+		#---...simulations at once and we retain some of this design for later
 		if self.single_mode:
 			if not len(self.sns)==1: raise Exception('you can only have one simulation name in single_mode')
 			self.data_prot_incoming = {self.sns[0]:{'data':self.data_prot_incoming}}
 			self.data = {self.sns[0]:{'data':self.data}}
 		#---get the "protein" positions
 		self.loader_spec_protein = self.design.get('loader_protein',
-			{'module':'codes.membrane_importer_gromacs','function':'curvature_coupling_loader_protein'})
+			{'module':'codes.curvature_coupling_loader','function':'curvature_coupling_loader_protein'})
 		self.loader_func_protein = self.gopher(
 			self.loader_spec_protein,module_name='module',variable_name='function')
 		self.data_prot = self.loader_func_protein(data=dict(protein_abstractor=self.data_prot_incoming))
-		#---get FFT data the usual way
+		#---get the "membrane" positions and send them through the FFT in the loader function
 		self.loader_spec = self.design.get('loader',
-			{'module':'codes.membrane_importer_gromacs','function':'curvature_coupling_loader'})
+			{'module':'codes.curvature_coupling_loader','function':'curvature_coupling_loader_membrane'})
 		self.loader_func = self.gopher(self.loader_spec,module_name='module',variable_name='function')
 		self.memory = self.loader_func(data=dict(undulations=self.data))
 		#---the style should be a function in this class

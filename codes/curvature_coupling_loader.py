@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+CURVATURE COUPLING LOADER
 Import GROMACS membrane data for the curvature coupling calculation.
 This function is alone so it can be swapped out with other importers.
 """
@@ -10,7 +11,7 @@ from base.tools import status
 from curvature_coupling.tools import fft_field
 from base.store import plotload
 
-def curvature_coupling_loader(data): 
+def curvature_coupling_loader_membrane(data): 
 	"""
 	Receive the undulation data and prepare the meshes for the curvature coupling calculation.
 	"""
@@ -28,7 +29,6 @@ def curvature_coupling_loader(data):
 			hqs = fft_field(midplane)
 			memory[(sn,'hqs')] = hqs
 			memory[(sn,'vecs')] = vecs
-
 	return memory
 
 def curvature_coupling_loader_protein(data): 
@@ -37,5 +37,8 @@ def curvature_coupling_loader_protein(data):
 	"""
 	#---note that you can load other upstream data with the following command:
 	#---... data_other,calc_other = work.plotload('undulations',status_override=True,
-	#---...     sns=data['protein_abstractor'].keys())
+	#---... 	sns=data['protein_abstractor'].keys())
+	#---note also that there are two ways to manipulate incoming data for InvestigateCurvature: (1) alter
+	#---...the data here or (2) duplicate the curvature_undulation_coupling.py calculation with custom 
+	#---...upstream data types and custom imports
 	return data['protein_abstractor']
