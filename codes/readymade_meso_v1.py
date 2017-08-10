@@ -39,16 +39,15 @@ def import_membrane_mesh(**kwargs):
 		topline = lines[0]
 		#---data is xyz in columns plus fourth column
 		dat = np.array([[float(j) for j in line.split()] for line in lines[1:]])
-		#---! UNDER CONSTRUCTION
+		#---! UNDER CONSTRUCTION. need to load these into a mesh object
 		import ipdb;ipdb.set_trace()
 	reform = {}
+	#---reformulate the data in the manner InvestigateCurvature expects i.e. upstream omnicalc format
 	reform['nframes'] = len(mesh)
+	#---! UNDER CONSTRUCTION
 	reform['grid_spacing'] = np.array(-1.0)
 	reform['vecs'] = np.array([-1.0,-1.0,-1.0])
 	reform['grid'] = np.array([nx,ny])
-	#---! UNDER CONSTRUCTION
-	#---reformulate the data in the manner InvestigateCurvature expects i.e. upstream omnicalc format
-	# ### [u'mesh', u'grid', u'vecs', u'grid_spacing', u'nframes']
 
 def import_curvature_inducer_points(**kwargs):
 	"""
