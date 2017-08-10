@@ -1,13 +1,23 @@
 collections:
   all:
-    - free_membrane_cl0
-    - bound_membrane_cl0
+    - CL160ENS-2
+    - CL160ENS-3
 
 slices:
-  free_membrane_cl0:
-    readymade_regular_membrane:
+  CL160ENS-2:
+    readymade_meso_v1:
       current:
-        dat: /store-iota/MASTER/Samrad/Mem_Undulation/MEM_position-0_Frame-0.dat
+        path: /store-iota/MASTER/Samrad/Mem_Undulation
+        directory: CL160ENS-2
+        membrane_xyz_glob: memb_xyz-0-0-*.xyz
+        nanogel_dat: NG_Position-0_Frame-0.dat
+  CL160ENS-3:
+    readymade_meso_v1:
+      current:
+        path: /store-iota/MASTER/Samrad/Mem_Undulation
+        directory: CL160ENS-3
+        membrane_xyz_glob: memb_xyz-0-0-*.xyz
+        nanogel_dat: NG_Position-0_Frame-0.dat
 
 meta:
   free_membrane_cl0:
@@ -23,13 +33,40 @@ variables:
     free_membrane_cl0: 
       path: Mem_Undulation/MEM_position-0_Frame-0.dat
 
-calculations:
+deprecated:
   # first attempt, deprecated
   curvature_coupling:
     calculation: 
       - undulations
       - protein_abstractor
     collections: big
+calculations:
+  # FINAL CURVATURE COUPLING VERSION!!!
+  curvature_undulation_coupling_dex:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: all
+    specs:
+      design:
+        loader_membrane:
+          module: codes.curvature_coupling_loader
+          function: curvature_coupling_loader_membrane
+        loader_protein:
+          module: codes.curvature_coupling_loader
+          function: curvature_coupling_loader_protein
+        style: wilderness
+        curvature_positions: 
+          method: neighborhood
+          distance_cutoff: 5.0
+          spacer: 2.5
+        extents:
+          method: fixed_isotropic
+          extent:
+            loop: 
+              - 2.5
+              - 1.0
+        curvature_sum: mean
 plots:
   # custom calculation instructions for samrad data
   curvature_dextran:
