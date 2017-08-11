@@ -26,7 +26,10 @@ def colorize(metadat,comparison='',resname=''):
 		colordict = {
 			'DOPC':'grey',
 			'DOPS':'red',
-			'PIP2':'purple',}
+			'DOPE':'blue',
+			'PIP2':'purple',
+			'PtdIns':'purple',
+			'CHL1':'green'}
 		return palette_colors[colordict[resname]]
 	else:
 		colordict = {
@@ -43,7 +46,6 @@ def colorize(metadat,comparison='',resname=''):
 				('MG','P35P'):'purple',
 				('Cal','P35P'):'orange',},
 			'protonation':{
-
 				('NA',):'green',
 				('MG',):'red',
 				('Cal',):'blue',
@@ -161,6 +163,7 @@ class BarGrouper:
 		self.namer = kwargs.get('namer',lambda x:x)
 		self.show_xticks = kwargs.get('show_xticks',True)
 		self.empty = kwargs.get('empty',False)
+		self.ax = kwargs.get('ax',None)
 		#---mimic the incoming data structure and store bar properties
 		self.barsave = copy.deepcopy(self.dat)
 		#---plot specs for each bar
@@ -206,8 +209,9 @@ class BarGrouper:
 		"""When a bar is completed we advance the cursor."""
 		self.cursor += self.width
 	def plot(self,wait=False):
-		fig = plt.figure(figsize=self.figsize)
-		ax = plt.subplot(111)
+		if not self.ax:
+			fig = self.fig = plt.figure(figsize=self.figsize)
+			ax = self.ax = plt.subplot(111)
 		#---! here instead of set_ ???
 		xs,ws = [np.array([b[k] for bb,b in enumerate(self.bars)]) for k in 'lw']
 		#---incoming values are tuples of mean,std
@@ -236,9 +240,8 @@ class BarGrouper:
 				rendered[bb].set_edgecolor('k')
 				#---apply the dimmer if this bar is "off"
 				if not self.namesdict[self.names[bb]] and self.dimmer: self.dimmer(rendered[bb])
-		self.plot_extras(ax)
+		self.plot_extras()
 		if not wait: plt.show()
-		self.ax = ax
 		#---! mimics the divider code
 		if self.bars:
 			lims = zip(*[(i['l'],i['r']) for i in self.bars])
@@ -266,8 +269,9 @@ class BarGrouper:
 		#---look up the bars in the group
 		bars = [delve(self.barsave,*p) for p in [tuple(p) for p in paths]]
 		return bars
-	def plot_extras(self,ax):
+	def plot_extras(self):
 		"""Handle extra annotations for different groups."""
+		ax = self.ax
 		for name,extra in self.extras:
 			if name=='divider':
 				bars = self.bars_by_names(extra['names'])
