@@ -182,6 +182,8 @@ variables:
 collections:
   one:
     - membrane-v530
+  another: 
+    - membrane-v532
   symmetric:
     - membrane-v509
     - membrane-v510
@@ -405,7 +407,7 @@ calculations:
     collections: all
     specs:
       upstream:
-        ion_binding: None
+        ion_binding: {}
       zonecut:
         loop: [1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.6,5.0]
   ion_binding_norms:
@@ -414,7 +416,7 @@ calculations:
     collections: all
     specs:
       upstream:
-        ion_binding: None
+        ion_binding: {}
         ion_binding_combinator:
           zonecut:
             loop:
@@ -473,6 +475,17 @@ calculations:
     uptype: simulation
     slice_name: current
     collections: all
+    specs:
+      upstream:
+        undulations: {}
+      atom_filter:
+        loop:
+          - "^O"
+          - None
+      distance_metric:
+        loop:
+          - z
+          - r
 
 # set aside
 calculations_aside:
@@ -554,12 +567,61 @@ plots:
       lipid_areas2d:
         selector: lipid_com
   hydration:
-    calculation: hydration
+    calculation: 
+      hydration:
+        # use "null" for None
+        atom_filter: "^O"
+        distance_metric: "z"
     collections: all
+    specs:
+      # set the cutoffs according to distance_metric
+      distance_ranges_by_metric:
+        "z": [0.0,50.0,0.5]
+        "r": [1.2,4.0,0.05]
+      # one plot for each group of simulations
+      sns:
+        composition:
+          - membrane-v509
+          - membrane-v530
+        position:
+          - membrane-v531
+          - membrane-v532
+          - membrane-v533
+          - membrane-v534
+        symmetric_all:
+          - membrane-v509
+          - membrane-v510
+          - membrane-v511
+          - membrane-v514
+          - membrane-v515
+        asymmetric_all:
+          - membrane-v536
+          - membrane-v538
+          - membrane-v530
+          - membrane-v542
+          - membrane-v531
+          - membrane-v533
+          - membrane-v532
+          - membrane-v534
+        zzz:
+          - membrane-v509
+          - membrane-v510
+          - membrane-v511
+          - membrane-v530
+          - membrane-v531
+          - membrane-v532
   head_angle_contour:
     calculation: head_angle
   ptdins_snapshots:
+    collections: another
     calculation:
       # are these necessary? you are plotloading tilt without adding it here
       hydrogen_bonding: {}
-      salt_bridges: {}
+      salt_bridges:
+        distance_cutoff: 2.2
+      lipid_abstractor:
+        selector: lipid_chol_com
+      lipid_mesh:
+        upstream: 
+          lipid_abstractor:
+            selector: lipid_chol_com
