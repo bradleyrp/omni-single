@@ -12,36 +12,35 @@ sns = work.sns()
 #---choosing a scanning range
 roundlev = 4  
 
-#---! remove the old "confidence" style which is deprecated
-plotspecs = [
-	{'errorbar_style':'confidence_bars','interval':0.05,'xmin':1.2,'xmax':4.0},
-	{'errorbar_style':'confidence_bars','interval':1.0,'xmin':0.0,'xmax':80.0},
-	{'errorbar_style':'confidence_bars','interval':2.0,'xmin':0.0,'xmax':50.0},][-1:]
-
-#---one plot per group of simulations set in the metadata
-sns_groups = work.plots.get('hydration',{}).get('specs',{}).get('sns',{})
-#---only load what we need
-sns = list(set([i for j in sns_groups.values() for i in j]))
-if not sns_groups: raise Exception('please set plots (hydration), specs, sns '
-	'to set simulation groups for each plot')
-#---we discard the key in the sns groups set in the metadata
-plotspecs = [dict(sns=sns_groups[key],**spec) for spec in plotspecs for key in sns_groups]
-
-hydration_scan = np.unique(np.concatenate([
-	np.arange(plotspec['xmin'],plotspec['xmax']+plotspec['interval'],plotspec['interval']).round(roundlev)
-	for plotspec in plotspecs]))
-#---cutoff sweep in angstroms
-lenscale = 10.0
-#---use reduced keys
-key_pack = lambda *args: tuple([('%0.0'+'%d'%roundlev+'f')%float(k) for k in args])
-key_unpack = lambda arg: [float(i) for i in arg.split('_')]
-
 #---block: load the calculation data
 if 'data' not in globals(): 
 	data,calc = plotload(plotname,work)
 	#---!
 	atom_filter = calc['calcs']['specs']['atom_filter']
 	distance_metric = calc['calcs']['specs']['distance_metric']
+
+	#---plotspecs are formulated from key parameters in the metadata
+	distance_ranges = work.plots.get('hydration',{}).get('specs',{}).get('distance_ranges_by_metric',{})
+	#---previously we had multiple plotspecs but now they are set in metadata and we use one
+	plotspecs = [dict([(['xmin','xmax','interval'][ii],i) 
+		for ii,i in enumerate(distance_ranges[distance_metric])])]
+
+	#---one plot per group of simulations set in the metadata
+	sns_groups = work.plots.get('hydration',{}).get('specs',{}).get('sns',{})
+	#---only load what we need
+	sns = list(set([i for j in sns_groups.values() for i in j]))
+	if not sns_groups: raise Exception('please set plots (hydration), specs, sns '
+		'to set simulation groups for each plot')
+	#---we discard the key in the sns groups set in the metadata
+	plotspecs = [dict(sns=sns_groups[key],**spec) for spec in plotspecs for key in sns_groups]
+
+	#---get all unique values in the ranges for post-processing
+	hydration_scan = np.unique(np.concatenate([
+		np.arange(plotspec['xmin'],plotspec['xmax']+plotspec['interval'],
+			plotspec['interval']).round(roundlev) for plotspec in plotspecs]))
+	#---use reduced keys
+	key_pack = lambda *args: tuple([('%0.0'+'%d'%roundlev+'f')%float(k) for k in args])
+	key_unpack = lambda arg: [float(i) for i in arg.split('_')]
 
 #---block: remote work!
 if 'postdat' in globals():
@@ -66,6 +65,8 @@ if 'postdat' not in globals():
 		import warnings
 		warnings.filterwarnings('error')
 
+	#---cutoff sweep in angstroms
+	lenscale = 10.0
 	postdat = {}
 	for sn in sns:
 		dat = data[sn]['data']
@@ -194,8 +195,12 @@ if 'basic' in routine:
 	def slatplot(x,y,y_err,ax,color,w,thick_data,plus_off,basic_bar=False,**kwargs):
 		"""Custom "slat" plots plot a line on top of an opaque confidence interval."""
 		if basic_bar and thick_data!=None: raise Exception('cannot use basic_bar with thick_data')
+		#---center or left markers
+		align = kwargs.get('align','middle')
 		#---independent variables are given by steps that reach out from the midpoint according to width (w)
-		xs = [x-w/2.,x+w/2.]
+		if align=='middle': xs = [x-w/2.,x+w/2.]
+		elif align=='left': xs = [x,x+w]
+		else: raise Exception('align must be middle or left')
 		#---check overlapping points from other timeseries
 		global point_registry
 		#---rounding tolerance level for identifying overlapping points
@@ -289,73 +294,54 @@ if 'basic' in routine:
 			if do_alt_colors:
 				color = {'membrane-v509':'r','membrane-v530':'b'}[sn]
 			else: color = colorize(work.meta[sn],comparison='protonation')
-			if spec['errorbar_style']=='confidence':
-				raise Exception('deprecated')
-				kwargs = dict(ms=5,color=color,
-					label='%s, %s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label']))
-				ax.plot(x[valid],y[valid],'.',**kwargs)
-				kwargs.pop('ms')
-				kwargs.update(alpha=0.2,lw=0)
-				ax.fill_between(x[valid],y[valid]-y_err[valid],y[valid]+y_err[valid],**kwargs)
-				x_collects.extend(x[valid])
-				ax.set_xticks(x)
-				ax.set_xticklabels(['%.1f'%i for i in x],rotation=90)
-			elif spec['errorbar_style']=='confidence_bars':
-				kwargs = dict(ms=5,color=color,
-					label='%s, %s%s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'],
-						'(%s)'%work.meta[sn]['composition_name'] if do_alt_colors else ''))
-				#---for each valid point we plot a "slat" showing the confidence interval or a plus sign
-				for v in valid:
-					slatplot(x[v],y[v],y_err=y_err[v],ax=ax,
-						#---the width of the bin is the sampling interval in the lipid-ion cutoff distance
-						w=spec['interval'],color=color,
-						#---set the linewidth of the steps in data units, a (small) fraction of a water
-						thick_data=0.02,
-						#---set the inset trim of the zero-variance plus sign
-						plus_off=spec['interval']/3.)
-				x_collects.extend(x[valid])
-				minor_xticks = np.unique(np.reshape([[i+spec['interval']/2.,
-					i-spec['interval']/2.] for i in x],-1))
-				#---plot the normalization constants above ...!!!
-				for v in valid:
-					slatplot(x[v],yn[v],y_err=None,ax=axtop,
-						#---the width of the bin is the sampling interval in the lipid-ion cutoff distance
-						w=spec['interval'],color=color,thick_data=None,plus_off=None,basic_bar=True)
-				#---identical tick-mark formatting
-				for ax_this in [ax,axtop]:
-					ax_this.set_xticks(minor_xticks,minor=True)
-					ax_this.set_xticks(minor_xticks,minor=True)
-					ax_this.set_axisbelow(True)
-					ax_this.xaxis.grid(True,which='minor',zorder=0)
-				#---major ticks are set automatically and just enlarged a bit here
-				ax.set_yticklabels(['%d'%i for i in ax.get_yticks()],
-					fontsize=figspecs['fs_ticks'])
-				axtop.set_xticklabels([])
-				#---major ticks are set automatically and just enlarged a bit here
-				ax.set_xticklabels(['%.1f'%i for i in ax.get_xticks()],
-					fontsize=figspecs['fs_ticks'])
-				ax.yaxis.grid(True,which='major',zorder=0)
-				#---! should we match the opacity with slatplot?
-				legendspec.append(dict(name='%s\n%s%s'%(
-					work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'],
-					'\n(%s)'%work.meta[sn]['composition_name'] if do_alt_colors else ''),
-					patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=color,alpha=0.5)))
-			else: raise Exception('unknown errorbar style: %s'%spec['errorbar_style'])
+			kwargs = dict(ms=5,color=color,
+				label='%s, %s%s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'],
+					'(%s)'%work.meta[sn]['composition_name'] if do_alt_colors else ''))
+			#---for each valid point we plot a "slat" showing the confidence interval or a plus sign
+			for v in valid:
+				slatplot(x[v],y[v],y_err=y_err[v],ax=ax,align='left',
+					#---the width of the bin is the sampling interval in the lipid-ion cutoff distance
+					w=spec['interval'],color=color,
+					#---set the linewidth of the steps in data units, a (small) fraction of a water
+					thick_data=0.02,
+					#---set the inset trim of the zero-variance plus sign
+					plus_off=spec['interval']/3.)
+			x_collects.extend(x[valid])
+			#---ticks follow th left alignment
+			minor_xticks = np.unique(np.reshape([[i,i-spec['interval']] for i in x],-1))
+			#---plot the normalization constants above ...!!!
+			for v in valid:
+				slatplot(x[v],yn[v],y_err=None,ax=axtop,align='left',
+					#---the width of the bin is the sampling interval in the lipid-ion cutoff distance
+					w=spec['interval'],color=color,thick_data=None,plus_off=None,basic_bar=True)
+			#---identical tick-mark formatting
+			for ax_this in [ax,axtop]:
+				ax_this.set_xticks(minor_xticks,minor=True)
+				ax_this.set_axisbelow(True)
+				ax_this.xaxis.grid(True,which='minor',zorder=0)
+			#---major ticks are set automatically and just enlarged a bit here
+			ax.set_yticklabels(['%d'%i for i in ax.get_yticks()],
+				fontsize=figspecs['fs_ticks'])
+			axtop.set_xticklabels([])
+			ax.yaxis.grid(True,which='major',zorder=0)
+			#---! should we match the opacity with slatplot?
+			legendspec.append(dict(name='%s\n%s%s'%(
+				work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'],
+				'\n(%s)'%work.meta[sn]['composition_name'] if do_alt_colors else ''),
+				patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=color,alpha=0.5)))
 		axtop.set_ylim((0,maxcount*1.1))
 		#---dislike tick marks
 		axtop.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 		axtop.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
 		for ax_this in [ax,axtop]:
 			ax_this.set_xlim(np.array(x_collects).min()-spec['interval'],np.array(x_collects).max())
-		error_bar_tag = {None:'.no_error_bars','basic':'.error_bars',
-			'confidence':'.interval','confidence_bars':'.interval_bars'}[
-			spec['errorbar_style']]
+		#---major ticks are set automatically and just enlarged a bit here
+		ax.set_xticklabels(['%.1f'%i for i in ax.get_xticks()],
+			fontsize=figspecs['fs_ticks'])
 		fn_fig = 'fig.hydration'
 		axtop.set_ylabel(r'$\mathrm{\langle N_{ions}(x) \rangle}$',fontsize=figspecs['fs_ylabel'])
 		ax.set_ylabel(r'$\mathrm{N_{waters}(x,t)}$',fontsize=figspecs['fs_ylabel'])
 		ax.set_xlabel('cation-lipid distance ($\mathrm{\AA}$)',fontsize=figspecs['fs_xlabel'])
-		#if atom_filter: axtop.set_title({'^O':'oxygen'}[atom_filter])
-		#---! not prepared for the old style
 		patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
 		patch = mpl.lines.Line2D([],[],color='k',marker='+',markersize=30,lw=0,mew=4)
 		patches.extend([
