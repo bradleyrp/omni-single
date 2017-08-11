@@ -20,25 +20,19 @@ show_static,press = True,not is_live
 mpl.rcParams['hatch.linewidth'] = 1.5
 #---hatch color was controllable here in mpl v2.0.0 but they reverted
 mpl.rcParams['hatch.color'] = 'w'
-#---selecting simulations and ordering by ion
-ion_order = ['K','NA','Na,Cal','MG','Cal']
-collections = ['asymmetric_all','symmetric_all']
-#---subselect interesting bars from the master set
-interesting = dict([
-	('v1',{'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1',
-		'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'both'}),
-	('v2',{'comparison':'position','cation':'Cal','pairname':'pip2',
-		'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'both'}),
-	('v3',{'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1',
-		'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'hbonds'}),
-	('v4',{'comparison':'position','cation':'Cal','pairname':'pip2',
-		'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'hbonds'}),])
-press_routine = ['summary','interesting'][-1:]
 
 #---block: IMPORT THE DATA
 if 'data' not in globals(): 
 	sns,(data,calc) = work.sns(),plotload(plotname,work)
 	data_salt,calc_salt = plotload('salt_bridges',work)
+	#---set the plot targets in the YAML for multiuse scripts
+	plotspecs = work.plots[plotname]['specs']
+	#---subselect interesting bars from the master set
+	interesting = plotspecs.get('interesting',{})
+	press_routine = plotspecs.get('press_routine',['summary','interesting'])
+	collections = plotspecs.get('collection_sets')
+	ion_order = plotspecs.get('ion_order')
+	legend_mapper = plotspecs.get('legend_mapper')
 
 #---block: UTILITY FUNCTIONS
 def reorder_by_ion(sns,ion_order,identity=True):
@@ -169,16 +163,10 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	#---custom items in the legend based on the comparison
 	if comparison_spec:
 		ion_names,ptdins_names = [comparison_spec[i] for i in ['ion_names','ptdins_names']]
-	elif comparison=='asymmetric_all':
-		ion_names = ['K','NA','Na,Cal','MG','Cal']
-		ptdins_names = ['PI2P','P35P','SAPI']
-	elif comparison=='symmetric_all':
-		ion_names = ['NA','MG','Cal']
-		ptdins_names = ['PI2P','PIPU','PIPP']
-	elif comparison=='cursor':
-		ion_names = ['NA']
-		ptdins_names = ['PI2P']
-	else: raise Exception('add comparison to legend maker: %s'%comparison)
+	else:
+		if comparison not in legend_mapper:
+			raise Exception('you must add this comparison (%s) to legend_mapper in the plot specs') 
+		ion_names,ptdins_names = [legend_mapper[comparison][k] for k in ['ion_names','ptdins_names']]
 	#---we can also add lipid types to the bar plots for the subset plots
 	lipid_resnames = [] if not lipid_resnames else lipid_resnames
 	rectangle_specs,patches,labels = {},[],[]
@@ -187,7 +175,9 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 		for item in group:
 			if name!='lipid_resname':
 				try: sn = next(sn for sn in sns_this if work.meta[sn][name]==item)
-				except: raise Exception('cannot get a simulation for %s,%s'%(name,item))
+				except: 
+					import ipdb;ipdb.set_trace()
+					raise Exception('cannot get a simulation for %s,%s'%(name,item))
 			#---simulation does not matter if we are adding lipids to the legend
 			else: sn = sns_this[0]
 			if sn not in sns_this: continue
@@ -331,7 +321,7 @@ def hbonds_plotter(bars=None,checks=None,**kwargs):
 	bars.ax.yaxis.grid(which="minor",color='k',linewidth=0.5,alpha=0.5,zorder=0)
 	bars.ax.tick_params(axis=u'both', which=u'both',length=0)
 	bars.ax.set_title(title,fontsize=40)
-	legend,patches = legend_maker_stylized(bars.ax,sns_this=[])
+	legend,patches = legend_maker_stylized(bars.ax,sns_this=sns)
 	return legend
 
 ###---PLOTTING

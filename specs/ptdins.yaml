@@ -555,6 +555,31 @@ plots:
   hydrogen_bonding:
     calculation: hydrogen_bonding
     collections: all
+    specs:
+      press_routine:
+        - summary
+        #- interesting
+      interesting:
+        v1: {'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1',
+          'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'both'}
+        v2: {'comparison':'position','cation':'Cal','pairname':'pip2',
+          'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'both'}
+        v3: {'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1',
+          'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'hbonds'}
+        v4: {'comparison':'position','cation':'Cal','pairname':'pip2',
+          'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'hbonds'}
+      ion_order: ['K','NA','Na,Cal','MG','Cal']
+      collection_sets: ['asymmetric_all','symmetric_all']
+      legend_mapper:
+        asymmetric_all:
+          ion_names: ['K','NA','Na,Cal','MG','Cal']
+          ptdins_names: ['PI2P','P35P','SAPI']
+        symmetric_all:
+          ion_names: ['NA','MG','Cal']
+          ptdins_names: ['PI2P','PIPU','PIPP']
+        cursor:
+          ion_names: 'NA'
+          ptdins_names: 'PI2P'
   # no plot but hydrogen_bonding uses these data via plotload to plot everything
   salt_bridges:
     calculation: 
