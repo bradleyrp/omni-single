@@ -33,6 +33,12 @@ if 'data' not in globals():
 	collections = plotspecs.get('collection_sets')
 	ion_order = plotspecs.get('ion_order')
 	legend_mapper = plotspecs.get('legend_mapper')
+	relevant_resnames = plotspecs.get('relevant_resnames',None)
+	bar_formats_style = plotspecs.get('bar_formats_style','candy')
+	legend_maker_specs = plotspecs.get('legend_maker_specs',{})
+	figsize_all = plotspecs.get('figsize_all',(16,9))
+	sns_explicit_color_names = plotspecs.get('sns_explicit_color_names',{})
+	nmols_recount = plotspecs.get('nmols_recount',None)
 
 #---block: UTILITY FUNCTIONS
 def reorder_by_ion(sns,ion_order,identity=True):
@@ -59,13 +65,18 @@ def count_hydrogen_bonds_by_sn(bonds,obs,nmols):
 	inter = bonds[inter_inds]
 	#---catalog bonding pairs by residue
 	resnames_combos = np.transpose((inter[:,0],inter[:,3]))
+	if relevant_resnames: 
+		resnames_combos = resnames_combos[np.where(np.all([
+			np.in1d(resnames_combos[:,i],relevant_resnames) for i in range(2)],axis=0))]
 	inds,counts = uniquify(resnames_combos)
 	pairs = resnames_combos[inds]
 	#---discard sol
 	lipid_only = np.where(np.all(pairs!='SOL',axis=1))[0]
 	#---cut cholesterol in half because it is in both leaflets and POPC does not make hbonds
 	nmols_leaflet = 400 
-	if 'CHL1' in nmols: nmols['CHL1'] /= 2.0
+	if nmols_recount:
+		nmols_recount_f = eval(nmols_recount)
+		nmols = nmols_recount_f(nmols)
 	#---get the proportions relative to combos
 	#---! CHECK THE MEANING OF THIS NUMBER, COMBINATORICALLY-WISE
 	#---subsample the obs matrix (frames by combos) to pick out each unique resname combo
@@ -135,34 +146,43 @@ def count_hydrogen_bonds(data,bonds_key='bonds'):
 
 def make_bar_formats(sns,style='candy'):
 	"""Make bar formats, most recently, candy-colored bars with hatches."""
+	colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
+		for key,val in {
+		'red':0,'blue':1,'green':2,'purple':3,'orange':4,
+		'yellow':5,'brown':6,'pink':7,'grey':8,}.items()])
+	colors['pink'] = mpl.colors.ColorConverter().to_rgb("#f1948a")
+	colors['beige'] = mpl.colors.ColorConverter().to_rgb("#C3C3AA")
+	#---combine blue and green to denote the dilute Na,Cal simulation
+	bgw = 0.3
+	colors['bluegreen'] = np.average((colors['blue'],colors['green']),weights=[1-bgw,bgw],axis=0)
+	bgw2 = 0.6
+	colors['bluegreen2'] = np.average((colors['blue'],colors['green']),weights=[1-bgw2,bgw2],axis=0)
 	if style=='original':
 		out = dict([(sn,{'c':colorize(work.meta[sn],comparison=comparison)}) for sn in sns])
 	elif style=='candy':
-		colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
-			for key,val in {
-			'red':0,'blue':1,'green':2,'purple':3,'orange':4,
-			'yellow':5,'brown':6,'pink':7,'grey':8,}.items()])
-		colors['pink'] = mpl.colors.ColorConverter().to_rgb("#f1948a")
-		colors['beige'] = mpl.colors.ColorConverter().to_rgb("#C3C3AA")
-		#---combine blue and green to denote the dilute Na,Cal simulation
-		bgw = 0.3
-		colors['bluegreen'] = np.average((colors['blue'],colors['green']),weights=[1-bgw,bgw],axis=0)
 		colors_ions = {'NA':'green','Na,Cal':'bluegreen','MG':'pink','Cal':'blue','K':'grey',}
 		hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':''}
 		out = dict([(sn,{
 			'c':colors[colors_ions[work.meta[sn]['cation']]],
 			'hatch':hatches_lipids[work.meta[sn]['ptdins_resname']]}) for sn in sns])
+	elif style=='actinlink':
+		out = dict([(sn,{
+			#---the actinlink plots have custom colors
+			'c':colors[sns_explicit_color_names[sn]],
+			'hatch':'//' if work.meta[sn].get('cholesterol',False) else ''}) for sn in sns])
 	else: raise Exception('no bar style: %s'%style)
-	[v.update(edgecolor=v['c']) for k,v in out.items()]
+	for k,v in out.items(): v.update(edgecolor=v['c'])
 	return out
 
 def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None,
-	comparison_spec=None,lipid_resnames=None):
+	comparison_spec=None,lipid_resnames=None,sns_explicit=None):
 	global bar_formats,comparison
 	#---custom items in the legend based on the comparison
 	if comparison_spec:
 		ion_names,ptdins_names = [comparison_spec[i] for i in ['ion_names','ptdins_names']]
+		#---custom simulations must come in through the comparison_spec in the YAML file
+		sns_explicit = comparison_spec.get('sns_explicit',None)
 	else:
 		if comparison not in legend_mapper:
 			raise Exception('you must add this comparison (%s) to legend_mapper in the plot specs') 
@@ -170,6 +190,7 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	#---we can also add lipid types to the bar plots for the subset plots
 	lipid_resnames = [] if not lipid_resnames else lipid_resnames
 	rectangle_specs,patches,labels = {},[],[]
+	#---loop over relevant cations, PIP2 types, and lipids so they are included in the legend
 	for name,group in [('cation',ion_names),('ptdins_resname',ptdins_names),
 		('lipid_resname',lipid_resnames)]:
 		for item in group:
@@ -196,6 +217,25 @@ def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=1.0,lw=3,ec='k',
 					**rectangle_specs[sn]))
 				labels.append(item)
+	#---additional legend items for explicit simulations that come from sns_explicit
+	if sns_explicit:
+		for sn in sns_explicit:
+			if sn not in rectangle_specs: rectangle_specs[sn] = {}
+			rectangle_specs[sn]['ec'] = 'k'
+			rectangle_specs[sn]['fc'] = bar_formats[sn]['edgecolor']
+			rectangle_specs[sn]['lw'] = 0
+			rectangle_specs[sn]['hatch'] = bar_formats[sn].get('hatch','')
+			patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+			labels.append(work.meta[sn].get('label',sn))
+	#---special annotation for cholesterol
+	if bar_formats_style=='actinlink':
+		for is_chol in [True,False]:
+			rectangle_specs[sn]['ec'] = 'k'
+			rectangle_specs[sn]['fc'] = 'w'
+			rectangle_specs[sn]['lw'] = 2
+			rectangle_specs[sn]['hatch'] = {True:'//',False:''}[is_chol]
+			patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+			labels.append('%s cholesterol'%{True:'with',False:'no'}[is_chol])
 	if not patches: patches,labels = [mpl.patches.Rectangle((0,0),1.0,1.0,fc='w')],['empty']
 	legend = ax.legend(patches,labels,loc=loc,fontsize=fs,
 		ncol=ncol,title=title,bbox_to_anchor=bbox,labelspacing=1.2,
@@ -250,7 +290,7 @@ def postprep(sns):
 	sns_names = dict([(sn,work.meta[sn]['ptdins_resname']+' and '+
 		work.meta[sn]['cation']) for sn in sns])
 	namer = lambda ((a,b),c): ('%s-%s'%(a,b))
-	bar_formats = make_bar_formats(sns)
+	bar_formats = make_bar_formats(sns,style=bar_formats_style)
 	#---premake the data for the outline style
 	posts = dict([(key,{}) for key in ['hbonds','salt']])
 	for key,(bonds_key,data_name) in [('hbonds',('bonds','data')),('salt',('bonds_salt','data_salt'))]:
@@ -288,7 +328,7 @@ def postprep(sns):
 	post,title = posts['both'],'hydrogen bonding + salt bridges'
 	#---prepare the data
 	bardat = hbonds_bardat(sns=sns,post=post,bar_formats=bar_formats)
-	bars_premade = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
+	bars_premade = BarGrouper(figsize=figsize_all,spacers={0:0,1:1.0,2:2.0},
 		dimmer=dimmer,namer=namer,show_xticks=False,**bardat)
 	return dict(namer=namer,bar_formats=bar_formats,posts=posts,sns_names=sns_names)
 
@@ -312,7 +352,7 @@ def hbonds_plotter(bars=None,checks=None,**kwargs):
 		keys = reorder_by_ion([k for k,v in checks.items() if v],ion_order)
 		empty = not keys
 		bardat = hbonds_bardat(sns=checks.keys()[:1] if empty else keys,post=post,bar_formats=bar_formats)
-		bars = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
+		bars = BarGrouper(figsize=figsize_all,spacers={0:0,1:1.0,2:2.0},
 			dimmer=dimmer,namer=namer,show_xticks=False,empty=empty,**bardat)
 	#---additional 
 	bars.plot(wait=True)
@@ -321,7 +361,12 @@ def hbonds_plotter(bars=None,checks=None,**kwargs):
 	bars.ax.yaxis.grid(which="minor",color='k',linewidth=0.5,alpha=0.5,zorder=0)
 	bars.ax.tick_params(axis=u'both', which=u'both',length=0)
 	bars.ax.set_title(title,fontsize=40)
-	legend,patches = legend_maker_stylized(bars.ax,sns_this=sns)
+	bars.ax.set_ylim((0,bars.ax.get_ylim()[1]))
+	legend_kwargs = dict(sns_this=sns)
+	#---overrides for the legendmaker
+	legend_kwargs.update(**legend_maker_specs)
+	legend,patches = legend_maker_stylized(bars.ax,
+		sns_this=legend_kwargs.pop('sns'),comparison_spec=legend_kwargs)
 	return legend
 
 ###---PLOTTING
@@ -348,7 +393,7 @@ if press and 'summary' in press_routine:
 		#---put the postprep data into globals
 		globals().update(postprep(sns))
 		for tag,spec in press_specs.items():
-			bars_premade = BarGrouper(figsize=(16,8),spacers={0:0,1:1.0,2:2.0},
+			bars_premade = BarGrouper(figsize=figsize_all,spacers={0:0,1:1.0,2:2.0},
 				dimmer=dimmer,namer=namer,show_xticks=False,
 				**hbonds_bardat(sns=sns,post=posts[spec['posts_subkey']],bar_formats=bar_formats))
 			legend = hbonds_plotter(bars_premade,title=spec['title'],checks=dict([(sn,True) for sn in sns]))

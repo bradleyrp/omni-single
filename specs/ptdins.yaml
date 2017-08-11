@@ -577,9 +577,6 @@ plots:
         symmetric_all:
           ion_names: ['NA','MG','Cal']
           ptdins_names: ['PI2P','PIPU','PIPP']
-        cursor:
-          ion_names: 'NA'
-          ptdins_names: 'PI2P'
   # no plot but hydrogen_bonding uses these data via plotload to plot everything
   salt_bridges:
     calculation: 
