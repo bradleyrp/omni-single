@@ -64,7 +64,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	#---use the landscape to get hydrogen bond donors and acceptors for lipids
 	hydrogen_bond_ref = {}
 	#---this section relies on correct definitions from the Landscape
-	targets = land.objects_by_category('lipid')
+	targets = land.objects_by_category('lipid')+land.objects_by_category('sterol')
 	#---METHODOLOGY NOTE: we catalog all hydrogen bonding opportunities ONLY BY NAME
 	#---loop over lipid targets and scan them for hydrogen bond opportunities
 	for resname in targets:
