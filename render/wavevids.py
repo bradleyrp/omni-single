@@ -87,7 +87,7 @@ def plothull(ax,points,griddims=None,vecs=None,c=None,mset=None,
 	"""
 	if alpha == None: alpha = 0.65
 	if fill == None: fill = True
-	if vecs == None: vecs = griddims
+	if type(vecs)==type(None): vecs = griddims
 	m,n = griddims
 	pts = np.array([[i[0]*m/vecs[0],i[1]*n/vecs[1]] for i in points])
 	patches = []

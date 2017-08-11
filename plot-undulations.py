@@ -11,7 +11,7 @@ from codes.undulate_plot import undulation_panel
 import numpy as np
 
 #---block: what to plot
-routine = ['spectra','height','dump_xyz'][:-1]
+routine = ['spectra','height','dump_xyz','height_histograms'][-1:]
 sns = work.sns()
 
 #---block: load the calculation data
@@ -177,3 +177,27 @@ if 'height' in routine:
 		cbar_label_specs=dict(rotation=0,labelpad=-20,y=1.1),
 		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
 		**({} if is_live else dict(outdir=work.paths['post_plot_spot'],fn='fig.average_height')))
+
+#---block: plot the average heights
+if 'height_histograms' in routine:
+
+	postdat = {}
+	zs = dict([(sn,data[sn]['data']['mesh'].mean(axis=0)) for sn in sns])
+	for snum,sn in enumerate(sns):
+		heights = (zs[sn]-zs[sn].mean()).reshape(-1)
+		postdat[sn] = heights
+
+	panelspecs = dict(layout={'out':{'grid':[1,1]},'ins':[{'grid':[1,1],
+		'hspace':0.4,'wspace':0.4}]},figsize=(8,6))
+	axes,fig = panelplot(**panelspecs)
+	zmax = max([np.abs(postdat[sn]).max() for sn in sns])
+	halfrange = np.linspace(0,zmax*1.1,100)
+	hbins = np.unique(np.concatenate((halfrange,-1*halfrange)))
+	ax = axes[0]
+	for sn in sns:
+		counts,bins = np.histogram(postdat[sn],bins=hbins)
+		ax.plot((hbins[1:]+hbins[:-1])/2.,counts,label=sn)
+	legend = ax.legend()
+	ax.axvline(0.0,c='k')
+	picturesave('fig.undulations.height_histograms',work.plotdir,
+		backup=False,version=True,meta={},extras=[legend])

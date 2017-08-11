@@ -7,6 +7,9 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None
 	"""
 	Plot several undulation spectra on one panel.
 	"""
+	#---function for the q4-scaline
+	func_q4 = lambda q,kappa: kappa*q**-4
+	uspecs = {}
 	sns = keys if keys else data.keys()
 	for sn in sns:
 		dat = data[sn]['data']
@@ -15,6 +18,7 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None
 		surf = np.mean(data[sn]['data']['mesh'],axis=0)
 		#---kernel of this plot: calculate the spectra here
 		uspec = calculate_undulations(surf,vecs,chop_last=True,perfect=True,lims=lims,raw=False)
+		uspecs[sn] = uspec
 		x,y = uspec['x'],uspec['y']
 		label = labels[sn] if labels else sn
 		label += '\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
@@ -22,9 +26,11 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None
 		color = colors[sn] if colors else None
 		ax.plot(x,y,'o-',lw=2,markersize=5,markeredgewidth=0,c=color,label=label)
 		ax.set_title(title)
+		ax.plot(x,func_q4(x,kappa=uspec['kappa']))
 	add_undulation_labels(ax,art=art)
 	add_std_legend(ax,loc='upper right',art=art)
 	add_axgrid(ax,art=art)
+	return uspecs
 
 def add_undulation_labels(ax,art=None):
 	"""

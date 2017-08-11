@@ -19,8 +19,6 @@ str_types = [str,unicode] if sys.version_info<(3,0) else [str]
 vecnorm = lambda vec: vec/np.linalg.norm(vec)
 vecangle = lambda v1,v2 : np.arccos(np.dot(vecnorm(v1),vecnorm(v2)))*(180./np.pi)
 
-from art_ptdins import uniquify
-
 #---define the columns for a row in the master dataset
 global bonds,obs,bonds_red
 rowspec = ['subject_resname','subject_resid','subject_atom',
@@ -163,6 +161,11 @@ def contacts(grofile,trajfile,**kwargs):
 		#---explicitly ignore hydrogen contacts here
 		targets = uni.select_atoms('(%s) and not name H*'%
 			' or '.join(['resname %s'%i for i in target_resnames]))
+	elif object_flag=='protein':
+		target_resnames = np.unique(uni.resnames)
+		#---explicitly ignore hydrogen contacts here
+		targets = uni.select_atoms('(%s) and not name H*'%
+			' or '.join(['resname %s'%i for i in target_resnames]))
 	else: raise Exception('not set up for object %s'%object_flag)
 
 	#---prepare coordinates for each frame
@@ -214,8 +217,6 @@ def contacts(grofile,trajfile,**kwargs):
 		targets.names[target_cat],))
 	status('stopwatch: %.1fs'%(time.time()-start_time),tag='compute')
 
-	#---! move this somewhere more centrally located
-	from art_ptdins import uniquify
 	idx,counts = uniquify(tabulation.astype(str))
 	bonds_catalog = tabulation[idx]
 

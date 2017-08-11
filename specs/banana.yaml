@@ -34,7 +34,9 @@ slices:
       proteins: +selectors/protein_selection
     slices:
       current_v0: {'pbc':'mol','groups':['all','proteins'],'start':240000,'end':590000,'skip':500}
-      current: +common_slices/v1
+      current_v1: +common_slices/v1
+      # note that this is a special slice designed to disambiguate wrong-structure (i.e. mistaken) runs
+      current: {'pbc':'mol','groups':['all','proteins'],'start':231000,'end':591000,'skip':500}
   v008:
     groups:
       all: all
@@ -74,6 +76,7 @@ variables:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
     protein_backbone: name BB
     resnames_lipid: ['DOPC','DOPS','POP2','POPC']
+    resnames_PIP2: ['POP2','PIP2']
   common_slices:
     v1: {'pbc':'mol','groups':['all','proteins'],'start':200000,'end':700000,'skip':1000}
   lipid_names:
@@ -146,8 +149,28 @@ calculations:
       subject: protein
       object: lipid
       cutoff:
-        loop: [10.0,20.0]
-
+        loop: [5.0,10.0,20.0]
+  curvature_undulation_coupling:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: big
+    specs:
+      upstream:
+        protein_abstractor: {}
+        undulations: {}
+      design:
+        loop:
+          v9:
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 5.0
+              spacer: 5.0
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+            curvature_sum: mean
 off calculations:
   curvature_coupling:
     uptype: post
@@ -167,7 +190,7 @@ plots:
   undulations:
     calculation: undulations
     slices: current
-    collections: all
+    collections: big
   undulations_videos:
     calculation: undulations
     collections: small
@@ -180,9 +203,170 @@ plots:
       - undulations
       - protein_abstractor
     collections: big
+    specs:
+      # last of the sweeps is  the active one    
+      sweeps:
+        - {'cfsig':'hcv3b','roundsig':'v5b',
+          'base_range_sweep':[0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64],
+          'base_range':
+            [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
+        - {'cfsig':'hcv3c','roundsig':'v5c',
+          'base_range_sweep':[0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64],
+          'base_range':
+            [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
   contacts:
     calculation:
       contacts:
-        cutoff: 20.0
+        cutoff: 5.0
     settings: 
       show_residue_names: False
+  ### deprecated !
+  curvature:
+    collections: big
+    calculation:
+      - undulations
+      - protein_abstractor
+    specs:
+      design: 
+        module: 'codes.curvature_coupling.database_design'
+        def: database_def
+      loader: 
+        module: 'codes.membrane_importer_gromacs'
+        function: curvature_coupling_loader
+      discards:
+        v1:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
+          C_0: [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+        v3:
+          style: gridded
+          spacer: 5.0
+        v4:
+          style: wilderness
+          curvature_positions: 
+            method: protein_subselection
+            selections:
+              - [109]
+              - [330]
+              - [660]
+              - [878]
+              - [257]
+              - [808]
+          extents:
+            method: fixed_isotropic
+            extent: 4.0
+          curvature_sum: mean
+      attempts:
+        v2:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
+          C_0: [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.032,-0.028,-0.024,-0.02,-0.018,-0.014,-0.01,-0.005,0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+      plot_specs:
+        v1:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10]
+          C_0: [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+        v2:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12]
+          C_0: [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.032,-0.028,-0.024,-0.02,-0.018,-0.014,-0.01,-0.005,0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+      plot_cursor: v4
+  curvature_review:
+    collections: big
+    calculation:
+      - undulations
+      - protein_abstractor
+  curvature_review_opt:
+    collections: big
+    calculation:
+      - undulations
+      - protein_abstractor
+  curvature_undulation_coupling:
+    calculation: 
+      - curvature_undulation_coupling
+      - protein_abstractor
+      - undulations
+      # use the following to get a single entry, above to sweep them
+      #curvature_undulation_coupling:
+      #  design: v7
+    collections: big
+    specs: 
+      routine:
+        #- curvature_field_review
+        - individual_reviews
+
+aside:
+  v6:
+    style: wilderness
+    curvature_positions: 
+      method: protein_subselection
+      selections:
+        - [109]
+        - [330]
+        - [660]
+        - [878]
+        - [257]
+        - [808]
+    extents:
+      method: fixed_isotropic
+      extent: 4.0
+    curvature_sum: mean
+  v9:
+    style: wilderness
+    curvature_positions: 
+      method: neighborhood
+      distance_cutoff: 5.0
+      spacer: 5.0
+    extents:
+      method: fixed_isotropic
+      extent: 4.0
+    curvature_sum: mean
+  v7:
+    style: wilderness
+    curvature_positions: 
+      method: protein_subselection
+      selections:
+        - [109]
+        - [330]
+        - [660]
+        - [878]
+    extents:
+      method: fixed_isotropic
+      extent: 4.0
+    curvature_sum: mean
+  also:
+    style: wilderness
+    curvature_positions: 
+      method: neighborhood
+      distance_cutoff: 
+        loop:
+          - 5.0
+          - 10.0
+      spacer:
+        loop:
+          - 4.0
+          - 2.0
+    extents:
+      method: fixed_isotropic
+      extent: 
+        loop:
+          - 4.0
+          - 2.0
+    curvature_sum: mean
+
