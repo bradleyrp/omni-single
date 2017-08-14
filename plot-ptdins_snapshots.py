@@ -584,7 +584,6 @@ if 'common_hydrogen_bonding_specific' in routine:
 				#---get the frame where these two are bound the most
 				fr = np.argmax(obs.T[sel_inter][bondlist_inds][sel_resname_match][
 					sel_resid_pair].T.sum(axis=1))
-				import ipdb;ipdb.set_trace()
 				#---which two bonds we can expect at this frame (note there may be other frames with equal 
 				#---...multiplicities)
 				which_these_bonds_inds = obs.T[sel_inter][bondlist_inds][
@@ -628,10 +627,20 @@ if 'consolidated_hydrogen_bonding' in routine:
 	methods = {
 		#'v6_common':{'nranked':10,'sns':['membrane-v532']},
 		#'v6_ptdins_chl1':{'nranked':10,'resname_filter':['PtdIns','CHL1'],'sns':['membrane-v532']},
-		'v6_ptdins_chl1_with_chl1':{'nranked':10,'resname_filter':['PtdIns','CHL1'],
-			'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
-		'v6_ptdins_with_chl1':{'nranked':10,'resname_filter':['PtdIns'],
-			'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
+		#'v6_ptdins_chl1_with_chl1':{'nranked':10,'resname_filter':['PtdIns','CHL1'],
+		#	'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
+		#'v6_ptdins_with_chl1':{'nranked':10,'resname_filter':['PtdIns'],
+		#	'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
+		#'v6_ptdins_dope_with_chl1':{'nranked':10,'resname_filter':['PtdIns','DOPE'],
+		#	'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
+		#'v6_ptdins_dops_with_chl1':{'nranked':10,'resname_filter':['PtdIns','DOPS'],
+		#	'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
+		#'v7_testing':{'nranked':[1],'resname_filter':['PtdIns'],
+		#	'sns':['membrane-v532'],'barnacles':['CHL1'],'associates':['CHL1']},
+		'v7_ptdins_with_chl1':{'nranked':10,'resname_filter':['PtdIns'],
+			'barnacles':['CHL1'],'associates':['CHL1']},
+		'v7_ptdins_dpoe_with_chl1':{'nranked':10,'resname_filter':['PtdIns','DOPE'],
+			'barnacles':['CHL1'],'associates':['CHL1']},
 		}
 
 	#---one rendering run per method
@@ -668,18 +677,39 @@ if 'consolidated_hydrogen_bonding' in routine:
 				lipid_resnames = [work.meta[sn]['ptdins_resname'] if l=='PtdIns' 
 					else l for l in resname_filter]
 			nranked = method['nranked']
-			#---perform the selection
-			subsel = np.where(np.all((
-				np.in1d(bonds_red[bonds_inds][:,0],lipid_resnames),
-				np.in1d(bonds_red[bonds_inds][:,2],lipid_resnames),
-				bonds_red[bonds_inds][:,1]!=bonds_red[bonds_inds][:,3]
-				),axis=0))[0]
+			#---two kinds of selections any combinations or specific pairings
+			if len(lipid_resnames)==1 or method.get('any_combos',False):
+				#---perform the selection
+				subsel = np.where(np.all((
+					np.in1d(bonds_red[bonds_inds][:,0],lipid_resnames),
+					np.in1d(bonds_red[bonds_inds][:,2],lipid_resnames),
+					bonds_red[bonds_inds][:,1]!=bonds_red[bonds_inds][:,3]
+					),axis=0))[0]
+			#---choosing two lipids implies that we want to do a pair otherwise we must set any_combos
+			elif len(lipid_resnames)==2:
+				subsel = np.where(
+					np.any((
+						np.all((
+							bonds_red[bonds_inds][:,0]==lipid_resnames[0],
+							bonds_red[bonds_inds][:,2]==lipid_resnames[1],
+							bonds_red[bonds_inds][:,1]!=bonds_red[bonds_inds][:,3]
+						),axis=0),
+						np.all((
+							bonds_red[bonds_inds][:,0]==lipid_resnames[1],
+							bonds_red[bonds_inds][:,2]==lipid_resnames[0],
+							bonds_red[bonds_inds][:,1]!=bonds_red[bonds_inds][:,3]
+						),axis=0),
+					),axis=0))[0]
+			else: raise Exception('unclear major selection criterion')
 			#---having filtered for desired bonds and already uniquified, we find the most common
 			#---...after we map each unique reduced bond back to all of the actual bonds (with atoms)
 			#---note that this step is slow
 			status('slow where loop to map reduced bonds to observations for %s'%sn,tag='compute')
 			map_red_to_obs = [np.where(np.all(bonds_red==i,axis=1))[0] 
 				for i in bonds_red[bonds_inds][subsel]]
+			#---load the mesh object once per simulation to save memory
+			status('fetching mesh object for %s'%sn,tag='load')
+			lipid_mesh = work.plotload('ptdins_snapshots_mesh',sns=[sn])[0][sn]['data']
 			#---loop over rankings. these are somewhat arbitrary because we have subselected so hard
 			ranking = np.argsort([obs.T[i].sum(axis=0).mean() for i in map_red_to_obs])[::-1]
 			nranked = range(nranked) if type(nranked)==int else nranked
@@ -730,11 +760,17 @@ if 'consolidated_hydrogen_bonding' in routine:
 				barnacles = method.get('barnacles',None)
 				if barnacles:
 					this_bond = bonds_by_pair[0]
-					resname_1,resname_2,resid_1,resid_2 = [this_bond[bond_spec_keys.split().index(i)] for i in ['resname_1','resname_2','resid_1','resid_2']]
+					resname_1,resname_2,resid_1,resid_2 = [this_bond[bond_spec_keys.split().index(i)] 
+						for i in ['resname_1','resname_2','resid_1','resid_2']]
 					subsel_barnacles = np.where(
 						np.any((
-							np.all((np.in1d(bonds_red[bonds_inds][:,0],[resname_1,resname_2]),np.in1d(bonds_red[bonds_inds][:,1],[resid_1,resid_2]),np.in1d(bonds_red[bonds_inds][:,2],method['barnacles']),),axis=0),
-							np.all((np.in1d(bonds_red[bonds_inds][:,2],[resname_1,resname_2]),np.in1d(bonds_red[bonds_inds][:,3],[resid_1,resid_2]),np.in1d(bonds_red[bonds_inds][:,0],method['barnacles']),),axis=0),
+							np.all((
+								np.in1d(bonds_red[bonds_inds][:,0],[resname_1,resname_2]),
+								np.in1d(bonds_red[bonds_inds][:,1],[resid_1,resid_2]),
+								np.in1d(bonds_red[bonds_inds][:,2],method['barnacles']),),axis=0),
+							np.all((np.in1d(bonds_red[bonds_inds][:,2],[resname_1,resname_2]),
+								np.in1d(bonds_red[bonds_inds][:,3],[resid_1,resid_2]),
+								np.in1d(bonds_red[bonds_inds][:,0],method['barnacles']),),axis=0),
 							),axis=0)
 						)[0]
 					#---only render the bonds if the barnacle has a bond in this frame
@@ -743,32 +779,104 @@ if 'consolidated_hydrogen_bonding' in routine:
 							bond = bonds[bonds_inds][subind]
 							render_spec['hydrogen_bonds'].append(dict([(i,bond[ii]) 
 								for ii,i in enumerate(bond_spec_keys.split())]))
+				#---construct several mappings between relevant indices
+				def mapback(seq):
+					"""Hash a list of numbers back to their indices."""
+					return dict([(v,k) for k,v in zip(np.arange(len(seq)),seq)])
+				#---we use 'i' to refer to the master index in lipid abstractor resname, resid, mono lists
+				#---the m2i mapping converts top (0) monolayer index into master index
+				#---! NOTE THAT SAPI has a different top monolayer index in the lipid abstractor data !!!
+				#---! ...this might explain the flipped head-tail angle plots, which paul said were intuitive
+				#---! ...but which always flummoxed ryan and possibly david
+				top_mono = work.meta[sn].get('index_top_monolayer',0)
+				m2i = np.where(data['lipid_abstractor'][sn]['data']['monolayer_indices']==top_mono)[0]
+				resids,resnames = [data['lipid_abstractor'][sn]['data'][k] for k in ['resids','resnames']]
+				#---the r2i mapping converts resid into master index
+				r2i = mapback(resids)
+				#---the i2m mapping converts master index into mesh index
+				i2m = mapback(m2i)
+				#---the m2r mapping converts mesh index into resid and r2m reverses it
+				m2r = np.array([resids[j] for j in m2i])
+				r2m = mapback(m2r)
+				def get_mesh_neighbors(index):
+					"""Get the neighbors for a vertex."""
+					neighbors = np.unique(simplices[np.where(np.any(simplices==index,axis=1))[0]])
+					ghosts = lipid_mesh['0.%d.ghost_ids'%fr][neighbors]
+					return ghosts
 				#---check for associates
 				associates = method.get('associates',None)
 				if associates:
-					simplices = data['lipid_mesh'][sn]['data']['0.%d.simplices'%frame_actual]
-					resname_resids = np.transpose((data['lipid_abstractor'][sn]['data']['resnames'],data['lipid_abstractor'][sn]['data']['resids']))
-					#---loop over partners
-					for xxx in [1,4]:
-						#---get resid for the first residue in the pair
-						ind = list(resname_resids[:,1]).index(bonds_by_pair[0][xxx])
+					simplices = lipid_mesh['0.%d.simplices'%fr]
+					resname_resids = np.transpose((
+						data['lipid_abstractor'][sn]['data']['resnames'],
+						data['lipid_abstractor'][sn]['data']['resids']))
+					#---loop over which of the partners in the pair
+					for wp in [1,4]:
+						#---get resid for this member of the pair
+						ind_mesh  = r2m[int(bonds_by_pair[0][wp])]
+						neighbors_mesh = get_mesh_neighbors(ind_mesh)
+						neighbors_resids = np.array([m2r[i] for i in get_mesh_neighbors(ind_mesh)])
+						neighbors_resnames = [data['lipid_abstractor'][sn]['data']['resnames'][r2i[i]] 
+							for i in neighbors_resids]
 						#---reverse mapping to monolayers
-						#---! note this was extremely hasty
-						indm = np.where(np.where(data['lipid_abstractor'][sn]['data']['monolayer_indices']==0)[0]==ind)[0][0]
-						neighborsm = np.unique(simplices[np.where(np.any(simplices==indm,axis=1))[0]])
-						ghosts = data['lipid_mesh'][sn]['data']['0.%d.ghost_ids'%frame_actual][neighborsm]
-						neighbors = np.where(data['lipid_abstractor'][sn]['data']['monolayer_indices']==0)[0][ghosts]
-						near_neighbors = np.where(np.in1d(data['lipid_abstractor'][sn]['data']['resnames'][neighbors],associates))[0]
-						data['lipid_mesh'][sn]['data'].keys()
-						if len(near_neighbors)>0: render_spec['associates'] = []
+						near_neighbors = np.where(np.in1d(neighbors_resnames,associates))[0]
+						if len(near_neighbors)>0 and 'associates' not in render_spec:
+							render_spec['associates'] = []
 						#---include all nearest neighbors in the visualization
-						for resid in neighbors[near_neighbors]:
+						for resid in neighbors_resids[near_neighbors]:
 							render_spec['associates'].append(dict(
-								resname=data['lipid_abstractor'][sn]['data']['resnames'][resid],
-								resid=str(data['lipid_abstractor'][sn]['data']['resids'][resid])))
-				#---also identify 
+								resname=resnames[r2i[resid]],
+								resid=str(resids[r2i[resid]])))
+				#---intervention to draw meshes
+				this_frame = fr
+				highlight_s,lowlight_s = 20,2
+				ax = plt.subplot(111)
+				resnames_all = data['lipid_abstractor'][sn]['data']['resnames'][
+					np.where(data['lipid_abstractor'][sn]['data']['monolayer_indices']==top_mono)[0]]
+				ax.scatter(
+					lipid_mesh['0.%d.points'%this_frame][:,0],
+					lipid_mesh['0.%d.points'%this_frame][:,1],s=lowlight_s,alpha=0.5,
+					color=[colorize(work.meta[sn],resname=r) for r in resnames_all],zorder=2)
+				### ax.scatter(*mesh['0.%d.points'%fr][:,:2][ghosts].T,s=4,c='b')
+				ax.set_xlim((0,lipid_mesh['vecs'][this_frame][0]))
+				ax.set_ylim((0,lipid_mesh['vecs'][this_frame][1]))
+				ax.set_aspect('equal')
+				ax.set_xticks([])
+				ax.set_yticks([])
+				ax.tick_params(axis=u'both',which=u'both',length=0)
+				#---render the hydrogen bonds
+				for hbond in render_spec.get('hydrogen_bonds',[]):
+					indices = np.array([-1,-1])
+					for pnum,partner in enumerate([1,2]):
+						resid = int(hbond['resid_%d'%partner])
+						resname = hbond['resname_%d'%partner]
+						index = r2m[resid]
+						indices[pnum] = index
+						ax.scatter(*lipid_mesh['0.%d.points'%this_frame][:,:2][index].T,s=highlight_s,
+							c=colorize(work.meta[sn],resname=resname),zorder=2)
+					ax.plot(*lipid_mesh['0.%d.points'%this_frame][:,:2][indices].T,zorder=1,lw=1,c='k')
+				for assoc in render_spec.get('associates',[]):
+					resid = int(assoc['resid'])
+					resname = assoc['resname']
+					index = r2m[resid]
+					ax.scatter(*lipid_mesh['0.%d.points'%this_frame][:,:2][index].T,s=highlight_s,
+						c=colorize(work.meta[sn],resname=resname),zorder=2)
+				#---save the mesh
+				tag_mesh_fn = re.sub('snapshot','snapshot_mesh_review',render_spec['fn'])
+				picturesave(tag_mesh_fn,render_spec['tempdir'],backup=False,version=True,meta={},extras=[])
+				#---if associates are broken over PBCs we render the mesh for reference but not the snapshot
+				resids_this = np.array([r2i[k] for k in np.concatenate((
+					[i['resid_%d'%j] for i in bond_spec['hydrogen_bonds'] for j in [1,2]],
+					[i['resid'] for i in render_spec.get('associates',[])])).astype(int)])
+				com_distance = data['lipid_abstractor'][sn]['data']['points'][frame_actual][
+					resids_this].ptp(axis=0)
+				if np.any(com_distance>=data['lipid_abstractor'][sn]['data']['vecs'][frame_actual]/2.):
+					status('associates are broken over PBCs so we rendered the mesh but not the snapshot',
+						tag='warning')
+					continue
+				#---render the snapshot
 				render_lipid_pair(**render_spec)
 				status('done rendering simulation %s'%sn,i=rank_num,looplen=len(nranked),tag='render')
 				snapshot_catalog[(sn,rank_num)] = render_spec
-				#if rank_num==3: 
-				#	import ipdb;ipdb.set_trace()
+			#---clean up mesh object to save memory
+			del lipid_mesh
