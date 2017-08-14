@@ -178,10 +178,12 @@ variables:
         - membrane-v543
         - membrane-v510
         - membrane-v511
-
 collections:
   one:
     - membrane-v530
+  important_two:
+    - membrane-v531
+    - membrane-v532
   another: 
     - membrane-v532
   symmetric:
@@ -322,6 +324,8 @@ meta:
     ion_label:          "$\\mathrm{{Na}^{+}}$"
     ptdins_label:       "$\\mathrm{{PI}}$"
     ptdins_resname:      SAPI
+    ### !!!
+    index_top_monolayer: 1
   membrane-v538:
     composition_name:    asymmetric
     cation:              K
@@ -391,41 +395,6 @@ calculations:
             loop:
               - lipid_com
               - lipid_chol_com
-  ion_binding:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      nrank: 3
-      upstream:
-        lipid_abstractor:
-          selector: lipid_chol_com
-  ion_binding_combinator:
-    uptype: post
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        ion_binding: {}
-      zonecut:
-        loop: [1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.6,5.0]
-  ion_binding_norms:
-    uptype: post
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        ion_binding: {}
-        ion_binding_combinator:
-          zonecut:
-            loop:
-              - 2.2
-              - 4.6
-        lipid_mesh:
-          upstream:
-            lipid_abstractor:
-              selector: lipid_com
   hydrogen_bonding:
     group: all
     uptype: simulation
@@ -486,6 +455,45 @@ calculations:
         loop:
           - z
           - r
+
+# set aside again
+calculations_aside2:
+  ion_binding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      nrank: 3
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+  ion_binding_combinator:
+    uptype: post
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        ion_binding: {}
+      zonecut:
+        loop: [1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.6,5.0]
+  ion_binding_norms:
+    uptype: post
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        ion_binding: {}
+        ion_binding_combinator:
+          zonecut:
+            loop:
+              - 2.2
+              - 4.6
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector: lipid_com
+
 
 # set aside
 calculations_aside:
@@ -638,7 +646,7 @@ plots:
   head_angle_contour:
     calculation: head_angle
   ptdins_snapshots:
-    collections: another
+    collections: asymmetric_all
     calculation:
       # are these necessary? you are plotloading tilt without adding it here
       hydrogen_bonding: {}
@@ -646,7 +654,18 @@ plots:
         distance_cutoff: 2.2
       lipid_abstractor:
         selector: lipid_chol_com
+  # a one-off plot with no script to load a single mesh object
+  ptdins_snapshots_mesh:
+    calculation:
       lipid_mesh:
         upstream: 
           lipid_abstractor:
             selector: lipid_chol_com
+  hydrogen_bonding_patterns:
+    collections: important_two
+    calculation:
+      lipid_abstractor:
+        selector:
+          lipid_chol_com
+      hydrogen_bonding: {}
+      # how to get protein_abstractor
