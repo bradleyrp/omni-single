@@ -37,13 +37,14 @@ variables:
 collections:
   cursor:
     - mdia2bilayer_nochl2
+    - mdia2bilayer_nochl3
+    - gelbilayer_nochl
+    - nwaspbilayernochl
     - mdia2bilayerphys
     - gelbilayerphys
-    - gelbilayer_nochl
     - nwasppeptide2
-    - nwaspbilayermut1
-    - nwaspbilayernochl
     - nwasppeptideb
+    - nwaspbilayermut1
   one:
     - mdia2bilayer_nochl2
 
@@ -54,7 +55,7 @@ meta:
   short_namer: "lambda sn,spot : 'v'+re.findall('(.+)',sn)[0]"
   #short_namer: "lambda sn,spot: sn"
   mdia2bilayer_nochl2:
-    name:               "mdia2bilayer nochl"
+    name:               "mdia2bilayer nochl r2"
     ptdins_resname:     "PI2P"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ion_label:          "$\\mathrm{{Na}^{+}}$"
@@ -62,7 +63,17 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2"
+    label:              "mDia2 (r1)"
+  mdia2bilayer_nochl3:
+    name:               "mdia2bilayer nochl r1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 (r2)"
   gelbilayer_nochl:
     name:               "gelbilayer_nochl"
     ptdins_resname:     "PI2P"
@@ -104,7 +115,7 @@ meta:
     protein_itp:         s01-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "N-WASP peptide B"
+    label:              "N-WASP peptide 2"
     cholesterol:         True
   nwaspbilayermut1:
     name:               "nwaspbilayermut1"
@@ -137,7 +148,7 @@ meta:
     protein_itp:         s01-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "N-WASP peptide (no CHOL)"
+    label:              "N-WASP peptide"
     cholesterol:         False
 
 slices:
@@ -189,6 +200,12 @@ slices:
     slices:
       current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':66100,'skip':100}
   nwaspbilayernochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':79100,'skip':100}
+  mdia2bilayer_nochl3:
     groups: 
       all: all
       protein: protein
@@ -246,8 +263,8 @@ calculations:
     slice_name: current
     collections: cursor
     specs:
-      angle_cutoff: 160.0
-      distance_cutoff: 3.4
+      angle_cutoff: 0.0
+      distance_cutoff: 10.0
       protein: true
   salt_bridges:
     group: all
@@ -339,3 +356,35 @@ plots:
       - contact_map
       - histograms
       - bars
+  hydrogen_bonding:
+    calculation: hydrogen_bonding
+    collections: cursor
+    specs:
+      press_routine:
+        - summary
+      interesting: {}
+      ion_order: ['NA']
+      collection_sets: ['cursor']
+      legend_mapper:
+        cursor:
+          ion_names: ['NA']
+          ptdins_names: ['PI2P']
+      # we filter out protein resnames here
+      relevant_resnames: ['PI2P','DOPE','DOPC','DOPS','CHL1']
+      # semi-soft-coded the color scheme
+      bar_formats_style: actinlink
+      legend_maker_specs:
+        sns: []
+        ion_names: []
+        ptdins_names: []
+        # the legend maker typically shows PIP2 isomers and cation identities
+        # ...however in this case we want legends for the distinct protein simulations
+        sns_explicit: ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayerphys','gelbilayerphys',
+          'gelbilayer_nochl','nwasppeptide2','nwaspbilayermut1','nwaspbilayernochl','nwasppeptideb']
+      figsize_all: [20,8]
+      sns_explicit_color_names: {
+        'mdia2bilayer_nochl2':'green','mdia2bilayer_nochl3':'green','mdia2bilayerphys':'green',
+        'gelbilayerphys':'red','gelbilayer_nochl':'red',
+        'nwasppeptide2':'blue','nwaspbilayermut1':'bluegreen2',
+          'nwaspbilayernochl':'blue','nwasppeptideb':'blue'}
+      nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
