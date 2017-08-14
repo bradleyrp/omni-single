@@ -28,6 +28,11 @@ def colorize(metadat,comparison='',resname=''):
 			'DOPS':'red',
 			'DOPE':'blue',
 			'PIP2':'purple',
+			'PI2P':'purple',
+			'P35P':'purple',
+			'PIPU':'purple',
+			'PIPP':'purple',
+			'SAPI':'purple',
 			'PtdIns':'purple',
 			'CHL1':'green'}
 		return palette_colors[colordict[resname]]
@@ -54,7 +59,6 @@ def colorize(metadat,comparison='',resname=''):
 				('NA','PI2P'):'green',
 				('Na,Cal','PI2P',):'blue',
 				('K','PI2P'):'grey',
-
 				('MG','PI2P'):'red',
 				('Cal','PI2P'):'blue',
 				('MG','P35P'):'purple',
