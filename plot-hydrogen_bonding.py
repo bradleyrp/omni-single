@@ -316,10 +316,10 @@ def hbonds_plotter(bars=None,checks=None,**kwargs):
 			dimmer=dimmer,namer=namer,show_xticks=False,empty=empty,**bardat)
 	#---additional 
 	bars.plot(wait=True)
-	bars.ax.tick_params(axis='both', which='major',labelsize=16)
+	bars.ax.tick_params(axis='both',which='major',labelsize=16)
 	bars.ax.set_ylabel(r'$\frac{\langle {N}_{bonds} \rangle}{{N}_{donor}{N}_{acceptor}}$',fontsize=26)
 	bars.ax.yaxis.grid(which="minor",color='k',linewidth=0.5,alpha=0.5,zorder=0)
-	bars.ax.tick_params(axis=u'both', which=u'both',length=0)
+	bars.ax.tick_params(axis=u'both',which=u'both',length=0)
 	bars.ax.set_title(title,fontsize=40)
 	legend,patches = legend_maker_stylized(bars.ax,sns_this=sns)
 	return legend
