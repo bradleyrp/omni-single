@@ -2,7 +2,7 @@ collections:
   all:
     - CL160ENS-2
     - CL160ENS-3
-
+#import matplotlib;import pylab as plt;matplotlib.use('Agg');import numpy as np;x=np.arange(0,2,0.001);y=np.sin(x)**2+4*np.cos(x);fig = plt.figure();plt.plot(x,y,'r.')
 slices:
   CL160ENS-2:
     readymade_meso_v1:
@@ -41,6 +41,14 @@ deprecated:
       - protein_abstractor
     collections: big
 calculations:
+  import_readymade_meso_v1_membrane:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: all
+    specs:
+      grid_spacing: 5.0
+off:
   # FINAL CURVATURE COUPLING VERSION!!!
   curvature_undulation_coupling_dex:
     uptype: post
@@ -110,3 +118,7 @@ plots:
           motion: static
           sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
           C_0: [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+  undulations:
+    collections: all
+    calculation:
+      import_readymade_meso_v1_membrane: {}

@@ -11,7 +11,8 @@ from codes.undulate_plot import undulation_panel
 import numpy as np
 
 #---block: what to plot
-routine = ['spectra','height','dump_xyz','height_histograms'][-1:]
+routine_all = ['spectra','height','dump_xyz','height_histograms']
+routine = work.plots.get(plotname,{}).get('specs',{}).get('routine',routine_all)
 sns = work.sns()
 
 #---block: load the calculation data
@@ -73,9 +74,11 @@ if 'height' in routine:
 
 	framecounts = [data[sn]['data']['nframes'] for sn in data]
 	nframes = min(framecounts)
-	data_protein,calc = plotload('protein_abstractor',work)
-	protein_pts_all = np.array([data_protein[sn]['data']['points_all'] for sn in sns])
-	protein_pts = [[protein_pts_all[ii][fr][...,:2] for ii,sn in enumerate(sns)] for fr in range(nframes)]
+	try: data_protein,_ = plotload('protein_abstractor',work)
+	except: data_protein = None
+	if data_protein:
+		protein_pts_all = np.array([data_protein[sn]['data']['points_all'] for sn in sns])
+		protein_pts = [[protein_pts_all[ii][fr][...,:2] for ii,sn in enumerate(sns)] for fr in range(nframes)]
 	mvecs = np.array([data[sn]['data']['vecs'][:nframes] for sn in sns]).mean(axis=1)
 	avgzs = [data[sn]['data']['mesh'].mean(axis=0).mean(axis=0) for sn in sns]
 	avgzs = [i-i.mean() for i in avgzs]
@@ -84,8 +87,8 @@ if 'height' in routine:
 
 	#---use the standard birdseye renderer to render the average structure
 	print_birdseye_snapshot_render(
-		avgzs,[p.mean(axis=0)[...,:2] for p in protein_pts_all],mvecs,nprots_list,
-		handle='OUT',pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,
+		avgzs,None if not data_protein else [p.mean(axis=0)[...,:2] for p in protein_pts_all],
+		mvecs,nprots_list,handle='OUT',pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,
 		extrema=extrema,fs=fs,titles=titles,cmap_mpl_name=cmap_mpl_name,
 		cbar_label_specs=dict(rotation=0,labelpad=-20,y=1.1),
 		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
@@ -160,7 +163,7 @@ if 'height' in routine:
 
 	framecounts = [data[sn]['data']['nframes'] for sn in data]
 	nframes = min(framecounts)
-	data_protein,calc = plotload('protein_abstractor',work)
+	data_protein,_ = plotload('protein_abstractor',work)
 	protein_pts_all = np.array([data_protein[sn]['data']['points_all'] for sn in sns])
 	protein_pts = [[protein_pts_all[ii][fr][...,:2] for ii,sn in enumerate(sns)] for fr in range(nframes)]
 	mvecs = np.array([data[sn]['data']['vecs'][:nframes] for sn in sns]).mean(axis=1)

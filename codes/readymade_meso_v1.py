@@ -6,13 +6,13 @@ IMPORT SAMANEH'S DATA!
 
 import os,sys,glob
 from base.tools import status
+import numpy as np
 
 def frame_to_mesh():
 	"""
 	Convert a list of XYZ points into the mesh format with several checks for consistency.
 	"""
 	xs,ys = [np.unique(i) for i in dat[:,:2].T]
-
 
 def import_membrane_mesh(**kwargs):
 	"""
@@ -30,6 +30,7 @@ def import_membrane_mesh(**kwargs):
 	#---! save timestamps here if desired. ensure synchronicity with the nanogel inputs
 	#---read each file
 	nframes = len(fns)
+	points = []
 	for fnum,fn in enumerate(fns):
 		status('reading %s'%fn,i=fnum,looplen=nframes,tag='load')
 		with open(fn) as fp: text = fp.read()
@@ -37,8 +38,13 @@ def import_membrane_mesh(**kwargs):
 		#---first line is metadata
 		#---! should we drop the first line?
 		topline = lines[0]
-		#---data is xyz in columns plus fourth column
-		dat = np.array([[float(j) for j in line.split()] for line in lines[1:]])
+		#---the frame is xyz in columns plus fourth column
+		frame = np.array([[float(j) for j in line.split()] for line in lines[1:]])
+		points.append(frame)
+	return points
+
+if False:
+	if False:
 		#---! UNDER CONSTRUCTION. need to load these into a mesh object
 		import ipdb;ipdb.set_trace()
 	reform = {}
