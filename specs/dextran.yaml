@@ -2,7 +2,6 @@ collections:
   all:
     - CL160ENS-2
     - CL160ENS-3
-#import matplotlib;import pylab as plt;matplotlib.use('Agg');import numpy as np;x=np.arange(0,2,0.001);y=np.sin(x)**2+4*np.cos(x);fig = plt.figure();plt.plot(x,y,'r.')
 slices:
   CL160ENS-2:
     readymade_meso_v1:
@@ -48,14 +47,20 @@ calculations:
     collections: all
     specs:
       grid_spacing: 5.0
-off:
-  # FINAL CURVATURE COUPLING VERSION!!!
+  import_readymade_meso_v1_nanogel:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: all
   curvature_undulation_coupling_dex:
     uptype: post
     group: all
     slice_name: current
     collections: all
     specs:
+      upstream:
+        import_readymade_meso_v1_membrane: {}
+        import_readymade_meso_v1_nanogel: {}
       design:
         loader_membrane:
           module: codes.curvature_coupling_loader
@@ -65,14 +70,19 @@ off:
           function: curvature_coupling_loader_protein
         style: wilderness
         curvature_positions: 
-          method: neighborhood
-          distance_cutoff: 5.0
-          spacer: 2.5
+          loop: 
+            #injective:
+            #  method: protein_subselection
+            #  selections: 'one-to-one'
+            neighborhood:
+              method: neighborhood
+              distance_cutoff: 5.0
+              spacer: 10.0
         extents:
           method: fixed_isotropic
           extent:
             loop: 
-              - 2.5
+              #- 2.5
               - 1.0
         curvature_sum: mean
 plots:
@@ -122,3 +132,29 @@ plots:
     collections: all
     calculation:
       import_readymade_meso_v1_membrane: {}
+    specs: 
+      routine:
+        - spectra
+        - height
+        - height_histograms
+        #- debug3d
+      show_fit: False
+  # why must this name mimic the others?
+  curvature_undulation_coupling:
+    calculation: 
+      - curvature_undulation_coupling_dex
+      - import_readymade_meso_v1_nanogel
+      - import_readymade_meso_v1_membrane
+      # use the following to get a single entry, above to sweep them
+      #curvature_undulation_coupling:
+      #  design: v7
+    collections: all
+    specs: 
+      # NOTE
+      calcname: curvature_undulation_coupling_dex
+      protein_abstractor_name: import_readymade_meso_v1_nanogel
+      undulations_name: import_readymade_meso_v1_membrane
+      routine:
+        #- curvature_field_review
+        - individual_reviews
+### cannot modify routine here and then replot() is that a problem?
