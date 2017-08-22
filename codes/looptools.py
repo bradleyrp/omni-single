@@ -16,7 +16,7 @@ def basic_compute_loop(compute_function,looper,run_parallel=True,debug=None):
 	!!! remove this from contacts.py when it works
 	"""
 	#---send the frame as the debug argument
-	if debug!=None:
+	if debug!=None and debug!=False:
 		fr = debug
 		incoming = compute_function(**looper[fr])
 		import ipdb;ipdb.set_trace()
