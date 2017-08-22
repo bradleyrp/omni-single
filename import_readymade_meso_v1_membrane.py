@@ -8,37 +8,7 @@ import os
 import numpy as np
 import codes.curvature_coupling
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
-from codes.readymade_meso_v1 import import_curvature_inducer_points,import_membrane_mesh
-
-def curvature_undulation_coupling_dex_XXXXXXXXXXXXXXXXXXXX(**kwargs):
-	"""
-	Supervise the curvature-undulation coupling calculation.
-	"""
-	#---parameters
-	sn = kwargs['sn']
-	work = kwargs['workspace']
-	calc = kwargs['calc']
-	#---the original version of this function was designed to import mesoscale data and beging a curvature
-	#---...coupling calculation. however the mesoscale data were not on a regular grid so we moved 
-	#---...this one step earlier in the pipeline so we can interpolate the positions here
-	#---in this section we retrieve the membrane positions
-	#---! COMMENT NEEDS FIXED BELOW!
-	#---note that in contrast to the standard undulations.py we retrieve the 
-	#---...upstream data in a separate function via readymade_meso_v1. in the standard method, both the
-	#---...protein_abstractor and undulations data come into this function via e.g.
-	#---...kwargs['upstream']['protein_abstractor'] which gets sent to InvestigateCurvature
-	#---note that users who wish to manipulate the incoming data can do so in a custom copy of 
-	#---...curvature_undulation_coupling.py (i.e. this script) or in the loader functions
-	membrane_mesh = import_membrane_mesh(calc=calc,work=work,sn=sn)
-	curvature_inducer_points = import_curvature_inducer_points(calc=calc,work=work,sn=sn)
-	#---instantiate the calculation	
-	ic = InvestigateCurvature(sn=sn,work=kwargs['workspace'],
-		design=kwargs['calc']['specs'].get('design',{}),
-		protein_abstractor=curvature_inducer_points,
-		undulations=membrane_mesh)
-	#---repackage the data
-	attrs,result = ic.finding['attrs'],ic.finding['result']
-	return result,attrs
+from codes.readymade_meso_v1 import import_membrane_mesh
 
 import time
 import numpy as np
@@ -71,21 +41,16 @@ def import_readymade_meso_v1_membrane(**kwargs):
 	if ncols!=4: raise Exception('expecting 4-column input on incoming data')
 	#---with a consistent number of points everything is an array
 	points = np.array(points)[:,:,:3]
-	#---infer the box vectors from the data
-	#if not np.all(points.min(axis=0).min(axis=0)[:2]==np.array([0,0])):
-	#	print('minimum points must be the origin')
-	#	import ipdb;ipdb.set_trace()
+	#---previously checked that the minimum points were identically zero but this was not always true
 	#---box vectors are just the maximum points
 	#---! check that this assumption makes sense
-	vecs = points.max(axis=0)[:,:2]
-	#"""
-	#points[0][np.where(np.abs(points[0][:,2]-151.575007)<10**-3)]
-	os.environ['USE_SYSTEM_VTK'] = "OFF"
-	from codes import review3d
-	review3d.review3d(points=[points[0][:,:3]],radius=10)
-	#return
-	#looks great
-	#"""
+	vecs = points.max(axis=1)[:,:3]
+	#---debug the shapes in 3D
+	if False:
+		from codes import review3d
+		fr = 0
+		review3d.pbcbox(vecs[fr])
+		review3d.review3d(points=[points[fr][:,:3]],radius=10)
 	grid_spacing = calc['specs']['grid_spacing']
 	nframes = len(points)
 	#---choose grid dimensions
@@ -104,4 +69,7 @@ def import_readymade_meso_v1_membrane(**kwargs):
 	result['nframes'] = np.array(nframes)
 	result['vecs'] = vecs
 	attrs['grid_spacing'] = grid_spacing
+	#---introduce a dated validator string to ensure that any changes to the pipeline do not overwrite
+	#---...other data and are fully propagated downstream
+	attrs['validator'] = '2017.08.16.1930'
 	return result,attrs	

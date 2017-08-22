@@ -4,18 +4,13 @@
 IMPORT SAMANEH'S DATA!
 """
 
-import os,sys,glob
+import os,sys,glob,re
 from base.tools import status
 import numpy as np
 
-def frame_to_mesh():
-	"""
-	Convert a list of XYZ points into the mesh format with several checks for consistency.
-	"""
-	xs,ys = [np.unique(i) for i in dat[:,:2].T]
-
 def import_membrane_mesh(**kwargs):
 	"""
+	Import membrane XYZ data and send it to a calculation that mimics `undulations` for Samaneh's data.
 	"""
 	sn = kwargs.pop('sn',None)
 	calc = kwargs.pop('calc',None)
@@ -32,7 +27,7 @@ def import_membrane_mesh(**kwargs):
 	nframes = len(fns)
 	points = []
 	for fnum,fn in enumerate(fns):
-		status('reading %s'%fn,i=fnum,looplen=nframes,tag='load')
+		status('reading %s'%os.path.basename(fn),i=fnum,looplen=nframes,tag='load')
 		with open(fn) as fp: text = fp.read()
 		lines = text.splitlines()
 		#---first line is metadata
@@ -43,21 +38,29 @@ def import_membrane_mesh(**kwargs):
 		points.append(frame)
 	return points
 
-if False:
-	if False:
-		#---! UNDER CONSTRUCTION. need to load these into a mesh object
-		import ipdb;ipdb.set_trace()
-	reform = {}
-	#---reformulate the data in the manner InvestigateCurvature expects i.e. upstream omnicalc format
-	reform['nframes'] = len(mesh)
-	#---! UNDER CONSTRUCTION
-	reform['grid_spacing'] = np.array(-1.0)
-	reform['vecs'] = np.array([-1.0,-1.0,-1.0])
-	reform['grid'] = np.array([nx,ny])
-
-def import_curvature_inducer_points(**kwargs):
+def import_nanogel_positions(**kwargs):
 	"""
+	Import nanogel data and send it to a calculation that mimics `protein_abstractor` for Samaneh's data.
 	"""
+	sn = kwargs.pop('sn',None)
 	calc = kwargs.pop('calc',None)
+	work = kwargs.pop('work',None)
 	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
-	import ipdb;ipdb.set_trace()
+	#---location data can be found in the slices dictionary
+	#---! note that the slice name is hard-coded here: "current"
+	location = work.slices[sn]['readymade_meso_v1']['current']
+	with open(os.path.join(location['path'],location['directory'],location['nanogel_dat'])) as fp:
+		text = fp.read()
+	#---nanogel is saved with the step number not the frame number
+	step_to_frame = lambda x: x/1000000
+	regex_frame = '(\d+)\n(.*?)(?=\n\d+\n|\Z)'
+	frames = re.findall(regex_frame,text,flags=re.M+re.DOTALL)
+	framenos,points = [],[]
+	for fnum,frame in enumerate(frames):
+		status('reading nanogel frame',i=fnum,looplen=len(frames),tag='load')
+		framenos.append(step_to_frame(int(frame[0])))
+		ixyz = np.array([[float(j) for j in i.split()] for i in frame[1].splitlines()])
+		if not np.all(ixyz[:,0].astype(int)==np.arange(1,len(ixyz)+1)):
+			raise Exception('indexing problem in the nanogel')
+		points.append(ixyz[:,1:])
+	return {'framenos':framenos,'points':np.array(points)}

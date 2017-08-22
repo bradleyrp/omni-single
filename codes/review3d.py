@@ -16,7 +16,8 @@ def review3d(**kwargs):
 		return mlab.points3d(x,y,z,colormap=colormap,scale_factor=r,color=color)
 	def lineplot(x,y,z,colormap='Spectral',r=0.1,color=(0,0,0)):
 		mlab.plot3d(x,y,z,tube_radius=r,color=color,colormap=colormap)
-	def pointplot_bare(x,y,z,colormap='Spectral'): return mlab.points3d(x,y,z,colormap=colormap)
+	def pointplot_bare(x,y,z,colormap='Spectral',r=0.1): 
+		return mlab.points3d(x,y,z,colormap=colormap,scale_factor=r)
 	#---get incoming settings
 	tube_thickness = kwargs.get('tube',0.1)
 	sphere_radius = kwargs.get('radius',0.1)
@@ -25,7 +26,7 @@ def review3d(**kwargs):
 	if 'colorset' in kwargs:
 		#---via: http://stackoverflow.com/questions/22253298/mayavi-points3d-with-different-size-and-colors
 		for points in kwargs.get('points',[]): 
-			pts = pointplot_bare(*points.T,colormap=cmap)
+			pts = pointplot_bare(*points.T,colormap=cmap,r=sphere_radius)
 			pts.glyph.scale_mode = 'scale_by_vector'
 			#---set the size with the norm of a vector
 			pts.mlab_source.dataset.point_data.vectors = np.tile(

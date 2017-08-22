@@ -104,6 +104,7 @@ class InvestigateCurvature:
 
 	def gopher(self,spec,module_name,variable_name):
 		"""Load an external module. Useful for changing the workflow without changing the code."""
+		#---note that this function was folded into the omnicalc codebase in omni/base/tools.py
 		mod = importlib.import_module(spec[module_name])
 		target = mod.__dict__.get(spec[variable_name],None)
 		#---the database design might need work so we always export it
@@ -161,6 +162,11 @@ class InvestigateCurvature:
 			def arange_symmetric(a,b,c):
 				return np.unique(np.concatenate((np.arange(a,b,c),-1*np.arange(a,b,c))))
 			for sn in self.sns:
+
+				###---!!! beware this code might have an indexing problem !!!
+
+				#---nope .. now that you fixed the index error each protein gets its own neighborhood presumably with an indeterminate position
+
 				#---for each frame we compute the centroid and orientation
 				points_all = self.data_prot[sn]['data']['points_all']
 				cogs = points_all.mean(axis=2).mean(axis=1)[:,:2]
@@ -193,6 +199,15 @@ class InvestigateCurvature:
 					ref_grid_rot_in_box = (ref_grid_rot + 
 						(ref_grid_rot<0)*vecs[fr,:2] - (ref_grid_rot>=vecs[fr,:2])*vecs[fr,:2])
 					points[:,fr] = ref_grid_rot_in_box
+				#---debug with a plot if desired
+				if False:
+					import matplotlib.pyplot as plt
+					plt.scatter(*ref_grid_rot_in_box.T)
+					from base.store import picturesave
+					fn = 'fig.DEBUG.curvature_undulation_coupling_neighborhood'
+					picturesave(fn,self.work.plotdir)
+					raise Exception('dropped debugging image for your review and deletion '
+						'to %s. remove it and then turn this debugger off to continue'%fn)
 				#---save the position of the curvature fields for later
 				self.memory[(sn,'drop_gaussians_points')] = points
 				ndrops = len(ref_grid)

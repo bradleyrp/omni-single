@@ -50,9 +50,12 @@ calculations:
     group: all
     slice_name: current
     collections: all
+    specs:
+      mapping_style: single_inducer 
   # gently-modified version of the curvature_undulation_coupling calculation which
   # ...substitutes the MD inputs for the mesoscale inputs specific to this project
   curvature_undulation_coupling_dex:
+    ignore: false
     uptype: post
     group: all
     slice_name: current
@@ -62,29 +65,39 @@ calculations:
         import_readymade_meso_v1_membrane: {}
         import_readymade_meso_v1_nanogel: {}
       design:
-        loader_membrane:
-          module: codes.curvature_coupling_loader
-          function: curvature_coupling_loader_membrane
-        loader_protein:
-          module: codes.curvature_coupling_loader
-          function: curvature_coupling_loader_protein
-        style: wilderness
-        curvature_positions: 
-          loop: 
-            #injective:
-            #  method: protein_subselection
-            #  selections: 'one-to-one'
-            neighborhood:
+        loop:
+          v1:
+            loader_membrane:
+              module: codes.curvature_coupling_loader
+              function: curvature_coupling_loader_membrane
+            loader_protein:
+              module: codes.curvature_coupling_loader
+              function: curvature_coupling_loader_protein
+            style: wilderness
+            curvature_positions: 
               method: neighborhood
-              distance_cutoff: 5.0
-              spacer: 10.0
-        extents:
-          method: fixed_isotropic
-          extent:
-            loop: 
-              #- 2.5
-              - 1.0
-        curvature_sum: mean
+              distance_cutoff: 0.0
+              spacer: 40.0
+            extents:
+              method: fixed_isotropic
+              extent: 20.0
+            curvature_sum: mean
+          v2:
+            loader_membrane:
+              module: codes.curvature_coupling_loader
+              function: curvature_coupling_loader_membrane
+            loader_protein:
+              module: codes.curvature_coupling_loader
+              function: curvature_coupling_loader_protein
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 0.0
+              spacer: 20.0
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+            curvature_sum: mean
 
 # which data to load for plotting (REQUIRED, but optional if you use the same exact name as the calculation)
 plots:
@@ -112,6 +125,11 @@ plots:
       calcname: curvature_undulation_coupling_dex
       protein_abstractor_name: import_readymade_meso_v1_nanogel
       undulations_name: import_readymade_meso_v1_membrane
+      # alternate loaders for interpreting the nanogel positions
+      loader: 
+        module: codes.curvature_coupling_loader_dex
+        function: prepare_mesoscale_postdat
+      # which plots to make
       routine:
         #- curvature_field_review
         - individual_reviews

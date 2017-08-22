@@ -22,7 +22,8 @@ def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
 	"""
 	Outer loop for rendering protein videos.
 	"""
-	if len(np.shape(surfs)) != 3: raise Exception('incoming data must be simulation by x by y')
+	if not all([len(np.shape(s))==2 for s in surfs]):
+		raise Exception('incoming data must be simulation by x by y')
 	npanels = len(surfs)
 	axes,fig = panelplot(**panelspecs)
 	#---loop over panels
@@ -89,7 +90,8 @@ def plothull(ax,points,griddims=None,vecs=None,c=None,mset=None,
 	if fill == None: fill = True
 	if type(vecs)==type(None): vecs = griddims
 	m,n = griddims
-	pts = np.array([[i[0]*m/vecs[0],i[1]*n/vecs[1]] for i in points])
+	#import ipdb;ipdb.set_trace()
+	#pts = np.array([[i[0]*m/vecs[0],i[1]*n/vecs[1]] for i in points])
 	patches = []
 	#---you must send a vector with three dimensions: protein index, atom, xy
 	for pts in points:

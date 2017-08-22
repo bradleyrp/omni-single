@@ -3,7 +3,7 @@
 import numpy as np
 from . undulate import calculate_undulations
 
-def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None,labels=None):
+def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None,labels=None,show_fit=True):
 	"""
 	Plot several undulation spectra on one panel.
 	"""
@@ -26,7 +26,7 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None
 		color = colors[sn] if colors else None
 		ax.plot(x,y,'o-',lw=2,markersize=5,markeredgewidth=0,c=color,label=label)
 		ax.set_title(title)
-		ax.plot(x,func_q4(x,kappa=uspec['kappa']))
+		if show_fit: ax.plot(x,func_q4(x,kappa=uspec['kappa']))
 	add_undulation_labels(ax,art=art)
 	add_std_legend(ax,loc='upper right',art=art)
 	add_axgrid(ax,art=art)

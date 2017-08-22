@@ -3,26 +3,41 @@
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
 from render.wavevids import plothull
 
-avail = ['curvature_field_review','individual_reviews']
-routine = work.plots[plotname].get('specs',{}).get('routine',avail)
-
 if 'data' not in globals():
+	avail = ['curvature_field_review','individual_reviews']
+	plotspecs = work.plots[plotname].get('specs',{})
+	routine = plotspecs.get('routine',avail)
+	calcname = plotspecs.get('calcname',plotname)
+	protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
+	undulations_name = plotspecs.get('undulations_name','undulations')
 	#---the curvature undulation coupling data are notably absent from the upstream calculations
 	#---...because we pull all upstream sweeps here for comparison
 	data,calc = plotload(plotname)
 	#---get all upstream curvature sweeps
-	ups = work.calc_meta.unroll_loops(work.calcs[plotname],return_stubs=True)[1]
+	ups = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)[1]
 	for up in ups: up['specs'].pop('upstream',None)
 	datas,calcs = {},{}
 	for unum,up in enumerate(ups):
 		#---temporarily set the plots
 		work.plots[plotname]['calculation'] = {plotname:up['specs']}
 		#---look up the right upstream data
-		dat,cal = plotload(plotname)
+		dat,cal = plotload(calcname)
 		tag = up['specs']['design']
 		if type(tag)==dict: tag = 'v%d'%unum
 		datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
 		calcs[tag] = dict([(sn,cal) for sn in work.sns()])
+	#---check for alternate loaders
+	alt_loader = plotspecs.get('loader',None)
+	if alt_loader:
+		from base.tools import gopher
+		postdat = gopher(alt_loader)(data=data)
+	#---compile the necessary (default) data into a dictionary
+	else:
+		postdat = dict([(sn,dict(
+			vecs=data[undulations_name][sn]['data']['vecs'].mean(axis=0),
+			points_protein=data[protein_abstractor_name][sn]['data']['points_all']))
+			for sn in work.sns()])
+
 
 if 'curvature_field_review' in routine:
 	figsize = (10,10)
@@ -48,6 +63,7 @@ if 'individual_reviews' in routine:
 
 	def plot_hull_and_trial_centers(ax,n_instances=None,debug_frame=0,color=None):
 		"""Plot the protein hull along with the positions of the trial functions."""
+		global postdat
 		#---! currently only set for a single protein
 		trials = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)
 		nframes = len(trials)
@@ -58,11 +74,18 @@ if 'individual_reviews' in routine:
 			color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
 			ax.scatter(*pts.T,s=1,c=color_this)
 		griddims = datas[tag][sn]['cf'].shape
-		vecs = data['protein_abstractor'][sn]['data']['vecs'].mean(axis=0)
-		points_protein = data['protein_abstractor'][sn]['data']['points']
+		#if data[protein_abstractor_name][sn]['data']['vecs']=='readymade_meso_v1':
+		#	vecs = data[undulations_name][sn]['data']['vecs'].mean(axis=0)
+		#else: 
+		#vecs = data[protein_abstractor_name][sn]['data']['vecs'].mean(axis=0)
+		#points_protein = data[protein_abstractor_name][sn]['data']['points']
+		#---alternate handling for mesoscale
+		#if points_protein=='readymade_meso_v1':
+		#points_protein = data[protein_abstractor_name][sn]['data']['points_all']
+		vecs,points_protein = [postdat[sn][i] for i in ['vecs','points_protein']]
 		for ptsnum,pts in enumerate(points_protein[samples][...,:2]):
 			color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
-			plothull(ax,[pts],griddims=griddims,vecs=vecs,lw=0,c=color_this)
+			if False: plothull(ax,[pts],griddims=griddims,vecs=vecs,lw=0,c=color_this)
 		ax.set_xlim((0,vecs[0]))
 		ax.set_ylim((0,vecs[1]))
 		ax.set_aspect(1.0)
@@ -77,7 +100,12 @@ if 'individual_reviews' in routine:
 				'neighborhood_dynamic','average_field','example_field','example_field_pbc','spectrum']
 			axes,fig = square_tiles(len(viewnames),figsize)
 			#---several plots use the same data
-			vecs = data['protein_abstractor'][sn]['data']['vecs'].mean(axis=0)
+			#---custom handling for the mesoscale data which lacks vectors from the nanogel
+			#if data[protein_abstractor_name][sn]['data']['vecs']=='readymade_meso_v1':
+			#	vecs = data[undulations_name][sn]['data']['vecs'].mean(axis=0)
+			#else: 
+			#vecs = data[protein_abstractor_name][sn]['data']['vecs'].mean(axis=0)
+			vecs = postdat[sn]['vecs']
 			griddims = datas[tag][sn]['cf'].shape
 			#---PLOT the mean curvature field
 			ax = axes[viewnames.index('average_field')]
@@ -97,14 +125,18 @@ if 'individual_reviews' in routine:
 			plot_hull_and_trial_centers(ax,n_instances=10)
 			ax.set_title('neighborhood, dynamic')
 			#---PLOT the average height
-			mesh = data['undulations'][sn]['data']['mesh']
+			mesh = data[undulations_name][sn]['data']['mesh']
 			surf = mesh.mean(axis=0).mean(axis=0)
 			surf -= surf.mean()
 			hmax = np.abs(surf).max()
 			ax = axes[viewnames.index('average_height')]
 			ax.imshow(surf.T,origin='lower',interpolation='nearest',cmap=mpl.cm.__dict__['RdBu_r'],
 				extent=[0,vecs[0],0,vecs[1]])
-			mean_prot_pts = data['protein_abstractor'][sn]['data']['points'].mean(axis=0)[:,:2]
+			#if data[protein_abstractor_name][sn]['data']['points']=='readymade_meso_v1':
+			#	mean_prot_pts = data[protein_abstractor_name][sn]['data']['points_all'].mean(axis=0)[:,:2]
+			#else: 
+			#mean_prot_pts = data[protein_abstractor_name][sn]['data']['points'].mean(axis=0)[:,:2]
+			mean_prot_pts = postdat[sn]['points_protein_mean'][:,:2]
 			plothull(ax,[mean_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
 			ax.set_title(r'$\mathrm{\langle z \rangle}$'+'(max %.3f)'%hmax)
 			#---PLOT an example curvature field ('first' is hard-coded, instead of saving each frame)
@@ -144,5 +176,5 @@ if 'individual_reviews' in routine:
 				ax.tick_params(axis='x',which='both',bottom='off',top='off',labelbottom='on')
 				ax.tick_params(axis='y',which='both',left='off',right='off',labelbottom='off')
 			#---the metadata for this plot comes from the design section
-			meta = calcs[tag][sn]['calcs']['specs']['design']
+			#meta = calcs[tag][sn]['calcs']['specs']['design']
 			picturesave('fig.coupling_review.%s'%sn,work.plotdir,backup=False,version=True,meta=meta)
