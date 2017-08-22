@@ -1,19 +1,25 @@
 collections:
-  all:
-    - v007
+  all: 
     - v005
+    - v007
     - v008
-    - membrane-v653-free
+    - sv003
+    - sv004
+    - sv005
+    - sv006
   big: 
-    - v007
-    - v005
-    - v008
-  proteins: 
     - v007
     - v005
     - v008
   controls:
     - membrane-v653-free
+  small:
+    - sv003
+    - sv004
+    - sv005
+    - sv006
+  one: 
+    - v008
 
 slices:
   # BIG SIMULATIONS
@@ -40,7 +46,31 @@ slices:
     slices:
       current_v0: {'pbc':'mol','groups':['all','proteins'],'start':50000,'end':550000,'skip':500}
       current: +common_slices/v1
-  # CONTROL SIMULATIONS
+  # SMALL SIMULATIONS
+  sv003:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':400000,'skip':2000}
+  sv004:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':2000}
+  sv005:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':430000,'skip':2000}
+  sv006:
+    groups:
+      all: all
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['all','proteins'],'start':000000,'end':490000,'skip':2000}
   membrane-v653-free:
     groups:
       all: all
@@ -69,13 +99,21 @@ meta:
     label: IRSp53
   extrana: >
     Note that simulations "simulation-v004-IRSp53-PIP2-bilayer-large" and "simulation-v006-endophilin-A1-PIP2-bilayer-large" have a minimal amount of water in them, and as a result, a few lipids broke the boundary. This is corrected by the "nojumps" flag.
+  sv003:
+    label: "IRSp53 (PC,PS)"
+  sv004:
+    label: "IRSp53"
+  sv005:
+    label: "endophilin (PC,PS)"
+  sv006:
+    label: "endophilin"
 
 calculations:
   protein_abstractor:
     uptype: simulation
     slice_name: current
     group: proteins
-    collections: proteins
+    collections: all
   lipid_abstractor:
     uptype: simulation
     slice_name: current
@@ -103,7 +141,8 @@ calculations:
   lipid_mesh:
     uptype: post
     slice_name: current
-    collections: []
+    collections:
+     - small
     specs:
       upstream:
         lipid_abstractor:
@@ -124,6 +163,7 @@ calculations:
     slice_name: current
     collections: 
      - big
+     - controls
     specs:
       upstream:
         protein_abstractor: {}
@@ -140,33 +180,20 @@ calculations:
               method: fixed_isotropic
               extent: 4.0
             curvature_sum: mean
-  curvature_undulation_coupling_controls:
+off calculations:
+  curvature_coupling:
+    uptype: post
+    slice_name: current_protein
+    collections: all
+    specs: 
+      upstream: undulations
+  diffusion_proteins:
     uptype: post
     group: all
-    slice_name: current
-    collections: 
-     - controls
-    # ortho specs are not quite meta and placed outside of specs because we expect the caller to
-    # ... package them correctly for storage. this is useful for looping inside a calculation
-    # ... and in this case, the ortho matches controls with hypothetical protein fields
-    ortho_specs:
-      imaginary_fields:
-        - big
+    slice_name: current_protein
+    collections: all
     specs:
-      upstream:
-        undulations: {}
-      design:
-        loop:
-          v9:
-            style: wilderness
-            curvature_positions: 
-              method: neighborhood
-              distance_cutoff: 5.0
-              spacer: 5.0
-            extents:
-              method: fixed_isotropic
-              extent: 4.0
-            curvature_sum: mean
+      upstream: protein_abstractor
 
 plots:
   undulations:
@@ -180,26 +207,120 @@ plots:
     calculation: lipid_mesh
     slices: current
     collections: small
+  curvature_coupling:
+    calculation: 
+      - undulations
+      - protein_abstractor
+    collections: big
+    specs:
+      # last of the sweeps is  the active one    
+      sweeps:
+        - {'cfsig':'hcv3b','roundsig':'v5b',
+          'base_range_sweep':[0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64],
+          'base_range':
+            [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
+        - {'cfsig':'hcv3c','roundsig':'v5c',
+          'base_range_sweep':[0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64],
+          'base_range':
+            [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]}
   contacts:
     calculation:
       contacts:
         cutoff: 5.0
     settings: 
       show_residue_names: False
+  ### deprecated !
+  curvature:
+    collections: big
+    calculation:
+      - undulations
+      - protein_abstractor
+    specs:
+      design: 
+        module: 'codes.curvature_coupling.database_design'
+        def: database_def
+      loader: 
+        module: 'codes.membrane_importer_gromacs'
+        function: curvature_coupling_loader
+      discards:
+        v1:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
+          C_0: [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+        v3:
+          style: gridded
+          spacer: 5.0
+        v4:
+          style: wilderness
+          curvature_positions: 
+            method: protein_subselection
+            selections:
+              - [109]
+              - [330]
+              - [660]
+              - [878]
+              - [257]
+              - [808]
+          extents:
+            method: fixed_isotropic
+            extent: 4.0
+          curvature_sum: mean
+      attempts:
+        v2:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12,18,24,32,64]
+          C_0: [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.032,-0.028,-0.024,-0.02,-0.018,-0.014,-0.01,-0.005,0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+      plot_specs:
+        v1:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10]
+          C_0: [0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+        v2:
+          style: manual
+          mapping: protein
+          motion: dynamic
+          sigma_a: [0,1,2,3,4,5,6,7,8,9,10,12]
+          C_0: [-0.1,-0.09,-0.08,-0.07,-0.06,-0.05,-0.04,-0.032,-0.028,-0.024,-0.02,-0.018,-0.014,-0.01,-0.005,0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,0.06,0.07,0.08,0.09,0.1]
+          isotropy: [1.0,2.0,4.0,8.0,16.0]
+          theta: [0,90]
+      plot_cursor: v4
+  curvature_review:
+    collections: big
+    calculation:
+      - undulations
+      - protein_abstractor
+  curvature_review_opt:
+    collections: big
+    calculation:
+      - undulations
+      - protein_abstractor
   curvature_undulation_coupling:
     calculation: 
       - curvature_undulation_coupling
       - protein_abstractor
       - undulations
+      # use the following to get a single entry, above to sweep them
+      #curvature_undulation_coupling:
+      #  design: v7
     collections: big
     specs: 
-      # alternate names to match alternate inputs above, or the control case
-      calcname: curvature_undulation_coupling
       routine:
-        # - curvature_field_review
+        #- curvature_field_review
         - individual_reviews
 
-notes_aside_curvature_undulation_coupling_banana:
+aside:
   v6:
     style: wilderness
     curvature_positions: 
