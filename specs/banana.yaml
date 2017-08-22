@@ -140,6 +140,27 @@ calculations:
               method: fixed_isotropic
               extent: 4.0
             curvature_sum: mean
+  curvature_undulation_coupling_pixel:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: 
+     - all
+    specs:
+      upstream:
+        undulations: {}
+      design:
+        loop:
+          v10:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 20.0
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+            curvature_sum: mean
+aside:
   curvature_undulation_coupling_controls:
     uptype: post
     group: all
@@ -167,6 +188,8 @@ calculations:
               method: fixed_isotropic
               extent: 4.0
             curvature_sum: mean
+
+  
 
 plots:
   undulations:
