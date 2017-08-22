@@ -6,6 +6,7 @@ str_types = [str,unicode] if sys.version_info<(3,0) else [str]
 
 if 'data' not in globals():
 	avail = ['curvature_field_review','individual_reviews']
+	#---alternate method for plotting controls
 	plotspecs = work.plots[plotname].get('specs',{})
 	routine = plotspecs.get('routine',avail)
 	calcname = plotspecs.get('calcname',plotname)
@@ -143,7 +144,8 @@ if 'individual_reviews' in routine:
 			#	mean_prot_pts = data[protein_abstractor_name][sn]['data']['points_all'].mean(axis=0)[:,:2]
 			#else: 
 			#mean_prot_pts = data[protein_abstractor_name][sn]['data']['points'].mean(axis=0)[:,:2]
-			mean_prot_pts = postdat[sn]['points_protein_mean'][:,:2]
+			try: mean_prot_pts = postdat[sn]['points_protein_mean'][:,:2]
+			except: mean_prot_pts = data[protein_abstractor_name][sn]['data']['points'].mean(axis=0)[:,:2]
 			plothull(ax,[mean_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
 			ax.set_title(r'$\mathrm{\langle z \rangle}$'+'(max %.3f)'%hmax)
 			#---PLOT an example curvature field ('first' is hard-coded, instead of saving each frame)

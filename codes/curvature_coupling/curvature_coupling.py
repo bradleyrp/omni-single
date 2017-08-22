@@ -151,6 +151,39 @@ class InvestigateCurvature:
 				#---! inelegant
 				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
 				self.memory[(sn,'fields_unity')] = fields_unity
+		elif method=='pixel':
+			#---recall that the loop over sns is pretty much redundant
+			for sn in self.sns:
+				#---construct a box-vector-scaled grid of points which we call "pixels"
+				#---get data from the memory
+				hqs = self.memory[(sn,'hqs')]
+				self.nframes = len(hqs)
+				mn = hqs.shape[1:]
+				vecs = self.memory[(sn,'vecs')]
+				vecs_mean = np.mean(vecs,axis=0)
+				#---get the grid spacing from the metadata
+				spacer = pos_spec.get('spacer',None)
+				spacer_x,spacer_y = [pos_spec.get('spacer_%s'%i,spacer) for i in 'xy']
+				npts = (vecs_mean[:2]/np.array([spacer_x,spacer_y])).astype(int)
+				posts = np.array([[np.linspace(0,vecs[fr][d],npts[d]+1) 
+					for d in range(2)] for fr in range(self.nframes)])
+				fence = np.array([[(posts[fr][d][1:]+posts[fr][d][:-1])/2. for d in range(2)]
+					for fr in range(self.nframes)])
+				points = np.array([np.concatenate(np.transpose(np.meshgrid(*fence[fr]))) 
+					for fr in range(self.nframes)])
+				ndrops = len(points[0])
+				#---formulate the curvature request
+				curvature_request = dict(curvature=1.0,mn=mn,sigma_a=extent,sigma_b=extent,theta=0.0)
+				#---construct unity fields
+				fields_unity = np.zeros((self.nframes,ndrops,mn[0],mn[1]))
+				reindex,looper = zip(*[((fr,ndrop),
+					dict(vecs=vecs[fr],centers=[points[fr][ndrop]/vecs[fr][:2]],**curvature_request)) 
+					for fr in range(self.nframes) for ndrop in range(ndrops)])
+				status('computing curvature fields for %s'%sn,tag='compute')
+				incoming = basic_compute_loop(make_fields,looper=looper)
+				#---! inelegant
+				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
+				self.memory[(sn,'fields_unity')] = fields_unity
 		elif method=='neighborhood':
 			#---extra distance defines a border around the average hull
 			extra_distance = pos_spec['distance_cutoff']
