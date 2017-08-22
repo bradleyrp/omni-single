@@ -98,6 +98,16 @@ calculations:
               method: fixed_isotropic
               extent: 10.0
             curvature_sum: mean
+          v3:
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 100.0
+              spacer: 40.0
+            extents:
+              method: fixed_isotropic
+              extent: 20.0
+            curvature_sum: mean
 
 # which data to load for plotting (REQUIRED, but optional if you use the same exact name as the calculation)
 plots:
@@ -116,9 +126,9 @@ plots:
   # use plot-curvature_undulation_coupling.py to interpret the data for this project with different inputs
   curvature_undulation_coupling:
     calculation: 
-      - curvature_undulation_coupling_dex
-      - import_readymade_meso_v1_nanogel
-      - import_readymade_meso_v1_membrane
+      curvature_undulation_coupling_dex: {}
+      import_readymade_meso_v1_nanogel: {}
+      import_readymade_meso_v1_membrane: {}
     collections: all
     specs: 
       # alternate names to match the calculation inputs above
@@ -133,3 +143,9 @@ plots:
       routine:
         #- curvature_field_review
         - individual_reviews
+  # export undulation coupling data
+  dextran_analyze_undulations:
+    calculation: 
+      curvature_undulation_coupling_dex:
+        design: v1
+    collections: all
