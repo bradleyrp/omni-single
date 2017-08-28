@@ -185,6 +185,7 @@ class InvestigateCurvature:
 				#---! inelegant
 				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
 				self.memory[(sn,'fields_unity')] = fields_unity
+				self.memory[(sn,'drop_gaussians_points')] = points
 		elif method=='neighborhood':
 			#---extra distance defines a border around the average hull
 			extra_distance = pos_spec['distance_cutoff']
