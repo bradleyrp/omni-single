@@ -14,7 +14,7 @@ if 'data' not in globals():
 	undulations_name = plotspecs.get('undulations_name','undulations')
 	#---the curvature undulation coupling data are notably absent from the upstream calculations
 	#---...because we pull all upstream sweeps here for comparison
-	### data,calc = plotload(plotname)
+	data,calc = plotload(plotname)
 	#---get all upstream curvature sweeps
 	ups = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)[1]
 	for up in ups: up['specs'].pop('upstream',None)
