@@ -14,6 +14,9 @@ collections:
     - v008
   controls:
     - membrane-v653-free
+  two:
+    - v005
+    - membrane-v653-free
 
 slices:
   # BIG SIMULATIONS
@@ -145,12 +148,13 @@ calculations:
     group: all
     slice_name: current
     collections: 
-     - all
+     - two
     specs:
       upstream:
         undulations: {}
       design:
         loop:
+          # new, experimental hypotheses
           v10:
             style: wilderness
             curvature_positions: 
@@ -160,69 +164,36 @@ calculations:
               method: fixed_isotropic
               extent: 10.0
             curvature_sum: mean
-aside:
-  curvature_undulation_coupling_controls:
-    uptype: post
-    group: all
-    slice_name: current
-    collections: 
-     - controls
-    # ortho specs are not quite meta and placed outside of specs because we expect the caller to
-    # ... package them correctly for storage. this is useful for looping inside a calculation
-    # ... and in this case, the ortho matches controls with hypothetical protein fields
-    ortho_specs:
-      imaginary_fields:
-        - big
-    specs:
-      upstream:
-        undulations: {}
-      design:
-        loop:
-          v9:
+          v11e:
             style: wilderness
             curvature_positions: 
-              method: neighborhood
-              distance_cutoff: 5.0
-              spacer: 5.0
+              method: pixel
+              spacer: 10.0
             extents:
               method: fixed_isotropic
-              extent: 4.0
+              extent: 50.0
             curvature_sum: mean
-
-  
-
-plots:
-  undulations:
-    calculation: undulations
-    slices: current
-    collections: big
-  undulations_videos:
-    calculation: undulations
-    collections: small
-  lipid_areas:
-    calculation: lipid_mesh
-    slices: current
-    collections: small
-  contacts:
-    calculation:
-      contacts:
-        cutoff: 5.0
-    settings: 
-      show_residue_names: False
-  curvature_undulation_coupling:
-    calculation: 
-      - curvature_undulation_coupling
-      - protein_abstractor
-      - undulations
-    collections: big
-    specs: 
-      # alternate names to match alternate inputs above, or the control case
-      calcname: curvature_undulation_coupling
-      routine:
-        # - curvature_field_review
-        - individual_reviews
-
-notes_aside_curvature_undulation_coupling_banana:
+          v11:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 10.0
+            extents:
+              method: fixed_isotropic
+              extent: 5.0
+            curvature_sum: mean
+          v12:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 4.0
+            extents:
+              method: fixed_isotropic
+              extent: 2.5
+            curvature_sum: mean
+aside:        
+  # the following are some original hypotheses for hotspots
+  # ...note that we discarded some hypotheses that looped over: extent, distance_cutoff, spacer
   v6:
     style: wilderness
     curvature_positions: 
@@ -261,23 +232,71 @@ notes_aside_curvature_undulation_coupling_banana:
       method: fixed_isotropic
       extent: 4.0
     curvature_sum: mean
-  also:
-    style: wilderness
-    curvature_positions: 
-      method: neighborhood
-      distance_cutoff: 
-        loop:
-          - 5.0
-          - 10.0
-      spacer:
-        loop:
-          - 4.0
-          - 2.0
-    extents:
-      method: fixed_isotropic
-      extent: 
-        loop:
-          - 4.0
-          - 2.0
-    curvature_sum: mean
 
+# excluded for now
+aside:
+  curvature_undulation_coupling_controls:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: 
+      - controls
+    # ortho specs are not quite meta and placed outside of specs because we expect the caller to
+    # ... package them correctly for storage. this is useful for looping inside a calculation
+    # ... and in this case, the ortho matches controls with hypothetical protein fields
+    ortho_specs:
+      imaginary_fields:
+        - big
+    specs:
+      upstream:
+        undulations: {}
+      design:
+        loop:
+          v9:
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 5.0
+              spacer: 5.0
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+            curvature_sum: mean
+
+plots:
+  undulations:
+    calculation: undulations
+    slices: current
+    collections: big
+  undulations_videos:
+    calculation: undulations
+    collections: small
+  lipid_areas:
+    calculation: lipid_mesh
+    slices: current
+    collections: small
+  contacts:
+    calculation:
+      contacts:
+        cutoff: 5.0
+    settings: 
+      show_residue_names: False
+  curvature_undulation_coupling:
+    calculation: 
+      - curvature_undulation_coupling
+      - protein_abstractor
+      - undulations
+    collections: big
+    specs: 
+      # alternate names to match alternate inputs above, or the control case
+      calcname: curvature_undulation_coupling
+      routine:
+        # - curvature_field_review
+        - individual_reviews
+  # the following is how you would train the focus on single point in an upstream loop
+  hidden_curvature_undulation_coupling_pixel:
+    calculation:
+      curvature_undulation_coupling_pixel:
+        design: v10
+    collections: 
+     - two
