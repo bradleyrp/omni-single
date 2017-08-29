@@ -2,6 +2,7 @@
 
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
 from render.wavevids import plothull
+str_types = [str,unicode] if sys.version_info<(3,0) else [str]
 
 if 'data' not in globals():
 	avail = ['curvature_field_review','individual_reviews']
@@ -20,7 +21,14 @@ if 'data' not in globals():
 	datas,calcs = {},{}
 	for unum,up in enumerate(ups):
 		#---temporarily set the plots
-		work.plots[plotname]['calculation'] = {plotname:up['specs']}
+		#---if the specs value is a string it is PROBABLY in a loop?
+		#---! THIS CODE WAS ABANDONED. FOR THE DEXTRAN PROJECT JUST HIDE UPSTREAM PARAMETER SWEEPS
+		#---! make this systematic later
+		if type(up['specs']['design']) in str_types:
+			new_plot_specs = work.calcs[calcname]['specs']['design']['loop'][up['specs']['design']]
+		#---no loop means we just pass along the upstream specs to the plots temporarily for plotload
+		else: new_plot_specs = up['specs']
+		work.plots[plotname]['calculation'] = {plotname:new_plot_specs}
 		#---look up the right upstream data
 		dat,cal = plotload(calcname)
 		tag = up['specs']['design']

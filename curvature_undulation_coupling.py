@@ -19,6 +19,7 @@ def curvature_undulation_coupling(**kwargs):
 	#---instantiate the calculation	
 	ic = InvestigateCurvature(sn=sn,work=kwargs['workspace'],
 		design=kwargs['calc']['specs'].get('design',{}),
+		fitting=kwargs['calc']['specs'].get('fitting',{}),
 		protein_abstractor=kwargs['upstream']['protein_abstractor'],
 		undulations=kwargs['upstream']['undulations'])
 	#---repackage the data

@@ -72,6 +72,7 @@ class InvestigateCurvature:
 		self.data = kwargs.pop('undulations',None)
 		if not self.data: raise Exception('send upstream undulations data')
 		self.design = kwargs.pop('design',{})
+		self.fitting_parameters = kwargs.pop('fitting',{})
 		self.style = self.design.get('style',None)
 		self.single_mode = kwargs.pop('single_mode',True)
 		if not self.style: raise Exception('invalid style %s'%self.style)
@@ -316,11 +317,11 @@ class InvestigateCurvature:
 			q_raw = np.reshape(q2d,-1)[1:]
 			area = (Lx*Ly/lenscale**2)
 
-			tweak = {}
-			#---! remove this eventually
+			tweak = self.fitting_parameters
 			signterm = tweak.get('inner_sign',-1.0)
-			lowcut = kwargs.get('lowcut',tweak.get('lowcut',0.0))
-			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('hicut',1.0))
+			initial_kappa = tweak.get('initial_kappa',25.0)
+			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
+			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
 			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
 			if residual_form == 'log':
 				def residual(values): 
@@ -365,7 +366,7 @@ class InvestigateCurvature:
 				else: raise Exception('invalid mode %s'%mode)
 
 			Nfeval = 0
-			initial_conditions = [25.0,0.0,-0.1]+[0+.0 for i in range(ndrops)]
+			initial_conditions = [initial_kappa,0.0,0.01]+[0.0 for i in range(ndrops)]
 			test_ans = objective(initial_conditions)
 			if not isinstance(test_ans,np.floating): 
 				raise Exception('objective_residual function must return a scalar')

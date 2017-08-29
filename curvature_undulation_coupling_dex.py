@@ -32,6 +32,7 @@ def curvature_undulation_coupling_dex(**kwargs):
 	#---instantiate the calculation	
 	ic = InvestigateCurvature(sn=sn,work=kwargs['workspace'],
 		design=kwargs['calc']['specs'].get('design',{}),
+		fitting=kwargs['calc']['specs'].get('fitting',{}),
 		protein_abstractor=kwargs['upstream']['import_readymade_meso_v1_nanogel'],
 		undulations=kwargs['upstream']['import_readymade_meso_v1_membrane'])
 	#---repackage the data
