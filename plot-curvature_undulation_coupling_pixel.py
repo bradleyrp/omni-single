@@ -59,18 +59,21 @@ def collect_upstream_calculations_over_loop():
 	return dict(datas=datas,calcs=calcs,data=data,calc=calc)
 
 @register_printer
-def curvature_field_review():
+def curvature_field_review(extrema_compare=True,fn_base='fig.curvature_pixel.review'):
 	"""
 	Review the curvature fields in a single plot.
 	"""
 	global datas,work
-	figsize = (12,12)
+	figsize = 12
 	cmap_name = 'RdBu_r'
 	ntiles = sum([len(v) for v in datas.values()])
 	sns = work.sns()
-	axes,fig = square_tiles(ntiles=ntiles,figsize=figsize)
+	cf_key = 'cf_first'
+	axes,fig = square_tiles(ntiles=ntiles,figsize=figsize,hspace=0.25,wspace=0.25)
 	cmax = max([np.abs(d[sn]['cf']).max() for d in datas.values() for sn in work.sns()])
-	for dnum,(tag,dat) in enumerate(datas.items()):
+	tags = sorted(datas.keys())
+	for dnum,tag in enumerate(tags):
+		dat = datas[tag]
 		for snum,sn in enumerate(sns):
 			ax = axes[dnum*len(sns)+snum]
 			#---!!! ULTRAHACK this needs removed
@@ -78,15 +81,23 @@ def curvature_field_review():
 				global datau
 				datau,_ = plotload('undulations')
 			vecs = datau[sn]['data']['vecs'].mean(axis=0)
+			if not extrema_compare: cmax_this = np.abs(datas[tag][sn]['cf']).max()
+			else: cmax_this = cmax
 			ax.imshow(datas[tag][sn]['cf'].T,origin='lower',interpolation='nearest',
-				vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name],extent=[0,vecs[0],0,vecs[0]])
+				vmax=cmax_this,vmin=-1*cmax_this,cmap=mpl.cm.__dict__[cmap_name],
+				extent=[0,vecs[0],0,vecs[0]])
 			ax.scatter(*datas[tag][sn]['drop_gaussians_points'].mean(axis=0).T,
 				c='k',s=1)
 			error = datas[tag][sn]['bundle'][sn]['fun']
 			extrema = np.abs(datas[tag][sn]['cf']).max()
 			ax.set_title('%s\n%s: error=%.4f, extrema=%.4f'%(
 				work.meta.get(sn,{}).get('label',sn),tag,error,extrema))
-	picturesave('fig.curvature_pixel.review',work.plotdir,backup=False,version=True,meta={})
+	picturesave(fn_base,work.plotdir,backup=False,version=True,meta={})
+
+@register_printer
+def curvature_field_review_self():
+	"""Wrapper for self-comparison."""
+	curvature_field_review(fn_base='fig.curvature_pixel.review_self',extrema_compare=False)
 
 ###---MAIN
 
@@ -98,9 +109,10 @@ def loader():
 	if any([globals()[v] is None for v in variables]):
 		status('loading upstream data',tag='load')
 		#---get the routine for this plot (not updated before replot if you change the metadata)
-		avail = ['curvature_field_review']
+		#---! could you make this automatically detectable
+		#avail = ['curvature_field_review','curvature_field_review']
 		plotspecs = work.plots.get(plotname,work.calcs.get(plotname,{})).get('specs',{})
-		routine = plotspecs.get('routine',avail)
+		routine = plotspecs.get('routine',printers)
 		combodat = collect_upstream_calculations_over_loop()
 		data,datas = combodat['data'],combodat['datas']
 	else: status('data are already loaded',tag='load')
@@ -111,7 +123,9 @@ def printer():
 	#---! get routine from the metadata here
 	if routine is None: routine = list(printers)	
 	#---routine items are function names
-	for key in routine: globals()[key]()
+	for key in routine: 
+		status('running routine %s'%key,tag='printer')
+		globals()[key]()
 
 if __name__=='__main__': 
 	loader()

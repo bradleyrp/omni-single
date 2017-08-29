@@ -257,10 +257,13 @@ class InvestigateCurvature:
 					dict(vecs=vecs[fr],centers=[points[ndrop][fr]/vecs[fr][:2]],**curvature_request)) 
 					for fr in range(self.nframes) for ndrop in range(ndrops)])
 				status('computing curvature fields for %s'%sn,tag='compute')
-				incoming = basic_compute_loop(make_fields,looper=looper)
+				incoming = basic_compute_loop(make_fields,looper=looper,run_parallel=True)
 				#---! inelegant
 				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
 				self.memory[(sn,'fields_unity')] = fields_unity
+				if False:
+					import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(fields_unity[0][0].T);plt.show()
+					import ipdb;ipdb.set_trace()
 		else: raise Exception('invalid selection method')
 
 	def curvature_sum(self,cfs,curvatures,**kwargs):
@@ -284,6 +287,9 @@ class InvestigateCurvature:
 		extents = spec.get('extents',{})
 		extents_method = extents.get('method')
 		curvature_sum_method = self.design['curvature_sum']
+		#---special handling for pixel extents if None: extent is half the spacer
+		if extents['extent']==None and spec['curvature_positions']['method']:
+			extents['extent'] = spec['curvature_positions']['spacer']/2.
 		#---prepare curvature fields
 		if extents_method=='fixed_isotropic': self.drop_gaussians(**spec)
 		else: raise Exception('invalid extents_method %s'%extents_method)

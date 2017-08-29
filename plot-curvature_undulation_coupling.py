@@ -85,7 +85,7 @@ if 'individual_reviews' in routine:
 		vecs,points_protein = [postdat[sn][i] for i in ['vecs','points_protein']]
 		for ptsnum,pts in enumerate(points_protein[samples][...,:2]):
 			color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
-			if False: plothull(ax,[pts],griddims=griddims,vecs=vecs,lw=0,c=color_this)
+			plothull(ax,pts,griddims=griddims,vecs=vecs,lw=0,c=color_this)
 		ax.set_xlim((0,vecs[0]))
 		ax.set_ylim((0,vecs[1]))
 		ax.set_aspect(1.0)
@@ -97,7 +97,8 @@ if 'individual_reviews' in routine:
 			cmap_name = 'RdBu_r'	
 			#---this plot is an assortment of views
 			viewnames = ['average_height','average_height_pbc','neighborhood_static',
-				'neighborhood_dynamic','average_field','example_field','example_field_pbc','spectrum']
+				'neighborhood_dynamic','average_field','example_field','example_field_pbc',
+				'spectrum','spectrum_zoom']
 			axes,fig = square_tiles(len(viewnames),figsize)
 			#---several plots use the same data
 			#---custom handling for the mesoscale data which lacks vectors from the nanogel
@@ -110,11 +111,12 @@ if 'individual_reviews' in routine:
 			#---PLOT the mean curvature field
 			ax = axes[viewnames.index('average_field')]
 			cmax = np.abs(datas[tag][sn]['cf']).max()
+			cmax_instant = np.abs(datas[tag][sn]['cf_first']).max()
 			ax.imshow(datas[tag][sn]['cf'].T,origin='lower',interpolation='nearest',
 				vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name],extent=[0,vecs[0],0,vecs[1]])
 			mean_trial = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2).mean(axis=0)
 			ax.scatter(*mean_trial.T,s=1,c='k')
-			ax.set_title(r'$\mathrm{\langle C_0(x,y) \rangle}$')
+			ax.set_title(r'$\mathrm{\langle C_0(x,y) \rangle}$'+' (max %.3f)'%cmax)
 			#---PLOT a single instance of the neighborhood (good for debugging)
 			ax = axes[viewnames.index('neighborhood_static')]
 			debug_frame = 0
@@ -151,13 +153,13 @@ if 'individual_reviews' in routine:
 			ax.set_ylim((0,vecs[1]))
 			mean_trial = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)[example_frame]
 			ax.scatter(*mean_trial.T,s=1,c='k')
-			ax.set_title('example field',fontsize=10)
+			ax.set_title('example field (max %.3f)'%cmax_instant,fontsize=10)
 			#---PLOT periodic view of the example field
 			ax = axes[viewnames.index('example_field_pbc')]
 			ax.imshow(np.tile(cf_first.T,(3,3)),origin='lower',interpolation='nearest',
 				vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name],
 				extent=[-vecs[0],2*vecs[0],-vecs[1],2*vecs[1]])
-			ax.set_title('example field (max %.3f)'%cmax)
+			ax.set_title('example field (max %.3f)'%cmax_instant)
 			#---PLOT periodic view of the average height
 			ax = axes[viewnames.index('average_height_pbc')]
 			ax.imshow(np.tile(surf.T,(3,3)),origin='lower',interpolation='nearest',
@@ -166,16 +168,40 @@ if 'individual_reviews' in routine:
 			ax.set_title(r'$\mathrm{\langle z \rangle}$'+'(max %.3f)'%hmax)
 			#---PLOT spectrum
 			ax = axes[viewnames.index('spectrum')]
-			ax.scatter(datas[tag][sn]['qs'],datas[tag][sn]['ratios'],s=4,c='k',alpha=0.5)
+			ax.scatter(datas[tag][sn]['qs'],datas[tag][sn]['ratios'],s=4,c='k',alpha=0.25)
+			#---! high cutoff is hard-coded here but needs to be removed to the yaml. we need to get default
+			hicut = work.plots[plotname].get('fitting',{}).get('high_cutoff',1.0)
+			qs = datas[tag][sn]['qs']
+			band = qs<=hicut
+			ax.scatter(datas[tag][sn]['qs'][band],datas[tag][sn]['ratios'][band],s=10,c='k',alpha=1.0)
 			ax.axhline(1.0,c='k')
 			ax.set_xscale('log')
 			ax.set_yscale('log')
-			ax.set_title(r'energy spectrum (relative)')
+			error = datas[tag][sn]['bundle'][sn]['fun']
+			ax.set_title('full spectrum')
 			ax.grid(True)
+			ax.axvline(hicut,ymin=0.0,ymax=1.0,c='k',lw=2)
+			#---PLOT spectrum, relevant section
+			ax = axes[viewnames.index('spectrum_zoom')]
+			qs = datas[tag][sn]['qs']
+			band = qs<=hicut
+			ys = datas[tag][sn]['ratios'][band]
+			ax.scatter(qs[band],ys,s=20,c='k',alpha=1.0,clip_on=False)
+			ax.axhline(1.0,c='k')
+			ax.set_xscale('log')
+			ax.set_yscale('log',subsy=[])
+			ax.set_yticks([min(ys),1.0,max(ys)])
+			#---intransigent ticks!
+			ax.set_yticklabels([('%.2f'%i if type(i)!=bool else '') for i in [min(ys),False,max(ys)]])
+			ax.set_xlim(min(qs),hicut)
+			error = datas[tag][sn]['bundle'][sn]['fun']
+			ax.set_title('spectrum (error %.5f)'%error)
 			#---no tick marks on anything
 			for ax in axes:
 				ax.tick_params(axis='x',which='both',bottom='off',top='off',labelbottom='on')
 				ax.tick_params(axis='y',which='both',left='off',right='off',labelbottom='off')
 			#---the metadata for this plot comes from the design section
-			#meta = calcs[tag][sn]['calcs']['specs']['design']
+			meta = calcs[tag][sn]['calcs']['specs']['design']
+			#---add high cutoff (from fitting parameters if defined) to the meta
+			meta['high_cutoff'] = hicut
 			picturesave('fig.coupling_review.%s'%sn,work.plotdir,backup=False,version=True,meta=meta)
