@@ -18,3 +18,6 @@ for snum,sn in enumerate(sns):
 ax.set_xscale('log')
 ax.set_yscale('log')
 picturesave('fig.TEST',work.plotdir)
+
+#---save the data to two-column format
+np.savetxt(os.path.join(work.plotdir,'test.dat'),np.transpose((dat['qs'],dat['ratios'])))
