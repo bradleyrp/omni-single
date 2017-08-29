@@ -69,69 +69,57 @@ calculations:
         high_cutoff: 0.2
       design:
         loop:
-          #v3:
-          #  style: wilderness
-          #  curvature_positions: 
-          #    method: neighborhood
-          #    distance_cutoff: 50.0
-          #    spacer: 40.0
-          #  extents:
-          #    method: fixed_isotropic
-          #    extent: 20.0
-          #  curvature_sum: mean
-          #v4:
-          #  style: wilderness
-          #  curvature_positions: 
-          #    method: neighborhood
-          #    distance_cutoff: 100.0
-          #    spacer: 40.0
-          #  extents:
-          #    method: fixed_isotropic
-          #    extent: 20.0
-          #  curvature_sum: mean
-          v5:
+          v3:
             style: wilderness
             curvature_positions: 
               method: neighborhood
-              distance_cutoff: 180.0
+              distance_cutoff: 50.0
               spacer: 40.0
             extents:
               method: fixed_isotropic
               extent: 20.0
             curvature_sum: mean
-
-old:
-  look: "[OPTIMIZE] searching!  step = 100 kappa = 12.59764 gamma = -0.00067 vibe = -0.73116 curve(0) =  1.08519 curve(1) = -0.31105 curve(2) = -1.10728 curve(3) = -0.09224 curve(4) = -2.49034 curve(5) =  0.10495 curve(6) =  0.15177 curve(7) =  0.95803 curve(8) =  0.44633 curve(9) =  0.96693 curve(10) =  1.36964 curve(11) =  0.97139 curve(12) =  -2.3824 curve(13) =  -0.6841 curve(14) = -0.47799 curve(15) = -0.45071 curve(16) = -1.10755 curve(17) = -0.32743 curve(18) =  0.75675 curve(19) = -1.07767 curve(20) = -1.46985 curve(21) = -0.52154 curve(22) =  0.98327 curve(23) = -0.89358 curve(24) = -0.78449 error =  0.02627"
-  v1:
-    style: wilderness
-    curvature_positions: 
-      method: neighborhood
-      distance_cutoff: 0.0
-      spacer: 40.0
-    extents:
-      method: fixed_isotropic
-      extent: 20.0
-    curvature_sum: mean
-  v2:
-    style: wilderness
-    curvature_positions: 
-      method: neighborhood
-      distance_cutoff: 0.0
-      spacer: 20.0
-    extents:
-      method: fixed_isotropic
-      extent: 10.0
-    curvature_sum: mean
-  v3:
-    style: wilderness
-    curvature_positions: 
-      method: neighborhood
-      distance_cutoff: 100.0
-      spacer: 40.0
-    extents:
-      method: fixed_isotropic
-      extent: 20.0
-    curvature_sum: mean
+  # duplicate of the pixel method for dextran
+  curvature_undulation_coupling_pixel_dex:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        import_readymade_meso_v1_membrane: {}
+      fitting:
+        initial_kappa: 10.0
+        high_cutoff: 0.2
+      design:
+        loop:
+          v10:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 200.0
+            extents:
+              method: fixed_isotropic
+              extent: 100.0
+            curvature_sum: mean
+          v11:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 150.0
+            extents:
+              method: fixed_isotropic
+              extent: 75.0
+            curvature_sum: mean
+          v12:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 100.0
+            extents:
+              method: fixed_isotropic
+              extent: 50.0
+            curvature_sum: mean
 
 # which data to load for plotting (REQUIRED, but optional if you use the same exact name as the calculation)
 plots:
@@ -147,10 +135,11 @@ plots:
         - height_histograms
         #- debug3d
       show_fit: False
-  # use plot-curvature_undulation_coupling.py to interpret the data for this project with different inputs
+  # point our custom calculation to the right plot function
   curvature_undulation_coupling:
     calculation: 
-      curvature_undulation_coupling_dex: {}
+      curvature_undulation_coupling_dex:
+        design: v3
       import_readymade_meso_v1_nanogel: {}
       import_readymade_meso_v1_membrane: {}
     collections: all
@@ -165,7 +154,7 @@ plots:
         function: prepare_mesoscale_postdat
       # which plots to make
       routine:
-        #- curvature_field_review
+        # - curvature_field_review
         - individual_reviews
   # export undulation coupling data
   dextran_analyze_undulations:
