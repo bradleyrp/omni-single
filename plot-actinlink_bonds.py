@@ -8,7 +8,8 @@ see lab notebook for details
 import time
 from joblib import Parallel,delayed
 from joblib.pool import has_shareable_memory
-from base.tools import status,framelooper
+from base.tools import status,framelooper,dictsum
+from base.compute_loop import basic_compute_loop
 
 #---block: what to plot
 avail = ['contact_maps','histograms','bars']
@@ -22,34 +23,43 @@ residue_codes = {'ARG':'R','HIS':'H','LYS':'K','ASP':'D','GLU':'E',
 	'SER':'S','THR':'T','ASN':'N','GLN':'Q','CYS':'C','SEL':'U','GLY':'G','PRO':'P',
 	'ALA':'A','ILE':'I','LEU':'L','MET':'M','PHE':'F','TRP':'W','TYR':'Y','VAL':'V'}
 residue_codes_reverse = dict([(j,i) for i,j in residue_codes.items()])
-
 residue_type_colors = {'basic':'Blues','acidic':'Reds','hydrophobic':'Greens',
 	'polar':'Purples','special':'Oranges'}
-plotspec = {'fs_xlabel':14,'fs_ylabel':20,'fs_title':20,
-	'legend_loc':'upper right','fs_legend':14,'legend_color_strength':0.5,'fs_legend_title':20,
-	'binary_color_intensity':0.5}
 residue_colors = dict([(name,residue_type_colors[residue_types[name]]) for name in residue_types])
 ticks_font = mpl.font_manager.FontProperties(family='Latin Modern Mono',style='normal',
 	size=14,weight='normal',stretch='normal')
-
-#---block: all chemical bonds on one contact map
 plotspec = {'fs_xlabel':14,'fs_ylabel':20,'fs_title':20,
 	'legend_loc':'upper right','fs_legend':14,'legend_color_strength':0.5,
 	'label_color_strength':1.0,'fs_legend_title':20,
 	'binary_color_intensity':0.5,'time_tick_interval':20,
-	'fs_xticks':11,'fs_yticks':11}
-plotspec_small = {'fs_legend_title':14,'fs_legend':12,'fs_xticks':12,'fs_yticks':12}
+	'fs_xticks':11,'fs_yticks':6,'fs_xticks_bars':6}
+plotspec_small = {'fs_legend_title':14,'fs_legend':12,'fs_xticks':12,'fs_yticks':8}
+#---define salt bridges
+valid_salt_bridges = [
+	{'resname':'ARG','atoms':['NH1','NH2']},
+	{'resname':'LYS','atoms':['NZ']},
+	{'resname':'HIS','atoms':['ND1','NE2']},]
+#---special subselections
+special_protein_parts = {'nwaspbilayernochl':np.arange(0,22+1).astype(int)}
+
+#---which combinations of simulations to plot, and how to name them 
 specs = {
-	'all':{'plotspec':dict(dict(plotspec).items()+dict(figsize=(8,16),fs_ylabel=10).items())},
+	'all':{'plotspec':dictsum(plotspec,dict(figsize=(8,16),fs_ylabel=10))},
 	'mDia2':{'lipid_resnames':['DOPS','PI2P'],'tag':'.PS_PIP2',
 		'sns':['mdia2bilayer_nochl2','mdia2bilayerphys'],
-		'plotspec':dict(dict(plotspec_small).items()+dict(figsize=(8,8),fs_ylabel=10).items())},
+		'plotspec':dictsum(plotspec_small,dict(figsize=(8,8),fs_ylabel=10))},
 	'gelsolin':{'lipid_resnames':['DOPS','PI2P'],'tag':'.PS_PIP2',
 		'sns':['gelbilayer_nochl','gelbilayerphys'],
-		'plotspec':dict(dict(plotspec_small).items()+dict(figsize=(8,8),fs_ylabel=10).items())},
+		'plotspec':dictsum(plotspec_small,dict(figsize=(8,8),fs_ylabel=10))},
 	'nwasp':{'lipid_resnames':['DOPS','PI2P'],'tag':'.PS_PIP2',
 		'sns':['nwasppeptide2','nwaspbilayermut1','nwaspbilayernochl','nwasppeptideb'],
-		'plotspec':dict(dict(plotspec_small).items()+dict(figsize=(8,14),fs_ylabel=10).items())},}
+		'plotspec':dictsum(plotspec_small,dict(figsize=(8,14),fs_ylabel=10))},}
+#---which types of data to plot
+bond_mappings = [
+	#{'name':'explicit','post_key':'counts_resid_resname','upstream':'contacts'},
+	#{'name':'reduced','post_key':'counts_resid_resname_singleton','upstream':'contacts'},
+	#{'name':'hbonds','post_key':'hbonds_compacted','upstream':'hbonds'},
+	{'name':'salt','post_key':'salt_compacted','upstream':'contacts'},]
 
 #---block: mimic the coda in contacts.py
 def hydrogen_bond_compactor():
@@ -71,6 +81,53 @@ def hydrogen_bond_compactor():
 		#---tacking on compacted data to mimic the form of the contact maps
 		data_hbonds[sn]['data']['hbonds_compacted'] = np.array(incoming)
 		data_hbonds[sn]['data']['pairs_resid_resname'] = np.array([(resid,resname_name) 
+			for resid in resids for resname_name,resname_set in resname_combos]).astype(str)
+
+#---block: filter out the salt bridges
+def salt_bridge_filter():
+	global data_contacts,bonds,obs,valid_salt_bridges
+	for sn in sns:
+		#---filter the bonds and observations from contact maps
+		bonds_all = data_contacts[sn]['data']['bonds']
+		obs_all = data_contacts[sn]['data']['observations']
+		nframes = len(obs_all)
+		salt_bridge_inds =[]
+		#---loop over frames in the simulation
+		for fr in range(nframes):
+			status('filtering salt bridges from contact data',i=fr,looplen=nframes,tag='compute')
+			#---find observed bonds for that frame
+			bonds_inds = np.where(obs_all[fr]==1.0)[0]
+			frame = bonds_all[bonds_inds]
+			hits_over_salt_bridges = []
+			for definition in valid_salt_bridges:
+				matches_resname = frame[:,0]==definition['resname']
+				matches_atom = np.in1d(frame[:,2],definition['atoms'])
+				matches_lipid_oxygen = np.array([i[0] for i in frame[:,5]])=='O'
+				matches = np.all((matches_resname,matches_atom,matches_lipid_oxygen),axis=0)
+				hits_over_salt_bridges.append(matches)
+			frame_matches = np.where(np.any(hits_over_salt_bridges,axis=0))
+			#---save the observed salt bridges by index number for the master bond list
+			salt_bridge_inds.append(bonds_inds[frame_matches])
+		#---get unique indices for the observed salt bridges
+		salt_inds = np.unique(np.concatenate(salt_bridge_inds))
+		#---set global bonds and obs so they only contain salt bridges and then run the bond_counter
+		bonds = bonds_all[salt_inds]
+		obs = obs_all[:,salt_inds]
+		print('nbonds for %s is %d'%(sn,len(salt_inds)))
+		#---! get resids for the protein and lipid_resnames from contact maps
+		lipid_resnames = np.unique(
+			data_contacts[sn]['data']['bonds'][:,rowspec.index('target_resname')])
+		resids = data_contacts[sn]['data']['subject_residues_resids']
+		resname_combos = [(r,np.array([r])) for r in lipid_resnames]+[
+			('all lipids',np.array(lipid_resnames))]
+		#---compute loop
+		looper = [{'resid':resid,'resname_set':resname_set} 
+			for resid in resids for resname_name,resname_set in resname_combos]
+		compute_function = bond_counter
+		incoming = basic_compute_loop(compute_function,looper,run_parallel=True)
+		#---tacking on compacted data to mimic the form of the contact maps
+		data_contacts[sn]['data']['salt_compacted'] = np.array(incoming)
+		if False: data_contacts[sn]['data']['pairs_resid_resname'] = np.array([(resid,resname_name) 
 			for resid in resids for resname_name,resname_set in resname_combos]).astype(str)
 
 #---block: post-post processing
@@ -132,13 +189,15 @@ def colorstreak_contact_map(sns,postdat,bond_name,plotspec,fn,**kwargs):
 	for ss,sn in enumerate(sns):
 		for rr,resname in enumerate(lipid_resnames):
 			ax = axes[rr][ss]
+			#---override the protein selections
+			resnums = special_protein_parts.get(sn,np.arange(postdat[sn][bond_name][resname].shape[0]))
 			resnames = postdat[sn]['subject_residues_resnames']
 			if rr==0: 
 				ax.set_ylabel(sn_title(sn),fontsize=plotspec['fs_ylabel'])
 				if work.plots[plotname].get('settings',{}).get('show_residue_names',True):
 					#---never set the ticklabels before the ticks
-					ax.set_yticks(np.arange(len(resnames))+0.5)
-					ax.set_yticklabels([residue_codes[r] for r in resnames],
+					ax.set_yticks(np.arange(len(resnames[resnums]))+0.5)
+					ax.set_yticklabels([residue_codes[r] for r in resnames[resnums]],
 						fontsize=plotspec['fs_yticks'])
 					for label in ax.get_yticklabels():
 						label.set_color(mpl.cm.__dict__[
@@ -150,11 +209,15 @@ def colorstreak_contact_map(sns,postdat,bond_name,plotspec,fn,**kwargs):
 					fontsize=plotspec['fs_title'])
 			resids = postdat[sn]['resids']
 			if do_crazy_colors:
-				image_data = np.array([mpl.cm.__dict__[
-					residue_colors.get(resnames[rnum],'Greys')](
-						postdat[sn][bond_name][resname][rnum].astype(float)/ceiling).T[:-1].T 
-					for rnum in np.arange(postdat[sn][bond_name][resname].shape[0])])
-			else: image_data = postdat[sn][bond_name][resname]
+				scores = np.array([postdat[sn][bond_name][resname][rnum].astype(float)/ceiling 
+					for rnum in resnums])
+				image_data = np.array([mpl.cm.__dict__[residue_colors.get(resnames[rnum],'Greys')](
+					postdat[sn][bond_name][resname][rnum].astype(float)/ceiling).T[:-1].T 
+					for rnum in resnums])
+				#---note that the crazy color color maps do not go identically to zero
+				#---...so we white them out
+				image_data[np.where(scores==0.0)] = [1.,1.,1.]
+			else: image_data = postdat[sn][bond_name][resname][resnums]
 			duration = (postdat[sn]['times'].max()-postdat[sn]['times'].min())*10**-3
 			xtick_interval = work.plots[plotname].get('settings',{}).get('xtick_interval',
 				plotspec['time_tick_interval'])
@@ -163,8 +226,8 @@ def colorstreak_contact_map(sns,postdat,bond_name,plotspec,fn,**kwargs):
 			#---! removed division by the following, designed to make things lighter when reduced
 			#---! ...{'explicit':1.0,'reduced':plotspec['binary_color_intensity']}[mode]
 			im = ax.imshow(image_data,
-				origin='lower',interpolation='nearest',extent=[0,duration,0,len(resids)],
-				aspect=float(duration)/len(resids),
+				origin='lower',interpolation='nearest',extent=[0,duration,0,len(resnums)],
+				aspect=float(duration)/len(resnums),
 				vmax=ceiling,vmin=0,cmap=mpl.cm.__dict__[cmap])
 			ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 			ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
@@ -233,11 +296,13 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 					raise Exception('bar style requires a lipid_bar_selection')
 				if resname==lipid_subselection:
 					#---bars show the mean number of contacts per frame
+					#---override the protein selections
+					resnums = special_protein_parts.get(sn,np.arange(postdat[sn][bond_name][resname].shape[0]))
 					raw2 = raw.mean(axis=1)
 					colors_this = [mpl.cm.__dict__[residue_type_colors[residue_types[name]]](
 						plotspec['legend_color_strength']) 
 						for name in postdat[sn]['subject_residues_resnames']]
-					ax.bar(np.arange(raw.shape[0]),raw2,color=colors_this)
+					ax.bar(resnums,raw2[resnums],color=colors_this)
 					ys = raw2
 					subs = raw2>0
 					ax.errorbar(np.arange(raw.shape[0])[subs],ys[subs],yerr=raw.std(axis=1)[subs],
@@ -261,10 +326,12 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 			ax.set_ylim(0,maxcount*1.05)
 			ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 			ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
+			#---override the protein selections
+			resnums = special_protein_parts.get(sn,np.arange(postdat[sn][bond_name][resname].shape[0]))
 			#---never set the ticklabels before the ticks
 			resnames = postdat[sn]['subject_residues_resnames']
-			ax.set_xticks(np.arange(len(resnames)))
-			ax.set_xticklabels([residue_codes[r] for r in resnames],fontsize=plotspec['fs_xticks'])
+			ax.set_xticks(np.arange(len(resnums)))
+			ax.set_xticklabels([residue_codes[r] for r in resnames[resnums]],fontsize=plotspec['fs_xticks_bars'])
 			for label in ax.get_xticklabels():
 				label.set_color(mpl.cm.__dict__[
 					residue_colors.get(residue_codes_reverse[label._text],
@@ -279,8 +346,7 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 		frame.set_edgecolor('black')
 		frame.set_facecolor('white')
 	else: raise Exception('unclear style')
-	if not legend:
-		import ipdb;ipdb.set_trace()
+	if not legend: raise Exceptin('dev')
 	picturesave(fn,work.plotdir,backup=False,version=True,meta={},extras=[legend])
 
 #---block: counting hydrogen bonds
@@ -297,20 +363,6 @@ def bond_counter(resid,resname_set):
 	result = obs.T[which].sum(axis=0)
 	return result
 
-#---block: stolen from contacts.py
-def basic_compute_loop(compute_function,looper,run_parallel=True,debug=False):
-	"""Canonical form of the basic compute loop."""
-	start = time.time()
-	if run_parallel:
-		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
-			delayed(compute_function,has_shareable_memory)(**looper[ll]) 
-			for ll in framelooper(len(looper),start=start))
-	else: 
-		incoming = []
-		for ll in framelooper(len(looper)):
-			incoming.append(compute_function(**looper[ll]))
-	return incoming
-
 #---block: import the post-processed data	
 if 'data_contacts' not in globals(): 
 	sns_contacts,(data_contacts,calc_contacts) = work.sns(),plotload('contacts',work)
@@ -318,14 +370,8 @@ if 'data_contacts' not in globals():
 	if sns_hbonds!=sns_contacts: 
 		raise Exception('collections for hydrogen_bonding and contacts are not equal')
 	else: sns = sns_hbonds
-	
 	#---set the cutoff in the yaml file to make this plot because we pull from multiple upstream sources
 	cutoff = calc_contacts['calcs']['specs']['cutoff']
-	#---map data type onto keys
-	bond_mappings = [
-		{'name':'explicit','post_key':'counts_resid_resname','upstream':'contacts'},
-		{'name':'reduced','post_key':'counts_resid_resname_singleton','upstream':'contacts'},
-		{'name':'hbonds','post_key':'hbonds_compacted','upstream':'hbonds'},]
 	#---specify the upstream data and naming scheme
 	rowspec = ['subject_resname','subject_resid','subject_atom',
 		'target_resname','target_resid','target_atom']
@@ -339,9 +385,9 @@ if 'data_contacts' not in globals():
 		for i in work.vars.get('selectors',{}).get('resnames_PIP2',{})]).get(x,x)
 	sn_title = lambda sn: '%s%s'%(work.meta[sn].get('label',re.sub('_','-',sn)),
 		'' if not work.meta[sn].get('cholesterol',False) else '\n(cholesterol)')
-
 	#---post-post processing
 	if 'postdat' not in globals(): 
+		salt_bridge_filter()
 		hydrogen_bond_compactor()
 		postdat = make_postdat()
 
@@ -357,16 +403,16 @@ for bond in bond_mappings:
 		if 'contact_map' in routine: 
 			fn = 'fig.%s.%s%s.%s%s'%(figname,specname,spec.get('tag',''),bond['name'],
 				'.cutoff_%.1f'%cutoff if bond['name'] in ['explicit','reduced'] else '')
-			if bond['name']=='hbonds':
-				kwargs.update(legend_title='hydrogen bonds',cbar_title='counts')
+			if bond['name']=='hbonds': kwargs.update(legend_title='hydrogen bonds',cbar_title='counts')
+			elif bond['name']=='salt': kwargs.update(legend_title='salt bridges',cbar_title='counts')
 			colorstreak_contact_map(fn=fn,**kwargs)
-		if 'histograms' in routine and spec=={}:
+		if 'histograms' in routine and specname=='all':
 			plotspec_this = dict(kwargs['plotspec'])
 			kwargs.update(plotspec=plotspec_this)
 			fn = 'fig.%s_%s.%s%s.%s%s'%(figname,'histogram',specname,spec.get('tag',''),bond['name'],
 				'.cutoff_%.1f'%cutoff if bond['name'] in ['explicit','reduced'] else '')
 			plot_histograms_or_occupancy(style='histograms',fn=fn,**kwargs)
-		if 'bars' in routine and spec=={}:
+		if 'bars' in routine and specname=='all':
 			plotspec_this = dict(kwargs['plotspec'])
 			kwargs.update(plotspec=plotspec_this)
 			#---! be careful with resnames
