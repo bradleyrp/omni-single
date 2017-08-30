@@ -114,6 +114,7 @@ def construct_curvature_field(**kwargs):
 	"""
 	Create a single curvature field over a regular grid over a fixed spatial extent.
 	Note that we have a ceiling on curvature for added dimples.
+	!!!!!!! PBCs under development.
 	"""
 	#---grid dimensions
 	m,n = kwargs.pop('mn')
@@ -127,11 +128,16 @@ def construct_curvature_field(**kwargs):
 	grid = np.array([[[i,j] for j in np.linspace(0,3*vecs[1]/lenscale,3*n)] 
 		for i in np.linspace(0,3*vecs[0]/lenscale,3*m)])
 	field = np.zeros(np.shape(grid)[:2])
-	#---loop over dimples
-	for center in centers:
-		field += gauss2d(grid,x0=vecs[0]*(1+center[0]),y0=vecs[1]*(1+center[1]),
+	#---we apply PBCs here. this might slow things down
+	#---previously PBCs were only implemented on the field (!) not the centers
+	offsets = np.concatenate(np.transpose(np.meshgrid(np.arange(3),np.arange(3))))
+	centers_pbc = np.array([c+offset for c in centers for offset in offsets])
+	#---loop over dimples with replicates in PBCs
+	for center in centers_pbc:
+		field += gauss2d(grid,x0=vecs[0]*center[0],y0=vecs[1]*center[1],
 			curvature=1.0,**kwargs)
-	#---ceiling on curvature
+	#---ceiling on curvature in case multiple inducers overlap
+	#---! NOTE
 	field[field>1.0] = 1.0
 	#---remove duplicates under PBCs
 	field_one = field[m:2*m,n:2*n]

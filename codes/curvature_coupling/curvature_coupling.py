@@ -72,6 +72,7 @@ class InvestigateCurvature:
 		self.data = kwargs.pop('undulations',None)
 		if not self.data: raise Exception('send upstream undulations data')
 		self.design = kwargs.pop('design',{})
+		self.fitting_parameters = kwargs.pop('fitting',{})
 		self.style = self.design.get('style',None)
 		self.single_mode = kwargs.pop('single_mode',True)
 		if not self.style: raise Exception('invalid style %s'%self.style)
@@ -104,6 +105,7 @@ class InvestigateCurvature:
 
 	def gopher(self,spec,module_name,variable_name):
 		"""Load an external module. Useful for changing the workflow without changing the code."""
+		#---note that this function was folded into the omnicalc codebase in omni/base/tools.py
 		mod = importlib.import_module(spec[module_name])
 		target = mod.__dict__.get(spec[variable_name],None)
 		#---the database design might need work so we always export it
@@ -150,6 +152,40 @@ class InvestigateCurvature:
 				#---! inelegant
 				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
 				self.memory[(sn,'fields_unity')] = fields_unity
+		elif method=='pixel':
+			#---recall that the loop over sns is pretty much redundant
+			for sn in self.sns:
+				#---construct a box-vector-scaled grid of points which we call "pixels"
+				#---get data from the memory
+				hqs = self.memory[(sn,'hqs')]
+				self.nframes = len(hqs)
+				mn = hqs.shape[1:]
+				vecs = self.memory[(sn,'vecs')]
+				vecs_mean = np.mean(vecs,axis=0)
+				#---get the grid spacing from the metadata
+				spacer = pos_spec.get('spacer',None)
+				spacer_x,spacer_y = [pos_spec.get('spacer_%s'%i,spacer) for i in 'xy']
+				npts = (vecs_mean[:2]/np.array([spacer_x,spacer_y])).astype(int)
+				posts = np.array([[np.linspace(0,vecs[fr][d],npts[d]+1) 
+					for d in range(2)] for fr in range(self.nframes)])
+				fence = np.array([[(posts[fr][d][1:]+posts[fr][d][:-1])/2. for d in range(2)]
+					for fr in range(self.nframes)])
+				points = np.array([np.concatenate(np.transpose(np.meshgrid(*fence[fr]))) 
+					for fr in range(self.nframes)])
+				ndrops = len(points[0])
+				#---formulate the curvature request
+				curvature_request = dict(curvature=1.0,mn=mn,sigma_a=extent,sigma_b=extent,theta=0.0)
+				#---construct unity fields
+				fields_unity = np.zeros((self.nframes,ndrops,mn[0],mn[1]))
+				reindex,looper = zip(*[((fr,ndrop),
+					dict(vecs=vecs[fr],centers=[points[fr][ndrop]/vecs[fr][:2]],**curvature_request)) 
+					for fr in range(self.nframes) for ndrop in range(ndrops)])
+				status('computing curvature fields for %s'%sn,tag='compute')
+				incoming = basic_compute_loop(make_fields,looper=looper)
+				#---! inelegant
+				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
+				self.memory[(sn,'fields_unity')] = fields_unity
+				self.memory[(sn,'drop_gaussians_points')] = points
 		elif method=='neighborhood':
 			#---extra distance defines a border around the average hull
 			extra_distance = pos_spec['distance_cutoff']
@@ -161,6 +197,11 @@ class InvestigateCurvature:
 			def arange_symmetric(a,b,c):
 				return np.unique(np.concatenate((np.arange(a,b,c),-1*np.arange(a,b,c))))
 			for sn in self.sns:
+
+				###---!!! beware this code might have an indexing problem !!!
+
+				#---nope .. now that you fixed the index error each protein gets its own neighborhood presumably with an indeterminate position
+
 				#---for each frame we compute the centroid and orientation
 				points_all = self.data_prot[sn]['data']['points_all']
 				cogs = points_all.mean(axis=2).mean(axis=1)[:,:2]
@@ -193,6 +234,15 @@ class InvestigateCurvature:
 					ref_grid_rot_in_box = (ref_grid_rot + 
 						(ref_grid_rot<0)*vecs[fr,:2] - (ref_grid_rot>=vecs[fr,:2])*vecs[fr,:2])
 					points[:,fr] = ref_grid_rot_in_box
+				#---debug with a plot if desired
+				if False:
+					import matplotlib.pyplot as plt
+					plt.scatter(*ref_grid_rot_in_box.T)
+					from base.store import picturesave
+					fn = 'fig.DEBUG.curvature_undulation_coupling_neighborhood'
+					picturesave(fn,self.work.plotdir)
+					raise Exception('dropped debugging image for your review and deletion '
+						'to %s. remove it and then turn this debugger off to continue'%fn)
 				#---save the position of the curvature fields for later
 				self.memory[(sn,'drop_gaussians_points')] = points
 				ndrops = len(ref_grid)
@@ -208,10 +258,13 @@ class InvestigateCurvature:
 					dict(vecs=vecs[fr],centers=[points[ndrop][fr]/vecs[fr][:2]],**curvature_request)) 
 					for fr in range(self.nframes) for ndrop in range(ndrops)])
 				status('computing curvature fields for %s'%sn,tag='compute')
-				incoming = basic_compute_loop(make_fields,looper=looper)
+				incoming = basic_compute_loop(make_fields,looper=looper,run_parallel=True)
 				#---! inelegant
 				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
 				self.memory[(sn,'fields_unity')] = fields_unity
+				if False:
+					import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(fields_unity[0][0].T);plt.show()
+					import ipdb;ipdb.set_trace()
 		else: raise Exception('invalid selection method')
 
 	def curvature_sum(self,cfs,curvatures,**kwargs):
@@ -235,6 +288,9 @@ class InvestigateCurvature:
 		extents = spec.get('extents',{})
 		extents_method = extents.get('method')
 		curvature_sum_method = self.design['curvature_sum']
+		#---special handling for pixel extents if None: extent is half the spacer
+		if extents['extent']==None and spec['curvature_positions']['method']:
+			extents['extent'] = spec['curvature_positions']['spacer']/2.
 		#---prepare curvature fields
 		if extents_method=='fixed_isotropic': self.drop_gaussians(**spec)
 		else: raise Exception('invalid extents_method %s'%extents_method)
@@ -261,11 +317,11 @@ class InvestigateCurvature:
 			q_raw = np.reshape(q2d,-1)[1:]
 			area = (Lx*Ly/lenscale**2)
 
-			tweak = {}
-			#---! remove this eventually
+			tweak = self.fitting_parameters
 			signterm = tweak.get('inner_sign',-1.0)
-			lowcut = kwargs.get('lowcut',tweak.get('lowcut',0.0))
-			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('hicut',1.0))
+			initial_kappa = tweak.get('initial_kappa',25.0)
+			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
+			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
 			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
 			if residual_form == 'log':
 				def residual(values): 
@@ -310,7 +366,7 @@ class InvestigateCurvature:
 				else: raise Exception('invalid mode %s'%mode)
 
 			Nfeval = 0
-			initial_conditions = [25.0,0.0,-0.1]+[0+.0 for i in range(ndrops)]
+			initial_conditions = [initial_kappa,0.0,0.01]+[0.0 for i in range(ndrops)]
 			test_ans = objective(initial_conditions)
 			if not isinstance(test_ans,np.floating): 
 				raise Exception('objective_residual function must return a scalar')

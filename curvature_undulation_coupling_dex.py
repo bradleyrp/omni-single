@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 """
-Current optimized version of the curvature-undulation coupling method.
+Calculation which interfaces to InvestigateCurvature which handles the curvature undulation coupling 
+calculation. 
+This version is modified for incoming mesoscale data.
 """
 
 import numpy as np
 import codes.curvature_coupling
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
-from codes.readymade_meso_v1 import import_curvature_inducer_points,import_membrane_mesh
 
 def curvature_undulation_coupling_dex(**kwargs):
 	"""
@@ -24,13 +25,16 @@ def curvature_undulation_coupling_dex(**kwargs):
 	#---...kwargs['upstream']['protein_abstractor'] which gets sent to InvestigateCurvature
 	#---note that users who wish to manipulate the incoming data can do so in a custom copy of 
 	#---...curvature_undulation_coupling.py (i.e. this script) or in the loader functions
-	membrane_mesh = import_membrane_mesh(calc=calc,work=work,sn=sn)
-	curvature_inducer_points = import_curvature_inducer_points(calc=calc,work=work,sn=sn)
+	#---note also that users could point to upstream data as we have done here (data which are different than
+	#---...in the standard method this was derived from) or import alternate data directly here. we have 
+	#---...chosen to implement an upstream calculation to package the data so it enters the pipeline as early
+	#---...as possible however all of the methods described here are viable
 	#---instantiate the calculation	
 	ic = InvestigateCurvature(sn=sn,work=kwargs['workspace'],
 		design=kwargs['calc']['specs'].get('design',{}),
-		protein_abstractor=curvature_inducer_points,
-		undulations=membrane_mesh)
+		fitting=kwargs['calc']['specs'].get('fitting',{}),
+		protein_abstractor=kwargs['upstream']['import_readymade_meso_v1_nanogel'],
+		undulations=kwargs['upstream']['import_readymade_meso_v1_membrane'])
 	#---repackage the data
 	attrs,result = ic.finding['attrs'],ic.finding['result']
 	return result,attrs

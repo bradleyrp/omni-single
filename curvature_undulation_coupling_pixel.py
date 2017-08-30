@@ -8,7 +8,7 @@ import numpy as np
 import codes.curvature_coupling
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
 
-def curvature_undulation_coupling(**kwargs):
+def curvature_undulation_coupling_pixel(**kwargs):
 	"""
 	Supervise the curvature-undulation coupling calculation.
 	"""
@@ -19,8 +19,7 @@ def curvature_undulation_coupling(**kwargs):
 	#---instantiate the calculation	
 	ic = InvestigateCurvature(sn=sn,work=kwargs['workspace'],
 		design=kwargs['calc']['specs'].get('design',{}),
-		fitting=kwargs['calc']['specs'].get('fitting',{}),
-		protein_abstractor=kwargs['upstream']['protein_abstractor'],
+		protein_abstractor='pixel_method_only',
 		undulations=kwargs['upstream']['undulations'])
 	#---repackage the data
 	attrs,result = ic.finding['attrs'],ic.finding['result']

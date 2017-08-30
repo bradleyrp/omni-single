@@ -1,0 +1,15 @@
+slices:
+  CL160ENS-2:
+    readymade_meso_v1:
+      current:
+        path: /home/rpb/omicron/analyze-project-dextran/post/Mem_Undulation
+        directory: CL160ENS-2
+        membrane_xyz_glob: memb_xyz-0-0-*.xyz
+        nanogel_dat: NG_Position-0_Frame-0.dat
+  CL160ENS-3:
+    readymade_meso_v1:
+      current:
+        path: /home/rpb/omicron/analyze-project-dextran/post/Mem_Undulation
+        directory: CL160ENS-3
+        membrane_xyz_glob: memb_xyz-0-0-*.xyz
+        nanogel_dat: NG_Position-0_Frame-0.dat
