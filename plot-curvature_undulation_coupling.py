@@ -209,7 +209,9 @@ if 'individual_reviews' in routine:
 				ax.tick_params(axis='x',which='both',bottom='off',top='off',labelbottom='on')
 				ax.tick_params(axis='y',which='both',left='off',right='off',labelbottom='off')
 			#---the metadata for this plot comes from the design section
-			meta = calcs[tag][sn]['calcs']['specs']['specs']['design']
+			try: meta = calcs[tag][sn]['calcs']['design']
+			#---! custom upstream calculations for e.g. dextran project put the specs one level down
+			except: meta = calcs[tag][sn]['calcs']['specs']['design']
 			#---add high cutoff (from fitting parameters if defined) to the meta
 			meta['high_cutoff'] = hicut
 			picturesave('fig.coupling_review.%s'%sn,work.plotdir,backup=False,version=True,meta=meta)
