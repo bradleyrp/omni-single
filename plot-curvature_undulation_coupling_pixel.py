@@ -43,15 +43,13 @@ def collect_upstream_calculations_over_loop():
 	if plotname not in work.plots: work.plots[plotname] = copy.deepcopy(work.calcs[calcname])
 	#---load other upstream data
 	#---get all upstream curvature sweeps
-	ups = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)[1]
-	for up in ups: up['specs'].pop('upstream',None)
+	upstreams,upstreams_stubs = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)
+	#for u in upstreams_stubs: u['specs'].pop('upstream',None)
 	datas,calcs = {},{}
-	for unum,up in enumerate(ups):
-		#---temporarily set the plots
-		work.plots[plotname]['calculation'] = {plotname:up['specs']}
-		#---look up the correct upstream data
-		dat,cal = plotload(calcname)
-		tag = up['specs']['design']
+	for unum,upstream in enumerate(upstreams_stubs):
+		#---use the whittle option to select a particular calculation
+		dat,cal = plotload(calcname,whittle_calc={calcname:upstream['specs']})
+		tag = upstreams_stubs[unum]['specs']['design']
 		if type(tag)==dict: tag = 'v%d'%unum
 		datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
 		calcs[tag] = dict([(sn,cal) for sn in work.sns()])
