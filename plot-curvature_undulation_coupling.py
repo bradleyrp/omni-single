@@ -1,119 +1,103 @@
 #!/usr/bin/env python
 
+"""
+Plot all of the upstream loops for the curvature undulation coupling analysis.
+!!Ryan ported this script quickly. It needs cleaned, checked, pushed, and tested on ocean. Otherwise suitable.
+"""
+
+import copy
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
 from render.wavevids import plothull
 str_types = [str,unicode] if sys.version_info<(3,0) else [str]
 
-if 'data' not in globals():
-	avail = ['curvature_field_review','individual_reviews']
-	#---alternate method for plotting controls
-	plotspecs = work.plots[plotname].get('specs',{})
-	routine = plotspecs.get('routine',avail)
+#---automatically supervise important globals
+variables = ['data','datas','printers','routine','postdat','undulations_name','calcs']
+for key in [v for v in variables if v not in globals()]: globals()[key] = None
+#---redundant assignment for clarity (plotname is automagically loaded)
+plotname = 'curvature_undulation_coupling'
+
+###---FUNCTIONS
+
+def register_printer(func):
+	"""Add decorated functions to a list of "printers" which are the default routine."""
+	global printers
+	if printers is None: printers = []
+	printers.append(func.__name__)
+	return func
+
+def collect_upstream_calculations_over_loop():
+	"""
+	Some plotting and analysis benefits from checking all calculations in an upstream loop (which is 
+	contrary to the original design of )
+	!!! This script is a candidate for inclusion in omnicalc.py
+	"""
+	global plotname,work
+	#---! move to a separate function
+	plotspecs = work.plots.get(plotname,work.calcs.get(plotname,{})).get('specs',{})
 	calcname = plotspecs.get('calcname',plotname)
-	protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
-	undulations_name = plotspecs.get('undulations_name','undulations')
-	#---the curvature undulation coupling data are notably absent from the upstream calculations
-	#---...because we pull all upstream sweeps here for comparison
-	data,calc = plotload(plotname)
+	#---load the canonical upstream data that would be the focus of a plot in standard omnicalc
+	#---! load the upstream data according to the plot. note that this may fail in a loop hence needs DEV!
+	try: data,calc = plotload(plotname)
+	except:
+		data,calc = None,None
+		status('failed to load a single upstream calculation however this plot script has requested '
+			'all of them so we will continue with a warning. if you have downstream problems consider '
+			'adding a specific entry to plots to specify which item in an upstream loop you want',
+			tag='warning')
+	#---in case there is no plot entry in the metadata we copy it
+	if plotname not in work.plots: work.plots[plotname] = copy.deepcopy(work.calcs[calcname])
+	#---load other upstream data
 	#---get all upstream curvature sweeps
-	ups = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)[1]
-	for up in ups: up['specs'].pop('upstream',None)
+	upstreams,upstreams_stubs = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)
 	datas,calcs = {},{}
-	for unum,up in enumerate(ups):
-		#---temporarily set the plots
-		#---if the specs value is a string it is PROBABLY in a loop?
-		#---! THIS CODE WAS ABANDONED. FOR THE DEXTRAN PROJECT JUST HIDE UPSTREAM PARAMETER SWEEPS
-		#---! make this systematic later
-		if type(up['specs']['design']) in str_types:
-			new_plot_specs = work.calcs[calcname]['specs']['design']['loop'][up['specs']['design']]
-		#---no loop means we just pass along the upstream specs to the plots temporarily for plotload
-		else: new_plot_specs = up['specs']
-		work.plots[plotname]['calculation'] = {plotname:new_plot_specs}
-		#---look up the right upstream data
-		dat,cal = plotload(calcname)
-		tag = up['specs']['design']
+	#---loop over upstream calculations and load each specifically, using plotload with whittle_calc
+	for unum,upstream in enumerate(upstreams_stubs):
+		#---use the whittle option to select a particular calculation
+		dat,cal = plotload(calcname,whittle_calc={calcname:upstream['specs']})
+		tag = upstreams_stubs[unum]['specs']['design']
 		if type(tag)==dict: tag = 'v%d'%unum
 		datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
 		calcs[tag] = dict([(sn,cal) for sn in work.sns()])
-	#---check for alternate loaders
-	alt_loader = plotspecs.get('loader',None)
-	if alt_loader:
-		from base.tools import gopher
-		postdat = gopher(alt_loader)(data=data)
-	#---compile the necessary (default) data into a dictionary
-	else:
-		postdat = dict([(sn,dict(
-			vecs=data[undulations_name][sn]['data']['vecs'].mean(axis=0),
-			points_protein=data[protein_abstractor_name][sn]['data']['points_all']))
-			for sn in work.sns()])
+	#---singluar means the typical "focus" of the upstream calculation, plural is everything else
+	return dict(datas=datas,calcs=calcs,data=data,calc=calc)
 
-if 'curvature_field_review' in routine:
-	figsize = (10,10)
-	cmap_name = 'RdBu_r'	
-	layout = {'out':{'grid':[len(datas),1]},'ins':[{'grid':[1,len(work.sns())]} for d in datas]}
-	axes,fig = panelplot(layout,figsize=figsize)
-	cmax = max([np.abs(d[sn]['cf']).max() for d in datas.values() for sn in work.sns()])
-	for dnum,(tag,dat) in enumerate(datas.items()):
-		for snum,sn in enumerate(work.sns()):
-			ax = axes[dnum][snum]
-			ax.imshow(datas[tag][sn]['cf'].T,origin='lower',interpolation='nearest',
-				vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name])
-			error = datas[tag][sn]['bundle'][sn]['fun']
-			ax.set_title('%s\n%s: %.4f'%(work.meta[sn].get('label',sn),tag,error))
-	picturesave('fig.curvature_optimized_meta',work.plotdir,backup=False,version=True,
-		meta={'maximum C_0':cmax,'sns':work.sns(),'designs':datas.keys()})
+def plot_hull_and_trial_centers(data,sn,ax,n_instances=None,debug_frame=0,color=None):
+	"""Plot the protein hull along with the positions of the trial functions."""
+	global postdat
+	#---! currently only set for a single protein
+	trials = data[sn]['drop_gaussians_points'].transpose(1,0,2)
+	nframes = len(trials)
+	if n_instances!=None: samples = np.arange(0,nframes,nframes/n_instances)
+	else: samples = np.array([debug_frame])
+	pts = np.concatenate(trials[samples])
+	for ptsnum,pts in enumerate(trials[samples]):
+		color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
+		ax.scatter(*pts.T,s=1,c=color_this)
+	griddims = data[sn]['cf'].shape
+	vecs,points_protein = [postdat[sn][i] for i in ['vecs','points_protein']]
+	for ptsnum,pts in enumerate(points_protein[samples][...,:2]):
+		color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
+		plothull(ax,pts,griddims=griddims,vecs=vecs,lw=0,c=color_this)
+	ax.set_xlim((0,vecs[0]))
+	ax.set_ylim((0,vecs[1]))
+	ax.set_aspect(1.0)
 
-if 'individual_reviews' in routine:
-
+@register_printer
+def individual_reviews():
 	"""
-	Reviewing the various features of the curvature coupling fits.
+	Loop over all upstream curvature-undulation coupling calculations and plot a panel of review plots.
 	"""
-
-	def plot_hull_and_trial_centers(ax,n_instances=None,debug_frame=0,color=None):
-		"""Plot the protein hull along with the positions of the trial functions."""
-		global postdat
-		#---! currently only set for a single protein
-		trials = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)
-		nframes = len(trials)
-		if n_instances!=None: samples = np.arange(0,nframes,nframes/n_instances)
-		else: samples = np.array([debug_frame])
-		pts = np.concatenate(trials[samples])
-		for ptsnum,pts in enumerate(trials[samples]):
-			color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
-			ax.scatter(*pts.T,s=1,c=color_this)
-		griddims = datas[tag][sn]['cf'].shape
-		#if data[protein_abstractor_name][sn]['data']['vecs']=='readymade_meso_v1':
-		#	vecs = data[undulations_name][sn]['data']['vecs'].mean(axis=0)
-		#else: 
-		#vecs = data[protein_abstractor_name][sn]['data']['vecs'].mean(axis=0)
-		#points_protein = data[protein_abstractor_name][sn]['data']['points']
-		#---alternate handling for mesoscale
-		#if points_protein=='readymade_meso_v1':
-		#points_protein = data[protein_abstractor_name][sn]['data']['points_all']
-		vecs,points_protein = [postdat[sn][i] for i in ['vecs','points_protein']]
-		for ptsnum,pts in enumerate(points_protein[samples][...,:2]):
-			color_this = mpl.cm.__dict__['jet'](float(ptsnum)/len(samples)) if not color else color
-			plothull(ax,pts,griddims=griddims,vecs=vecs,lw=0,c=color_this)
-		ax.set_xlim((0,vecs[0]))
-		ax.set_ylim((0,vecs[1]))
-		ax.set_aspect(1.0)
-
 	for tag in datas:
 		for sn in work.sns():
 			status('reviewing curvature for %s'%sn,tag='plot')
 			figsize = (10,10)
 			cmap_name = 'RdBu_r'	
-			#---this plot is an assortment of views
+			#---this plot is an assortment of the following views
 			viewnames = ['average_height','average_height_pbc','neighborhood_static',
 				'neighborhood_dynamic','average_field','example_field','example_field_pbc',
 				'spectrum','spectrum_zoom']
 			axes,fig = square_tiles(len(viewnames),figsize)
 			#---several plots use the same data
-			#---custom handling for the mesoscale data which lacks vectors from the nanogel
-			#if data[protein_abstractor_name][sn]['data']['vecs']=='readymade_meso_v1':
-			#	vecs = data[undulations_name][sn]['data']['vecs'].mean(axis=0)
-			#else: 
-			#vecs = data[protein_abstractor_name][sn]['data']['vecs'].mean(axis=0)
 			vecs = postdat[sn]['vecs']
 			griddims = datas[tag][sn]['cf'].shape
 			#---PLOT the mean curvature field
@@ -128,11 +112,11 @@ if 'individual_reviews' in routine:
 			#---PLOT a single instance of the neighborhood (good for debugging)
 			ax = axes[viewnames.index('neighborhood_static')]
 			debug_frame = 0
-			plot_hull_and_trial_centers(ax,debug_frame=debug_frame,color='k')
+			plot_hull_and_trial_centers(datas[tag],sn,ax,debug_frame=debug_frame,color='k')
 			ax.set_title('neighborhood, static, frame %d'%debug_frame)
 			#---PLOT a composite of several frames of the neighborhood to see the dynamics
 			ax = axes[viewnames.index('neighborhood_dynamic')]
-			plot_hull_and_trial_centers(ax,n_instances=10)
+			plot_hull_and_trial_centers(datas[tag],sn,ax,n_instances=10)
 			ax.set_title('neighborhood, dynamic')
 			#---PLOT the average height
 			mesh = data[undulations_name][sn]['data']['mesh']
@@ -142,10 +126,6 @@ if 'individual_reviews' in routine:
 			ax = axes[viewnames.index('average_height')]
 			ax.imshow(surf.T,origin='lower',interpolation='nearest',cmap=mpl.cm.__dict__['RdBu_r'],
 				extent=[0,vecs[0],0,vecs[1]])
-			#if data[protein_abstractor_name][sn]['data']['points']=='readymade_meso_v1':
-			#	mean_prot_pts = data[protein_abstractor_name][sn]['data']['points_all'].mean(axis=0)[:,:2]
-			#else: 
-			#mean_prot_pts = data[protein_abstractor_name][sn]['data']['points'].mean(axis=0)[:,:2]
 			try: mean_prot_pts = postdat[sn]['points_protein_mean'][:,:2]
 			except: mean_prot_pts = data[protein_abstractor_name][sn]['data']['points'].mean(axis=0)[:,:2]
 			plothull(ax,[mean_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
@@ -178,7 +158,7 @@ if 'individual_reviews' in routine:
 			ax = axes[viewnames.index('spectrum')]
 			ax.scatter(datas[tag][sn]['qs'],datas[tag][sn]['ratios'],s=4,c='k',alpha=0.25)
 			#---! high cutoff is hard-coded here but needs to be removed to the yaml. we need to get default
-			hicut = work.plots[plotname].get('fitting',{}).get('high_cutoff',1.0)
+			hicut = calcs[tag][sn]['calcs']['specs'].get('fitting',{}).get('high_cutoff',1.0)
 			qs = datas[tag][sn]['qs']
 			band = qs<=hicut
 			ax.scatter(datas[tag][sn]['qs'][band],datas[tag][sn]['ratios'][band],s=10,c='k',alpha=1.0)
@@ -209,9 +189,59 @@ if 'individual_reviews' in routine:
 				ax.tick_params(axis='x',which='both',bottom='off',top='off',labelbottom='on')
 				ax.tick_params(axis='y',which='both',left='off',right='off',labelbottom='off')
 			#---the metadata for this plot comes from the design section
-			try: meta = calcs[tag][sn]['calcs']['design']
+			try: meta = calcs[tag][sn]['calcs']['specs']['specs']
 			#---! custom upstream calculations for e.g. dextran project put the specs one level down
-			except: meta = calcs[tag][sn]['calcs']['specs']['design']
+			except: meta = calcs[tag][sn]['calcs']['specs']
 			#---add high cutoff (from fitting parameters if defined) to the meta
 			meta['high_cutoff'] = hicut
 			picturesave('fig.coupling_review.%s'%sn,work.plotdir,backup=False,version=True,meta=meta)
+
+###---MAIN
+
+def loader():
+	"""Load the data only once."""
+	#---you must declare all globals here and above in the "automatic supervise" section
+	global variables,work,datas,data,routine,postdat,undulations_name,calcs
+	#---reload if not all of the globals in the variables
+	if any([globals()[v] is None for v in variables]):
+		status('loading upstream data',tag='load')
+		#---load sequence from the previous version of this plot script
+		plotspecs = work.plots[plotname].get('specs',{})
+		routine = plotspecs.get('routine',printers)
+		calcname = plotspecs.get('calcname',plotname)
+		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
+		undulations_name = plotspecs.get('undulations_name','undulations')
+		#---new method for getting all upstream calculations in the loop
+		combodat = collect_upstream_calculations_over_loop()
+		data,datas,calcs = combodat['data'],combodat['datas'],combodat['calcs']
+		#---extra loading compared to the pixel method from which this was derived, in order to use the new style
+		#---...plotting scheme with register_printer
+		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
+		undulations_name = plotspecs.get('undulations_name','undulations')
+		#---check for alternate loaders
+		alt_loader = plotspecs.get('loader',None)
+		if alt_loader:
+			from base.tools import gopher
+			postdat = gopher(alt_loader)(data=data)
+		#---compile the necessary (default) data into a dictionary
+		else:
+			postdat = dict([(sn,dict(
+				vecs=data[undulations_name][sn]['data']['vecs'].mean(axis=0),
+				points_protein=data[protein_abstractor_name][sn]['data']['points_all']))
+				for sn in work.sns()])
+	else: status('data are already loaded',tag='load')
+
+def printer():
+	"""Print the plots automatically from the routine."""
+	global routine
+	#---! get routine from the metadata here
+	if routine is None: routine = list(printers)	
+	#---routine items are function names
+	for key in routine: 
+		status('running routine %s'%key,tag='printer')
+		globals()[key]()
+
+#---load and print
+if __name__=='__main__': 
+	loader()
+	printer()
