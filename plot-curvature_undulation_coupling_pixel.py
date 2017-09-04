@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+Plot all of the upstream loops for the curvature undulation coupling, pixel method.
 """
 
 import copy
