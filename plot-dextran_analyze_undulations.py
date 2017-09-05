@@ -5,8 +5,10 @@ Extract curvature undulation coupling data for the dextran project for further a
 """
 
 if 'data' not in globals():
-
-	data,calc = plotload(plotname)
+	whittle_calc = {'curvature_undulation_coupling_dex':{
+		'design':'v3','upstream':{
+		'import_readymade_meso_v1_nanogel':{},'import_readymade_meso_v1_membrane':{}}}}
+	data,calc = plotload(plotname,whittle_calc=whittle_calc)
 	sns = work.sns()
 
 #---plot the ratio of the energies
