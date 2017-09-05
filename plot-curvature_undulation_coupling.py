@@ -209,13 +209,12 @@ def loader():
 		plotspecs = work.plots[plotname].get('specs',{})
 		routine = plotspecs.get('routine',printers)
 		calcname = plotspecs.get('calcname',plotname)
-		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
-		undulations_name = plotspecs.get('undulations_name','undulations')
 		#---new method for getting all upstream calculations in the loop
 		combodat = collect_upstream_calculations_over_loop()
 		data,datas,calcs = combodat['data'],combodat['datas'],combodat['calcs']
 		#---extra loading compared to the pixel method from which this was derived, in order to use the new style
 		#---...plotting scheme with register_printer
+		global protein_abstractor_name,undulations_name
 		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
 		undulations_name = plotspecs.get('undulations_name','undulations')
 		#---check for alternate loaders
