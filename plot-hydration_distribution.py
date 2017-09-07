@@ -23,7 +23,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 #---settings
 binsize = 0.01
 farcut = 1.05
-#---we must declare variables
+#---we must declare variables here. this should match the top of the reload function
 variables = 'sns,scanrange,distributions,distances,data,calc,normalizers,middles'.split(',')
 
 from codes.looptools import basic_compute_loop
@@ -50,15 +50,13 @@ def histogram_stack(sn,index):
 	return np.histogram(distances[sn][index],bins=scanrange)[0]
 
 def reload():
-	"""..."""
+	"""Load everything for the plot only once."""
 	#---canonical globals list
 	#---!? can this be made programmatic?
 	global sns,scanrange,distributions,distances,data,calc,normalizers,middles
-
 	#---reload sequence goes here
 	data,calc = plotload(plotname)
 	sns = work.specs['collections']['position']+['membrane-v538']
-
 	#---compute distance distributions
 	cutoff = max([data[sn]['data']['water_distances'].max() for sn in sns])
 	#---globals for parallel functions
@@ -70,7 +68,6 @@ def reload():
 	incoming = np.array(basic_compute_loop(histogram_stack,looper=looper))
 	distributions = dict([(sn,np.array([incoming[ii] for ii,i in enumerate(looper) 
 		if i['sn']==sn])) for sn in sns])
-
 	#---normalization factors
 	middles = (scanrange[1:]+scanrange[:-1])/2
 	areas = np.array([4*np.pi*binsize*middles[i]**2 for i in range(len(middles))])
@@ -79,6 +76,7 @@ def reload():
 	#---window to estimate bulk, lower than the dropoff, higher than the first two shells
 	bulk_window_raw = (0.75,1.0)
 	#---separate normalizer for each simulation because different ions
+	#---note that these normalizers are for all zones, so it might not approach unity on subsets
 	normalizers = {}
 	for sn in sns:
 		bulk_window = np.where(np.all((scanrange>=bulk_window_raw[0],
@@ -86,49 +84,6 @@ def reload():
 		#---reestimate ion-water pseudo-density at supposed bulk-like distances
 		water_density = (distributions[sn][:,bulk_window]/areas[bulk_window]).mean()
 		normalizers[sn] = areas*water_density
-
-@register_printer
-def plot1():
-	"""???"""
-	ax = plt.subplot(121)
-	for sn in sns[:2]:
-		#---drop points beyond our distance probe cutoff
-		view_window = scanrange[:-1]<=farcut
-		#---average over density observations gives the numerator of the RDF
-		curve = distributions[sn].mean(axis=0)/normalizers[sn]
-		ax.plot(middles[view_window],curve[view_window],'-',lw=1,zorder=3,label=sn)
-	ax.axhline(1.0,c='k',lw=1,zorder=1,alpha=0.35)
-	ax.legend()
-	picturesave('fig.test12222',work.plotdir,backup=False,version=True,meta={},extras=[])
-
-@register_printer
-def plot2():
-	"""???"""
-	#---compute filters
-	n_zones = 10
-	def minmax(a): return a.min(),a.max()
-	lipid_distance_lims = minmax(np.array([minmax(data[sn]['data']['lipid_distances']) 
-		for sn in sns]).reshape(-1))
-	lipid_distance_lims = (0.16,0.46)
-	fenceposts = np.linspace(*lipid_distance_lims,num=n_zones)
-	zones = dict([(sn,[np.all((data[sn]['data']['lipid_distances']>=i,
-		data[sn]['data']['lipid_distances']<=j),axis=0) 
-		for i,j in zip(fenceposts[:-1],fenceposts[1:])]) for sn in sns])
-
-	axes,fig = panelplot(figsize=(10,10),layout={'out':{'grid':[1,1]},
-		'ins':[{'grid':[len(sns),1]} for i in range(1)]})
-
-	view_window = scanrange[:-1]<=farcut
-	#---plot the lipid distance-dependant g(r) for one simulation
-	for snum,sn in enumerate(sns):
-		ax = axes[snum]
-		for znum,zone in enumerate(zones[sn]):
-			#---each observation (fr,ion) has a histogram, concatenated so the zone probe mimics this
-			distributions[sn][np.concatenate(zone)]
-			curve = distributions[sn][np.concatenate(zone)].mean(axis=0)/normalizers[sn]
-			ax.plot(middles[view_window],curve[view_window],'-',lw=1,zorder=3,
-				color=mpl.cm.__dict__['jet'](znum/float(len(zones[sn])-1)))
-	picturesave('fig.test12223',work.plotdir,backup=False,version=True,meta={},extras=[])
 
 @register_printer
 def water_distribution_sweep_plot():
@@ -217,40 +172,6 @@ def water_distribution_sweep_plot():
 		if axlabels:
 			ax.set_xlabel('r ($\mathrm{\AA}$)')
 			ax.set_ylabel('g(r)')
-		#---! gradient !?!?
-		if False:
-			nfine = 1000
-			extent = [xlims[0],xlims[1],ylims[0],ylims[1]]
-			def interpolated_edge(x,y):
-				xfine = np.linspace(x.min(),y.max(),1000)
-				yfine = scipy.interpolate.spline(x,y,xfine)
-				return xfine,yfine
-			def image_to_curve(i,j,npts,extent):
-				"""
-				Given two indices, the dimensions of an image, and its extent, 
-				we convert index to position.
-				"""
-				xlims,ylims = extent[:2],extent[2:]
-				x = float(i)/npts[0]*(xlims[1]-xlims[0])+xlims[0]
-				y = float(j)/npts[1]*(ylims[1]-ylims[0])+ylims[0]
-				return x,y
-			print(123)
-			reimage = np.array([[
-				np.linalg.norm(np.array([0.7,2.0])-image_to_curve(j[0],j[1],
-					npts=(nfine,nfine),extent=extent))
-				for j in i] for i in np.transpose(np.meshgrid(np.arange(nfine),np.arange(nfine)))])
-			print(456)
-			xcoarse = middles[view_window]
-			edge0,edge1 = curves[0][view_window],curves[1][view_window]
-			xfine,yfine = interpolated_edge(xcoarse,edge0)
-			ax.plot(xfine,yfine,c='k',lw=1,zorder=8)
-			xfine,yfine = interpolated_edge(xcoarse,edge1)
-			ax.plot(xfine,yfine,c='w',lw=1,zorder=8)
-			ins = np.transpose(np.meshgrid(np.arange(nfine),np.arange(nfine)))[50][50]
-			print(image_to_curve(ins[0],ins[1],npts=(nfine,nfine),extent=extent))
-			rando = np.random.random((nfine,nfine))
-			ax.imshow(reimage.T,extent=extent,
-				aspect=((xlims[1]-xlims[0])/(ylims[1]-ylims[0])))
 	#---assemble the plot
 	ax = plt.subplot(111)
 	xlims,ylims = (0.3,1.0),(0.,4.)
