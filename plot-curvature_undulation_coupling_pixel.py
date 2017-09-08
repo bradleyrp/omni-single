@@ -46,15 +46,22 @@ def collect_upstream_calculations_over_loop():
 	ups = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)[1]
 	for up in ups: up['specs'].pop('upstream',None)
 	datas,calcs = {},{}
-	for unum,up in enumerate(ups):
-		#---temporarily set the plots
-		work.plots[plotname]['calculation'] = {plotname:up['specs']}
-		#---look up the correct upstream data
-		dat,cal = plotload(calcname)
-		tag = up['specs']['design']
-		if type(tag)==dict: tag = 'v%d'%unum
-		datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
-		calcs[tag] = dict([(sn,cal) for sn in work.sns()])
+	#---!!!!!!!!!!!!!!
+	datas = {'hacked':dict([(sn,data[sn]['data']) for sn in work.sns()])}
+	if False:
+		for unum,upstream in enumerate(ups):
+			#---temporarily set the plots
+			work.plots[plotname]['calculation'] = {plotname:upstream['specs']}
+			#work.plots[plotname]['collections'] = 'all'
+			#work.plots[plotname]['slice_name'] = 'current'
+			#work.plots[plotname]['uptype'] = 'post'
+			#---look up the correct upstream data
+			#import ipdb;ipdb.set_trace()
+			dat,cal = plotload(calcname)
+			tag = upstream['specs']['design']
+			if type(tag)==dict: tag = 'v%d'%unum
+			datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
+			calcs[tag] = dict([(sn,cal) for sn in work.sns()])
 	#---singluar means the typical "focus" of the upstream calculation, plural is everything else
 	return dict(datas=datas,calcs=calcs,data=data,calc=calc)
 

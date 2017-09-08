@@ -178,7 +178,8 @@ if 'individual_reviews' in routine:
 			ax = axes[viewnames.index('spectrum')]
 			ax.scatter(datas[tag][sn]['qs'],datas[tag][sn]['ratios'],s=4,c='k',alpha=0.25)
 			#---! high cutoff is hard-coded here but needs to be removed to the yaml. we need to get default
-			hicut = work.plots[plotname].get('fitting',{}).get('high_cutoff',1.0)
+			####### hicut = work.plots[plotname].get('fitting',{}).get('high_cutoff',1.0)
+			hicut = work.calcs[calcname]['specs'].get('fitting',{}).get('high_cutoff',1.0)
 			qs = datas[tag][sn]['qs']
 			band = qs<=hicut
 			ax.scatter(datas[tag][sn]['qs'][band],datas[tag][sn]['ratios'][band],s=10,c='k',alpha=1.0)
@@ -209,7 +210,8 @@ if 'individual_reviews' in routine:
 				ax.tick_params(axis='x',which='both',bottom='off',top='off',labelbottom='on')
 				ax.tick_params(axis='y',which='both',left='off',right='off',labelbottom='off')
 			#---the metadata for this plot comes from the design section
-			meta = calcs[tag][sn]['calcs']['specs']['design']
+			#---! added specs???
+			meta = calcs[tag][sn]['calcs']['specs']['specs']['design']
 			#---add high cutoff (from fitting parameters if defined) to the meta
 			meta['high_cutoff'] = hicut
 			picturesave('fig.coupling_review.%s'%sn,work.plotdir,backup=False,version=True,meta=meta)

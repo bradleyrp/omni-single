@@ -79,6 +79,28 @@ calculations:
               method: fixed_isotropic
               extent: 20.0
             curvature_sum: mean
+          #v4:
+          #  style: wilderness
+          #  curvature_positions: 
+          #    method: neighborhood
+          #    distance_cutoff: 100.0
+          #    spacer: 40.0
+          #  extents:
+          #    method: fixed_isotropic
+          #    extent: 20.0
+          #  curvature_sum: mean
+          # added midplane method here
+          v5:
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 50.0
+              spacer: 40.0
+            extents:
+              method: fixed_isotropic
+              extent: 20.0
+            curvature_sum: mean
+            midplane_method: average
   # duplicate of the pixel method for dextran
   curvature_undulation_coupling_pixel_dex:
     uptype: post
