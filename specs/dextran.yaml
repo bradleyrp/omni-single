@@ -150,6 +150,15 @@ calculations:
               method: fixed_isotropic
               extent: 30.0
             curvature_sum: mean
+          #v15:
+          #  style: wilderness
+          #  curvature_positions: 
+          #    method: pixel
+          #    spacer: 50.0
+          #  extents:
+          #    method: fixed_isotropic
+          #    extent: 25.0
+          #  curvature_sum: mean
 
 # which data to load for plotting (REQUIRED unless you use the same exact name as the calculation)
 plots:
