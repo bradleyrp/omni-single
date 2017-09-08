@@ -8,19 +8,19 @@ collections:
     - CL160ENS-2
     - CL160ENS-3
 
-# where are the inputs (REQUIRED)
+# pointers to the data (REQUIRED)
 slices:
   CL160ENS-2:
     readymade_meso_v1:
       current:
-        path: /store-iota/MASTER/Samrad/Mem_Undulation
+        path: +paths/mem_undulation
         directory: CL160ENS-2
         membrane_xyz_glob: memb_xyz-0-0-*.xyz
         nanogel_dat: NG_Position-0_Frame-0.dat
   CL160ENS-3:
     readymade_meso_v1:
       current:
-        path: /store-iota/MASTER/Samrad/Mem_Undulation
+        path: +paths/mem_undulation
         directory: CL160ENS-3
         membrane_xyz_glob: memb_xyz-0-0-*.xyz
         nanogel_dat: NG_Position-0_Frame-0.dat
@@ -31,7 +31,9 @@ meta:
   bound_membrane_cl0: {}
 
 # avoid repetition inside this YAML file (OPTIONAL)
-variables: {}
+variables:
+  paths:
+    mem_undulation: /store-iota/MASTER/Samrad/Mem_Undulation
 
 # which calculations to perform (REQUIRED) via `make compute`
 calculations:
@@ -142,8 +144,26 @@ calculations:
               method: fixed_isotropic
               extent: 50.0
             curvature_sum: mean
+          v13:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 80.0
+            extents:
+              method: fixed_isotropic
+              extent: 40.0
+            curvature_sum: mean
+          v14:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 60.0
+            extents:
+              method: fixed_isotropic
+              extent: 30.0
+            curvature_sum: mean
 
-# which data to load for plotting (REQUIRED, but optional if you use the same exact name as the calculation)
+# which data to load for plotting (REQUIRED unless you use the same exact name as the calculation)
 plots:
   # read the membrane interpolation and compute undulation spectra
   undulations:
@@ -178,6 +198,16 @@ plots:
       routine:
         # - curvature_field_review
         - individual_reviews
+  # point our custom calculation to the right plot function
+  curvature_undulation_coupling_pixel:
+    calculation:
+      # choose the subject of the plots here, for plots with only one subject
+      # ... note however that the pixel plot also uses a sweep over all upstream loops for comparison
+      curvature_undulation_coupling_pixel_dex:
+        design: v12
+    collections: all
+    specs:
+      calcname: curvature_undulation_coupling_pixel_dex
   # export undulation coupling data
   dextran_analyze_undulations:
     calculation: 

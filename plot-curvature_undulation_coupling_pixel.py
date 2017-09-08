@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 """
+Plot all of the upstream loops for the curvature undulation coupling, pixel method.
 """
 
 import copy
@@ -43,25 +44,16 @@ def collect_upstream_calculations_over_loop():
 	if plotname not in work.plots: work.plots[plotname] = copy.deepcopy(work.calcs[calcname])
 	#---load other upstream data
 	#---get all upstream curvature sweeps
-	ups = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)[1]
-	for up in ups: up['specs'].pop('upstream',None)
+	upstreams,upstreams_stubs = work.calc_meta.unroll_loops(work.calcs[calcname],return_stubs=True)
+	#for u in upstreams_stubs: u['specs'].pop('upstream',None)
 	datas,calcs = {},{}
-	#---!!!!!!!!!!!!!!
-	datas = {'hacked':dict([(sn,data[sn]['data']) for sn in work.sns()])}
-	if False:
-		for unum,upstream in enumerate(ups):
-			#---temporarily set the plots
-			work.plots[plotname]['calculation'] = {plotname:upstream['specs']}
-			#work.plots[plotname]['collections'] = 'all'
-			#work.plots[plotname]['slice_name'] = 'current'
-			#work.plots[plotname]['uptype'] = 'post'
-			#---look up the correct upstream data
-			#import ipdb;ipdb.set_trace()
-			dat,cal = plotload(calcname)
-			tag = upstream['specs']['design']
-			if type(tag)==dict: tag = 'v%d'%unum
-			datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
-			calcs[tag] = dict([(sn,cal) for sn in work.sns()])
+	for unum,upstream in enumerate(upstreams_stubs):
+		#---use the whittle option to select a particular calculation
+		dat,cal = plotload(calcname,whittle_calc={calcname:upstream['specs']})
+		tag = upstreams_stubs[unum]['specs']['design']
+		if type(tag)==dict: tag = 'v%d'%unum
+		datas[tag] = dict([(sn,dat[sn]['data']) for sn in work.sns()])
+		calcs[tag] = dict([(sn,cal) for sn in work.sns()])
 	#---singluar means the typical "focus" of the upstream calculation, plural is everything else
 	return dict(datas=datas,calcs=calcs,data=data,calc=calc)
 

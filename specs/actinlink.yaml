@@ -46,7 +46,7 @@ collections:
     - nwasppeptideb
     - nwaspbilayermut1
   one:
-    - mdia2bilayer_nochl2
+    - gelbilayerphys
 
 meta:
   #! note that this short_namer must be compatible with the spots prefixer!
@@ -150,6 +150,7 @@ meta:
     cation:              NA
     label:              "N-WASP peptide"
     cholesterol:         False
+    index_top_monolayer: 0
 
 slices:
   mdia2bilayer_nochl2:
@@ -220,21 +221,21 @@ calculations:
     collections: cursor
     specs:
       separator: 
-        lipid_tip: "name P"
         monolayer_cutoff: 1.4
         topologize_tolerance: 
-          loop:
-            - 0.07
-            - 0.05
+          # previous default was 0.05 but 0.07 is more reliable
+          loop: [0.07]
       selector:
         loop:
           lipid_com:
             monolayer_cutoff: 1.85
             resnames: +selectors/resnames_lipid
+            lipid_tip: "name P"
             type: com
           lipid_chol_com:
             monolayer_cutoff: 1.4
             resnames: +selectors/resnames_lipid_chol
+            lipid_tip: "name P or name H3'"
             type: com
   protein_abstractor:
     uptype: simulation
@@ -263,8 +264,8 @@ calculations:
     slice_name: current
     collections: cursor
     specs:
-      angle_cutoff: 0.0
-      distance_cutoff: 10.0
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
       protein: true
   salt_bridges:
     group: all
@@ -284,6 +285,20 @@ calculations:
       object: lipid
       cutoff:
         loop: [2.2,3.4,5.0,10.0]
+  lipid_mesh:
+    uptype: post
+    slice_name: current
+    collections:
+      - cursor
+    specs:
+      upstream:
+        lipid_abstractor:
+          separator:
+            topologize_tolerance: 0.07
+          selector:
+            loop:
+              - lipid_com
+              - lipid_chol_com
 
 off calculations:
   protein_rmsd:
@@ -388,3 +403,26 @@ plots:
         'nwasppeptide2':'blue','nwaspbilayermut1':'bluegreen2',
           'nwaspbilayernochl':'blue','nwasppeptideb':'blue'}
       nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
+  # a one-off plot with no script to load a single mesh object
+  load_mesh:
+    calculation:
+      lipid_mesh:
+        upstream: 
+          lipid_abstractor:
+            selector: lipid_chol_com
+            separator:
+              topologize_tolerance: 0.07
+  hydrogen_bonding_patterns:
+    collections: cursor
+    calculation:
+      lipid_abstractor:
+        selector: lipid_chol_com
+        separator:
+          topologize_tolerance: 0.07
+      hydrogen_bonding: {}
+    specs:
+      get_protein_abstractor: True
+      dot_size_small: 18
+      dot_size_med: 26
+      dot_size_large: 40
+

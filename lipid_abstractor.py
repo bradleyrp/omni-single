@@ -114,12 +114,11 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		trajectory.append(sel.positions/lenscale)
 		vecs.append(sel.dimensions[:3])
 	vecs = np.array(vecs)/lenscale
-
     #---alternate lipid representation is useful for separating monolayers
 	monolayer_cutoff = kwargs['calc']['specs']['separator']['monolayer_cutoff']
 	monolayer_cutoff_retry = kwargs['calc']['specs']['separator'].get('monolayer_cutoff',True)
-	if 'lipid_tip' in kwargs['calc']['specs']['separator']:
-		tip_select = kwargs['calc']['specs']['separator']['lipid_tip']
+	if 'lipid_tip' in kwargs['calc']['specs']['selector']:
+		tip_select = kwargs['calc']['specs']['selector']['lipid_tip']
 		sel = uni.select_atoms(tip_select)
 		atoms_separator = []
 		for fr in range(nframes):
