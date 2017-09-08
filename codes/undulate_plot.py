@@ -3,7 +3,8 @@
 import numpy as np
 from . undulate import calculate_undulations
 
-def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None,labels=None,show_fit=True):
+def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,
+	colors=None,labels=None,show_fit=True,midplane_method=None):
 	"""
 	Plot several undulation spectra on one panel.
 	"""
@@ -17,7 +18,8 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,colors=None
 		vecs = data[sn]['data']['vecs']
 		surf = np.mean(data[sn]['data']['mesh'],axis=0)
 		#---kernel of this plot: calculate the spectra here
-		uspec = calculate_undulations(surf,vecs,chop_last=True,perfect=True,lims=lims,raw=False)
+		uspec = calculate_undulations(surf,vecs,chop_last=True,
+			perfect=True,lims=lims,raw=False,midplane_method=midplane_method)
 		uspecs[sn] = uspec
 		x,y = uspec['x'],uspec['y']
 		label = labels[sn] if labels else sn

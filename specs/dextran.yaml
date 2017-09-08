@@ -81,28 +81,28 @@ calculations:
               method: fixed_isotropic
               extent: 20.0
             curvature_sum: mean
-          #v4:
-          #  style: wilderness
-          #  curvature_positions: 
-          #    method: neighborhood
-          #    distance_cutoff: 100.0
-          #    spacer: 40.0
-          #  extents:
-          #    method: fixed_isotropic
-          #    extent: 20.0
-          #  curvature_sum: mean
-          # added midplane method here
-          v5:
+          v4:
             style: wilderness
             curvature_positions: 
               method: neighborhood
-              distance_cutoff: 50.0
+              distance_cutoff: 100.0
               spacer: 40.0
             extents:
               method: fixed_isotropic
               extent: 20.0
             curvature_sum: mean
-            midplane_method: average
+          # added midplane method here
+          #v5:
+          #  style: wilderness
+          #  curvature_positions: 
+          #    method: neighborhood
+          #    distance_cutoff: 50.0
+          #    spacer: 40.0
+          #  extents:
+          #    method: fixed_isotropic
+          #    extent: 20.0
+          #  curvature_sum: mean
+          #  midplane_method: average
   # duplicate of the pixel method for dextran
   curvature_undulation_coupling_pixel_dex:
     uptype: post
@@ -182,10 +182,12 @@ plots:
     specs: 
       routine:
         - spectra
-        - height
-        - height_histograms
+        #- height
+        #- height_histograms
         #- debug3d
       show_fit: False
+      midplane_method: flat
+      wavevector_limits: [0.2,0.3,1.0]
   # point our custom calculation to the right plot function
   curvature_undulation_coupling:
     calculation: 

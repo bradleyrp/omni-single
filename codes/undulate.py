@@ -76,12 +76,11 @@ def calculate_undulations_testing(surf,vecs,chop_last=False,lims=(0.0,1.0),perfe
 	#import pdb;pdb.set_trace()
 	return {'y':y3,'x':x3,'kappa':kappa}
 
-def calculate_undulations(surf,vecs,chop_last=False,lims=(0,1.0),perfect=False,raw=False):
-
+def calculate_undulations(surf,vecs,chop_last=False,lims=(0,1.0),
+	perfect=False,raw=False,midplane_method=None):
 	"""
 	Compute undulation spectrum.
 	"""
-
 	nframes,m,n = shape(surf)
 	frames = arange(nframes)
 	Lx,Ly = mean(vecs,axis=0)[:2]
@@ -90,7 +89,11 @@ def calculate_undulations(surf,vecs,chop_last=False,lims=(0,1.0),perfect=False,r
 		((i-m*(i>m/2))/((Lx)/1.)*2*pi)**2+
 		((j-n*(j>n/2))/((Ly)/1.)*2*pi)**2)
 		for j in range(0,n)] for i in range(0,m)])
-	surf = surf-mean(surf)
+	if midplane_method=='flat' or midplane_method==None:
+		surf = surf-mean(surf)
+	elif midplane_method=='average':
+		surf = surf-mean(surf,axis=0)
+	else: raise Exception('invalid midplane_method %s'%midplane_method)
 	hqs = array([fftwrap(surf[fr])/lenscale/double((m*n)) for fr in range(nframes)])
 	y = reshape(mean(abs(hqs)**2,axis=0),-1)
 	x = reshape(qmagsshift,-1)
@@ -100,4 +103,5 @@ def calculate_undulations(surf,vecs,chop_last=False,lims=(0,1.0),perfect=False,r
 	if lims!=None: goodslice = where(all((x3>lims[0],x3<lims[1]),axis=0))
 	else: goodslice = arange(len(x3)).astype(int)
 	kappa = mean(1/((y2[1:]*x2[1:]**4)[goodslice]*Lx*Ly/lenscale**2))
-	return {'y':y3,'x':x3,'kappa':kappa}
+	#---! NOTE TO RYAN TO ADD THE SIGMA
+	return {'y':y3,'x':x3,'kappa':kappa,'sigma':0.0}

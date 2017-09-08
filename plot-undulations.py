@@ -22,15 +22,18 @@ if 'data' not in globals():
 #---block: plot the undulation spectra
 if 'spectra' in routine:
 
+	plotspecs = work.plots[plotname].get('specs',{})
+	wavevector_limits = plotspecs.get('wavevector_limits',[0.5,1.0,2.0])
 	#---settings
 	art = {'fs':{'legend':12}}
 	layout = {'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]}
 	figsize=(5,5)
-	wavevector_limits = [0.5,1.0,2.0]
-
 	#---sweep over plots
-	plotspecs = sweeper(**{'layout':layout,'wavevector_limit':wavevector_limits})
-	for pnum,plotspec in enumerate(plotspecs):
+	plots_this = sweeper(**{'layout':layout,'wavevector_limit':wavevector_limits})
+	#---note that the default midplane method for undulation spectra is "average"
+	#---...however you can also use "flat". note that curvature undulation coupling uses default "flat"
+	midplane_method = plotspecs.get('midplane_method','average')
+	for pnum,plotspec in enumerate(plots_this):
 		status('plotting layout',i=pnum,tag='plot')
 		wavevector_limit = plotspec['wavevector_limit']
 		axes,fig = panelplot(layout,figsize=figsize)
@@ -42,7 +45,7 @@ if 'spectra' in routine:
 			undulation_panel(ax,data,
 				#---! note that labels,colors comes from art
 				keys=keys,art=art,title=title,labels=labels,colors=colors,
-				lims=(0,wavevector_limit),
+				lims=(0,wavevector_limit),midplane_method=midplane_method,
 				show_fit=work.plots[plotname].get('specs',{}).get('show_fit',False))
 		#---metadata and file tag
 		meta = deepcopy(calc)
