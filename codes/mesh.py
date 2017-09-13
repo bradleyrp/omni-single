@@ -11,10 +11,12 @@ import scipy
 import scipy.spatial
 import scipy.interpolate
 from numpy import linalg
+machine_eps = eps = np.finfo(float).eps
 
 #---import from omni.base
 from base.tools import status
 from base.timer import time_limit,TimeoutException
+from base.compute_loop import basic_compute_loop
 
 _not_reported = ['triarea','vecnorm','facenorm','torusnorm','reclock','beyonder','makemesh','rotation_matrix']
 _shared_extensions = ['vecnorm','rotation_matrix','makemesh']
@@ -81,11 +83,9 @@ def beyonder(points,vecs,dims=[0,1],growsize=0.2,new_only=False,growsize_nm=None
 	else: return alls[valids],inds[valids].astype(int)
 
 def torusnorm(pts1,pts2,vecs):
-
 	"""
 	Compute distances between points on a torus.
 	"""
-
 	cd = np.array([scipy.spatial.distance.cdist(pts1[:,d:d+1],pts2[:,d:d+1]) for d in range(2)])
 	cd[0] -= (cd[0]>vecs[0]/2.)*vecs[0]
 	cd[1] -= (cd[1]>vecs[1]/2.)*vecs[1]
@@ -94,11 +94,9 @@ def torusnorm(pts1,pts2,vecs):
 
 def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 	curvilinear=True,debug=False,growsize_nm=None,excise=True,areas_only=False):
-
 	"""
 	Function which computes curvature and simplex areas on a standard mesh.
 	"""
-
 	if debug: 
 		import time
 		st = time.time()
@@ -250,7 +248,6 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	return imono
 
 def topologize(pos,vecs,tol=0.07):
-
 	"""
 	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
 	of length equal to the box vectors so that there is a maximum amount of connectivity between adjacent
@@ -259,7 +256,6 @@ def topologize(pos,vecs,tol=0.07):
 	Note that we changed tol from 0.05 to 0.07 on 2017.08.02. We also added a timer and pass-through for 
 	belligerent systems. See RPB notes for more details.
 	"""
-
 	step = 0
 	kp = np.array(pos)
 	natoms = len(pos)
@@ -286,11 +282,9 @@ def topologize(pos,vecs,tol=0.07):
 	return moved
 
 def makemesh_regular(data,vecs,grid):
-	
 	"""
 	Generate a regular grid from a monolayer.
 	"""
-	
 	data = beyonder(data,vecs,growsize=0.1)
 	xypts = np.array([[i,j] for i in np.linspace(0,vecs[0],grid[0].astype(int)) 
 		for j in np.linspace(0,vecs[1],grid[1].astype(int))])
@@ -304,3 +298,122 @@ def makemesh_regular(data,vecs,grid):
 	#---...for reshaping objects by default, which convention has the last index changing "fastest")
 	xyz_pts = np.array([[bilinear_pts[i,0],bilinear_pts[i,1],result[i]] for i in range(len(result))])
 	return np.reshape(xyz_pts[:,2],grid.astype(int))
+
+###---AVERAGE  NORMAL PROJECTION FUNCTIONS
+
+def literalize(heights,vec):
+	"""Hasty function to turn heights into points."""
+	nx,ny = heights.shape
+	return np.concatenate((np.concatenate(np.transpose(np.meshgrid(*[np.linspace(0,vec[ii],n) 
+		for ii,n in enumerate([nx,ny])]))).T,[heights.reshape(-1).T])).T
+
+def height_recenter(pts,pivot,maxflux): 
+	"""Recenter all heights to the mean of the average height, shifted up one half box vector."""
+	pts[...,2] += maxflux - pivot
+	return pts
+
+def boxstuff(pts,vec): 
+	"""Ensure that the points are inside the box."""
+	return pts-(pts>vec)*vec+(pts<np.array([0.,0.,0.]))*vec
+
+def aind(x): 
+	"""Convert back to advanced indexing."""
+	return tuple(x.T)
+
+def vecnorm(x): return x/np.linalg.norm(x)
+def planeproject(x,n): return x-np.dot(x,n)/np.linalg.norm(n)*vecnorm(n)
+
+def get_normal_fluctuation(hover,target,normal,vec):
+	"""
+	Given a target point, an instantaneous point, and the vertex normal, compute the distance to the tangent plane.
+	"""
+	vector = hover - target
+	vector = vector - vec*(vector>(vec/2.)) + vec*(vector<(-1*vec/2.))
+	projected = planeproject(vector,normal)
+	#---get the sign of the projection
+	plane_point = vector+projected
+	sign = 1.0-2.0*(np.arccos(np.dot(vecnorm(normal),vecnorm(vector)))>np.pi/2.)
+	return sign*np.linalg.norm(plane_point)
+
+def inflate_lateral(source,inflate_factor):
+	"""Add extra rows and columns to heights."""
+	return source[np.meshgrid(*[np.arange(-inflate_factor,i+inflate_factor+1)%i for i in source.shape])]	
+
+def average_normal_projections(fr,mvec,pivot,maxflux,do_inflate=False):
+	"""
+	Projection subroutine for measure_normal_deviation_from_wavy_surface moved here for computation in parallel.
+	"""
+	global surf,surfs,mesh
+	#---! getting: calcs/codes/mesh.py:24: RuntimeWarning: invalid value encountered in divide ... in vecnorm
+	#---inflate the instantaneous surface
+	this_surf_inflated = surfs[fr]#inflate_lateral(surfs[fr],inflate_factor)
+	#---find the points on the instantaneous surface which are nearest the points on the regular grid on the average
+	#---convert instantaneous points to XYZ with the reference box vectors mvec
+	instant_all = boxstuff(height_recenter(literalize(this_surf_inflated,mvec),pivot=pivot,maxflux=maxflux),mvec)
+	#---after literalizing the inflated points, we take only the points which are relevant to the base structure
+	#---! is the order correct?
+	if do_inflate:
+		source = surf_average_base
+		inds = np.concatenate(np.transpose(np.meshgrid(*[np.arange(-inflate_factor,i+inflate_factor+1) 
+			for i in source.shape])))
+		base = np.where(np.all((np.all(inds>0,axis=1),np.all(np.array(source.shape)>=inds,axis=1)),axis=0))[0]
+		instant = instant_all[base]
+	else: instant = instant_all
+	#---note that we make a tree from the instantaneous points then probe over the average surface
+	#---! more efficient to do this in reverse, however it might not cover all of the average/reference points?
+	#---prepare a KDTree. we use a fudge factor of 1000 epsilon to avoid angry errors about being outside the box
+	tree = scipy.spatial.ckdtree.cKDTree(instant,boxsize=np.concatenate((mvec,mvec))+1000.*eps)
+	#---find the nearest reference points for each instantaneous point
+	close,nns = tree.query(surf,k=1)
+	#---given a mapping between instantaneous point and target position (on XY), project the instantaneous point
+	#---...onto the tangent plane given by the reference point. note that this is obviously a minor approximation in 
+	#---...which we assume that the point is hovering "above" the reference point close enough that the projection onto
+	#---...that tangent plane is correct. a more literal form of this might actually try to find the exact distance to 
+	#---...the triangle adjacent to the nearest reference vertex, but this would require adding extra neighbor
+	#---...information and I think it takes the surface a bit too literally.
+	#---! note that we could use the real points instead of regular grid points for the instantaneous point?
+	deviations = np.array([
+		get_normal_fluctuation(
+			normal=mesh['vertnorms'][index],
+			target=surf[index],
+			hover=instant[nns][index],
+			vec=mvec) 
+		for ii,index in enumerate(nns)])
+	#---corners fail for whatever reason. could not get the do_inflate method working
+	deviations[np.isnan(deviations)] = 0.0
+	return deviations
+
+def measure_normal_deviation_from_wavy_surface(heights,vecs,curvilinear=False):
+	"""
+	Given heights on a regular grid, compute the average surface and then compute the 
+	"""
+	do_inflate = False
+	inflate_factor = 10
+	surfs = heights
+	#---average surface
+	surf_average_base = surfs.mean(axis=0)
+	if do_inflate: surf_average = inflate_lateral(surf_average_base,inflate_factor)
+	else: surf_average = surf_average_base
+	#---height of the average surface
+	pivot = surf_average.mean()
+	#---standardized box vectors for all calculations (see notes above)
+	mvec_base = vecs.mean(axis=0)
+	#---get height fluctuations to set the half box height
+	maxflux = surfs.ptp()*1.1/2.
+	#---new standard box vectors have the correct height and inflated XY dimensions
+	inflate_factors = np.array(surf_average.shape).astype(float)/np.array(surf_average_base.shape)
+	#---use globals for parallel
+	global surf,surfs,mesh
+	if do_inflate: mvec = np.array([mvec_base[0]*inflate_factors[0],mvec_base[1]*inflate_factors[1],maxflux*2.])
+	else: mvec = np.array([mvec_base[0],mvec_base[1],maxflux*2.])
+	#---compute a reference surface in absolute points
+	#---we use vertical center so that all heights are shifted center of the new box given by twice maxflux
+	surf = boxstuff(height_recenter(literalize(surf_average,mvec),pivot=pivot,maxflux=maxflux),mvec)
+	#---make the reference mesh (slow step)
+	status('making mesh (curvilinear=%s)'%curvilinear,tag='compute')
+	mesh = makemesh(surf,mvec,curvilinear=curvilinear)
+	status('mesh is ready',tag='compute')
+	looper = [dict(fr=fr,pivot=pivot,mvec=mvec,maxflux=maxflux) for fr in range(len(surfs))]
+	incoming = basic_compute_loop(average_normal_projections,looper=looper,run_parallel=True)
+	#---we must reshape and concatenate the points
+	return np.reshape(incoming,(-1,)+surf_average.shape)
