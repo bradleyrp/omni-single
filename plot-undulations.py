@@ -50,6 +50,7 @@ if 'spectra' in routine:
 		#---metadata and file tag
 		meta = deepcopy(calc)
 		meta.update(**plotspec)
+		#---! ERROR WHY IS META NOT USED?
 		tag = 'qlim.%.1f'%wavevector_limit
 		picturesave('fig.%s.%s'%(plotname,tag),work.plotdir,backup=False,version=True,meta=plotspec)
 
