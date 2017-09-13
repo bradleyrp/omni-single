@@ -4,7 +4,7 @@ import numpy as np
 from . undulate import calculate_undulations
 
 def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,
-	colors=None,labels=None,show_fit=True,midplane_method=None):
+	colors=None,labels=None,show_fit=True,midplane_method=None,custom_heights=None):
 	"""
 	Plot several undulation spectra on one panel.
 	"""
@@ -18,7 +18,7 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,
 		vecs = data[sn]['data']['vecs']
 		surf = np.mean(data[sn]['data']['mesh'],axis=0)
 		#---kernel of this plot: calculate the spectra here
-		uspec = calculate_undulations(surf,vecs,chop_last=True,
+		uspec = calculate_undulations(surf,vecs,chop_last=True,custom_heights=custom_heights,
 			perfect=True,lims=lims,raw=False,midplane_method=midplane_method)
 		uspecs[sn] = uspec
 		x,y = uspec['x'],uspec['y']
@@ -28,7 +28,7 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,
 		color = colors[sn] if colors else None
 		ax.plot(x,y,'o-',lw=2,markersize=5,markeredgewidth=0,c=color,label=label)
 		ax.set_title(title)
-		if show_fit: ax.plot(x,func_q4(x,kappa=uspec['kappa']))
+		if show_fit: ax.plot(x,func_q4(x,kappa=uspec['kappa'])/np.product(vecs.mean(axis=0)[:2])/100.*2.,zorder=5,c='k',lw=1)
 	add_undulation_labels(ax,art=art)
 	add_std_legend(ax,loc='upper right',art=art)
 	add_axgrid(ax,art=art)
