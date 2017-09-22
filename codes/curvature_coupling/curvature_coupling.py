@@ -99,7 +99,9 @@ class InvestigateCurvature:
 		self.loader_spec = self.design.get('loader_membrane',
 			{'module':'codes.curvature_coupling_loader','function':'curvature_coupling_loader_membrane'})
 		self.loader_func = self.gopher(self.loader_spec,module_name='module',variable_name='function')
-		self.memory = self.loader_func(data=dict(undulations=self.data))
+		#---midplane method is "flat" by default
+		midplane_method = self.design.get('midplane_method','flat')
+		self.memory = self.loader_func(data=dict(undulations=self.data),midplane_method=midplane_method)
 		#---the style should be a function in this class
 		if self.do_calculation: self.finding = getattr(self,self.style)()
 
