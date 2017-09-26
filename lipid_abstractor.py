@@ -114,29 +114,6 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		trajectory.append(sel.positions/lenscale)
 		vecs.append(sel.dimensions[:3])
 	vecs = np.array(vecs)/lenscale
-    #---alternate lipid representation is useful for separating monolayers
-	monolayer_cutoff = kwargs['calc']['specs']['separator']['monolayer_cutoff']
-	monolayer_cutoff_retry = kwargs['calc']['specs']['separator'].get('monolayer_cutoff',True)
-	if 'lipid_tip' in kwargs['calc']['specs']['selector']:
-		tip_select = kwargs['calc']['specs']['selector']['lipid_tip']
-		sel = uni.select_atoms(tip_select)
-		atoms_separator = []
-		for fr in range(nframes):
-			status('loading lipid tips',tag='load',i=fr,looplen=nframes)
-			uni.trajectory[fr]
-			atoms_separator.append(sel.positions/lenscale)
-	else: atoms_separator = coms
-
-	#---identify monolayers
-	status('identify leaflets',tag='compute')
-	#---randomly select frames for testing monolayers
-	random_tries = 3
-	for fr in [0]+[np.random.randint(nframes) for i in range(random_tries)]:
-		finder_args = dict(monolayer_cutoff=monolayer_cutoff,monolayer_cutoff_retry=monolayer_cutoff_retry)
-		top_tol = kwargs['calc']['specs']['separator'].get('topologize_tolerance',None)
-		if top_tol: finder_args.update(topologize_tolerance=top_tol)
-		monolayer_indices = codes.mesh.identify_lipid_leaflets(atoms_separator[fr],vecs[fr],**finder_args)
-		if type(monolayer_indices)!=bool: break
 
 	checktime()
 	#---parallel
@@ -150,6 +127,29 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		for fr in range(nframes):
 			status('computing centroid',tag='compute',i=fr,looplen=nframes,start=start)
 			coms.append(codes.mesh.centroid(trajectory[fr],masses,divider))
+
+    #---alternate lipid representation is useful for separating monolayers
+	monolayer_cutoff = kwargs['calc']['specs']['separator']['monolayer_cutoff']
+	monolayer_cutoff_retry = kwargs['calc']['specs']['separator'].get('monolayer_cutoff',True)
+	if 'lipid_tip' in kwargs['calc']['specs']['selector']:
+		tip_select = kwargs['calc']['specs']['selector']['lipid_tip']
+		sel = uni.select_atoms(tip_select)
+		atoms_separator = []
+		for fr in range(nframes):
+			status('loading lipid tips',tag='load',i=fr,looplen=nframes)
+			uni.trajectory[fr]
+			atoms_separator.append(sel.positions/lenscale)
+	else: atoms_separator = coms
+	#---identify monolayers
+	status('identify leaflets',tag='compute')
+	#---randomly select frames for testing monolayers
+	random_tries = 3
+	for fr in [0]+[np.random.randint(nframes) for i in range(random_tries)]:
+		finder_args = dict(monolayer_cutoff=monolayer_cutoff,monolayer_cutoff_retry=monolayer_cutoff_retry)
+		top_tol = kwargs['calc']['specs']['separator'].get('topologize_tolerance',None)
+		if top_tol: finder_args.update(topologize_tolerance=top_tol)
+		monolayer_indices = codes.mesh.identify_lipid_leaflets(atoms_separator[fr],vecs[fr],**finder_args)
+		if type(monolayer_indices)!=bool: break
 
 	checktime()
 	coms_out = np.array(coms)
