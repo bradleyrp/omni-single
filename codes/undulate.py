@@ -88,7 +88,7 @@ def undulation_fitter(q_raw,hqs,area,initial_conditions=(20.0,0.0),residual_form
 	return dict(fit,kappa=fit.x[0],gamma=fit.x[1])
 
 def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
-	perfect=False,raw=False,midplane_method=None,custom_heights=None,residual_form='log',fit_tension=True):
+	perfect=False,raw=False,midplane_method=None,custom_heights=None,residual_form='log',fit_tension=False):
 	"""
 	Compute undulation spectrum.
 	"""
