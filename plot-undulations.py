@@ -91,6 +91,7 @@ if 'height' in routine:
 	extrema = [np.abs(extrema).max()*j for j in [-1,1]]
 
 	#---use the standard birdseye renderer to render the average structure
+	#---note that this function previously used smooth=1. by default for videos
 	print_birdseye_snapshot_render(
 		avgzs,None if not data_protein else [p.mean(axis=0)[...,:2] for p in protein_pts_all],
 		mvecs,nprots_list,handle='OUT',pbc_expand=1.0,smooth=None,panelspecs=panelspecs,
