@@ -93,7 +93,7 @@ if 'height' in routine:
 	#---use the standard birdseye renderer to render the average structure
 	print_birdseye_snapshot_render(
 		avgzs,None if not data_protein else [p.mean(axis=0)[...,:2] for p in protein_pts_all],
-		mvecs,nprots_list,handle='OUT',pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,
+		mvecs,nprots_list,handle='OUT',pbc_expand=1.0,smooth=None,panelspecs=panelspecs,
 		extrema=extrema,fs=fs,titles=titles,cmap_mpl_name=cmap_mpl_name,
 		cbar_label_specs=dict(rotation=0,labelpad=-20,y=1.1),
 		zlabel=r'$\mathrm{\langle z \rangle\,(nm)}$',
@@ -124,7 +124,7 @@ if 'dump_xyz' in routine:
 		chop_last=True,perfect=True,lims=lims,raw=False)
 	np.savetxt(
 		work.postdir+'banana-v003-0-400000-2000-%d-frames.hqhq.txt'%nframes,
-		np.array(np.transpose([uspec['x'],uspec['y']])))
+		np.array(np.transpose([uspec['q_binned'],uspec['energy_binned']])))
 
 	#---the above uses the undulation data but we also load some of the raw points and dump them
 	#---...the following section uses lipid_abstractor, collections all, slices current_protein

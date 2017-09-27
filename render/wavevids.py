@@ -17,7 +17,7 @@ from plotter.panels import panelplot
 import numpy as np
 
 def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
-	outdir='',fi=0,pbc_expand=1.0,smooth=1.,extrema=None,metadat=None,fs=None,
+	outdir='',fi=0,pbc_expand=1.0,smooth=None,extrema=None,metadat=None,fs=None,
 	titles=None,panelspecs=None,cmap_mpl_name='RdBu_r',fn=None,**kwargs):
 	"""
 	Outer loop for rendering protein videos.
@@ -30,15 +30,18 @@ def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
 	for ni in range(npanels):
 		m,n = griddims = np.shape(surfs[ni])
 		grid_spacing = mvecs[ni][:2]/griddims
-		#---smoothing parameter is in nm
-		grid_smooth = smooth/np.mean(grid_spacing,axis=0)
 		border = [int(float(pbc_expand)*i) for i in (m,n)]
 		griddat = np.tile(surfs[ni],(3,3))[m-border[0]:2*m+border[0],n-border[1]:2*n+border[1]]
 		extent = [-(border*grid_spacing)[0],mvecs[ni][0]+(border*grid_spacing)[0],
 			-(border*grid_spacing)[1],mvecs[ni][1]+(border*grid_spacing)[1]]
 		ax = axes[ni]
+		if smooth!=None:
+			#---smoothing parameter is in nm (previous default was 1.0)
+			grid_smooth = smooth/np.mean(grid_spacing,axis=0)
+			raw = scipy.ndimage.filters.gaussian_filter(griddat,grid_smooth)
+		else: raw = griddat
 		#---plot the surface
-		im = ax.imshow((scipy.ndimage.filters.gaussian_filter(griddat,grid_smooth)).T,
+		im = ax.imshow((raw).T,
 			interpolation='nearest',origin='lower',cmap=mpl.cm.__dict__[cmap_mpl_name],
 			vmax=extrema[1],vmin=extrema[0],extent=extent)
 		if pbc_expand != 0.:
