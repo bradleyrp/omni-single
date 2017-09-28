@@ -6,28 +6,37 @@ Plot all of the upstream loops for the curvature undulation coupling analysis.
 
 import copy
 from codes.curvature_coupling.curvature_coupling import InvestigateCurvature
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from render.wavevids import plothull
-str_types = [str,unicode] if sys.version_info<(3,0) else [str]
 from codes.looptools import basic_compute_loop
 
-#---we must declare variables here. this should match the top of the reload function
-variables = 'data,datas,printers,routine,postdat,undulations_name,calcs,protein_abstractor_name'.split(',')
+#---function names to plot or None for all
+plot_super.routine = None
 
-###---STANDARD
-
-#---declare standard variables
-required_variables = 'printers routine'.split()
-for v in variables+required_variables:
-	if v not in globals(): globals()[v] = None
-
-def register_printer(func):
-	"""Add decorated functions to a list of "printers" which are the default routine."""
-	global printers
-	if printers is None: printers = []
-	printers.append(func.__name__)
-	return func
-
-###---PLOTS
+@autoload(plot_super)
+def loader():
+	"""Load data."""
+	#---only load once
+	if 'data' not in globals():
+		global data,datas,routine,postdat,undulations_name,calcs,protein_abstractor_name
+		plotspecs = work.plots[plotname].get('specs',{})
+		calcname = plotspecs.get('calcname',plotname)
+		#---new method for getting all upstream calculations in the loop
+		combodat = work.collect_upstream_calculations_over_loop(plotname)
+		data,datas,calcs = combodat['data'],combodat['datas'],combodat['calcs']
+		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
+		undulations_name = plotspecs.get('undulations_name','undulations')
+		#---check for alternate loaders
+		alt_loader = plotspecs.get('loader',None)
+		if alt_loader:
+			from base.tools import gopher
+			postdat = gopher(alt_loader)(data=data)
+		#---compile the necessary (default) data into a dictionary
+		else:
+			postdat = dict([(sn,dict(
+				vecs=data[undulations_name][sn]['data']['vecs'].mean(axis=0),
+				points_protein=data[protein_abstractor_name][sn]['data']['points_all']))
+				for sn in work.sns()])
 
 def plot_hull_and_trial_centers(data,sn,ax,n_instances=None,debug_frame=0,color=None):
 	"""Plot the protein hull along with the positions of the trial functions."""
@@ -184,7 +193,7 @@ def individual_reviews_plotter(viewnames,out_fn,figsize=(10,10)):
 			meta['high_cutoff'] = hicut
 			picturesave('fig.%s.%s'%(out_fn,sn),work.plotdir,backup=False,version=True,meta=meta)
 
-@register_printer
+@autoplot(plot_super)
 def individual_reviews():
 	"""
 	Plot a few versions of the main figure.
@@ -198,60 +207,3 @@ def individual_reviews():
 			'viewnames':['average_height','example_field'],'figsize':(6,6)}}
 	for out_fn,details in plotspec.items(): 
 		individual_reviews_plotter(out_fn=out_fn,**details)
-
-###---MAIN
-
-def reload():
-	"""Load everything for the plot only once."""
-	#---canonical globals list is loaded systematically 
-	#---...but you have to load it into globals manually below
-	global data,datas,printers,routine,postdat,undulations_name,calcs,protein_abstractor_name
-	#---custom reload sequence goes here
-	plotspecs = work.plots[plotname].get('specs',{})
-	routine = plotspecs.get('routine',printers)
-	calcname = plotspecs.get('calcname',plotname)
-	#---new method for getting all upstream calculations in the loop
-	combodat = work.collect_upstream_calculations_over_loop(plotname)
-	data,datas,calcs = combodat['data'],combodat['datas'],combodat['calcs']
-	#---extra loading compared to the pixel method from which this was derived, in order to use the new style
-	#---...plotting scheme with register_printer
-	protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
-	undulations_name = plotspecs.get('undulations_name','undulations')
-	#---check for alternate loaders
-	alt_loader = plotspecs.get('loader',None)
-	if alt_loader:
-		from base.tools import gopher
-		postdat = gopher(alt_loader)(data=data)
-	#---compile the necessary (default) data into a dictionary
-	else:
-		postdat = dict([(sn,dict(
-			vecs=data[undulations_name][sn]['data']['vecs'].mean(axis=0),
-			points_protein=data[protein_abstractor_name][sn]['data']['points_all']))
-			for sn in work.sns()])
-
-def printer():
-	"""Print the plots automatically from the routine."""
-	global routine
-	#---! get routine from the metadata here
-	if routine is None: routine = list(printers)	
-	#---routine items are function names
-	for key in routine: 
-		status('running routine %s'%key,tag='printer')
-		globals()[key]()
-
-###---STANDARD
-
-def printer():
-	"""Load once per plot session."""
-	global variables,routine,printers
-	#---reload if not all of the globals in the variables
-	if any([v not in globals() or globals()[v] is None for v in variables]): reload()
-	#---after loading we run the printers
-	printers = list(set(printers if printers else []))
-	if routine is None: routine = list(printers)	
-	#---routine items are function names
-	for key in routine: 
-		status('running routine %s'%key,tag='printer')
-		globals()[key]()
-
-if __name__=='__main__': printer()
