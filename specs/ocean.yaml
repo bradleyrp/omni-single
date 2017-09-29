@@ -103,6 +103,9 @@ calculations:
         undulations:
           grid_spacing: 0.5
       design:
+        # added this flag but old data minus the flag still exists (what to do with it?)
+        # ...actually this was recoputed because the flag didn't trigger a recompute (!)
+        store_instantaneous_fields: True
         style: wilderness
         curvature_positions: 
           method: neighborhood

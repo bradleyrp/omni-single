@@ -382,6 +382,9 @@ class InvestigateCurvature:
 				method=curvature_sum_method).mean(axis=0))
 			solutions['cf_first'] = np.array(self.curvature_sum(cfs,fit.x[3:],
 				method=curvature_sum_method)[0])
+			#---save explicit fields
+			if spec.get('store_instantaneous_fields',False):
+				solutions['cfs'] = np.array(self.curvature_sum(cfs,fit.x[3:],method=curvature_sum_method))
 			#---we also save the dropped gaussian points here
 			if extents_method=='fixed_isotropic': 
 				solutions['drop_gaussians_points'] = self.memory[(sn,'drop_gaussians_points')]

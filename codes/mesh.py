@@ -387,6 +387,7 @@ def measure_normal_deviation_from_wavy_surface(heights,vecs,curvilinear=False):
 	"""
 	Given heights on a regular grid, compute the average surface and then compute the 
 	"""
+	global surf,surfs,mesh
 	do_inflate = False
 	inflate_factor = 10
 	surfs = heights
@@ -403,7 +404,6 @@ def measure_normal_deviation_from_wavy_surface(heights,vecs,curvilinear=False):
 	#---new standard box vectors have the correct height and inflated XY dimensions
 	inflate_factors = np.array(surf_average.shape).astype(float)/np.array(surf_average_base.shape)
 	#---use globals for parallel
-	global surf,surfs,mesh
 	if do_inflate: mvec = np.array([mvec_base[0]*inflate_factors[0],mvec_base[1]*inflate_factors[1],maxflux*2.])
 	else: mvec = np.array([mvec_base[0],mvec_base[1],maxflux*2.])
 	#---compute a reference surface in absolute points
