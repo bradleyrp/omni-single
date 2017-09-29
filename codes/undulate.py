@@ -107,7 +107,7 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 		surf = surf-np.mean(surf)
 	elif midplane_method=='average':
 		surf = surf-np.mean(surf,axis=0)
-	elif midplane_method=='average_normal' and custom_heights==None:
+	elif midplane_method=='average_normal' and type(custom_heights)==type(None):
 		raise Exception('send custom_heights for average_normal')
 	elif midplane_method=='average_normal': surf = custom_heights
 	else: raise Exception('invalid midplane_method %s'%midplane_method)
@@ -123,7 +123,7 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 	packed = {}
 	#---choose a binning method, range method, and fitting method
 	if fit_style in ['band,perfect,simple','band,perfect,basic',
-		'band,perfect,fit','band,perfect,curvefit']:
+		'band,perfect,fit','band,perfect,curvefit','band,perfect,curvefit-crossover']:
 
 		if lims==None: raise Exception('fit_style %s requires lims'%fit_style)
 		#---collapse, perfectly
@@ -177,6 +177,25 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 					fit = scipy.optimize.curve_fit(hqhq,x3,np.log10(y3),**kwargs)
 				kappa,gamma = fit[0][0],fit[0][1]
 			else: raise Exception('invalid residual_form %s'%residual_form)
+
+		elif fit_style=='band,perfect,curvefit-crossover':
+			#---in this method we use the scipy curve_fit function
+			exponent = 4.0
+			kwargs = {}
+			kwargs.update(bounds=((5.0,-1.0,lims[0]+0.001),(10**2.0,1.0,lims[1]-0.001)))
+			kwargs.update(maxfev=10**5)
+			if residual_form!='log': raise Exception('crossover only works with residual_form log')
+			if fit_tension==False: raise Exception('crossover only works with fit_tension')
+			def hqhq(q_raw,kappa,sigma,crossover):	
+				if sigma==0.0: sigma = eps
+				regime_tension = q_raw<=crossover
+				regime_bending = ~regime_tension
+				heights_tension = np.log10(1.0/(area/2.0*(sigma*q_raw[regime_tension]**2.0)))
+				heights_bending = np.log10(1.0/(area/2.0*(kappa*q_raw[regime_bending]**4.0)))
+				return np.concatenate((heights_tension,heights_bending))
+			fit = scipy.optimize.curve_fit(hqhq,x3,np.log10(y3),(20.0,0.001,0.02),**kwargs)
+			kappa,gamma,crossover = fit[0][0],fit[0][1],fit[0][2]
+			packed.update(crossover=crossover)
 		elif fit_style=='band,perfect,fit':
 			#---the most advanced method uses scipy.optimmize in a separate function
 			fit = undulation_fitter(x3,y3,area,residual_form=residual_form,
