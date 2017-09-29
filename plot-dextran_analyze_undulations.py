@@ -9,9 +9,7 @@ routine = [
 	'entropy_via_curvature_undulation',
 	'entropy_via_undulations',
 	'spectra_comparison',
-	][-1:]
-#---high cutoff for undulations since it lacks this setting
-high_cutoff_undulation = 0.1
+	][1:2]
 
 from base.tools import gopher
 from hypothesis import sweeper
@@ -22,12 +20,59 @@ import copy
 #---share writes
 os.umask(0o002)
 
+###---SETTINGS
+
 #---fetch the entropy function
 if 'entropy_function' not in globals():
 	entropy_loader = {
 		'module':'codes.dextran_entropy_calculation',
 		'function':'undulations_to_entropy'}
 	entropy_function = gopher(entropy_loader)
+
+#---high cutoff for undulations since it lacks this setting
+high_cutoff_undulation = 0.1
+#---subjects of the analysis: different ways to fit the undulations
+manyspectra = sweeper(**{
+	'fit_style':['band,perfect,curvefit','band,perfect,fit'][:1],
+	'midplane_method':['flat','average','average_normal'],
+	'lims':[(0.0,high_cutoff_undulation),(0.04,high_cutoff_undulation)],
+	'residual_form':['log','linear'][:1],
+	'fit_tension':[False,True]})
+
+#--load the data
+if 'data' not in globals():
+	data,calc = plotload('import_readymade_meso_v1_membrane',work)
+	data_average_normal,_ = plotload('undulations_average_normal',work)
+	sns = work.sns()
+
+###---FUNCTIONS
+
+def calculate_undulations_wrapper(sn,**kwargs):
+	"""
+	Fit the undulations for both the undulations survey and the entropy calculation.
+	"""
+	global data,calculate_undulations,data_average_normal
+	fit_style = kwargs.pop('fit_style')
+	residual_form = kwargs.pop('residual_form')
+	midplane_method = kwargs.pop('midplane_method')
+	fit_tension = kwargs.pop('fit_tension')
+	lims = kwargs.pop('lims')
+	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
+
+	if midplane_method=='average_normal': 
+		custom_heights = data_average_normal[sn]['data']['average_normal_heights']
+	else: custom_heights = None
+	dat = data[sn]['data']
+	mesh = dat['mesh']
+	vecs = dat['vecs']
+	surf = np.mean(dat['mesh'],axis=0)
+
+	uspec = calculate_undulations(surf,vecs,
+		fit_style=fit_style,custom_heights=custom_heights,lims=lims,
+		midplane_method=midplane_method,residual_form=residual_form,fit_tension=fit_tension)
+	return uspec
+
+###---PLOTS
 
 if 'entropy_via_curvature_undulation' in routine:
 
@@ -49,33 +94,16 @@ if 'entropy_via_curvature_undulation' in routine:
 
 if 'entropy_via_undulations' in routine:
 
-	#---load all possible upstream curvature undulation coupling data and get the entropy
-	if 'data' not in globals():
-		#---use plotload to get membrane shapes
-		data,calc = plotload('import_readymade_meso_v1_membrane')
-		sns = work.sns()
-
-	#---inject undulation fits to the incoming membrane data for upcoming entropy calculation
-	for sn in data:
-		dat = data[sn]['data']
-		surf = dat['mesh'].mean(axis=0)
-		vecs = dat['vecs']
-		#---! revisit this after deciding on how to do the fits in spectra_comparison below
-		raise Exception('update the call to calculate undulations')
-		#---! check if we really want perfect collapser
-		result = calculate_undulations(surf,vecs,chop_last=False,
-			lims=(0,high_cutoff_undulation),perfect=True,raw=False)
-		#---save this for later
-		dat['undulation_postprocessing'] = result
-
-	#---use height-height undulations to calculate the entropy
-	entropy_survey_undulations = {}
-	for sn in data:
-		dat = data[sn]['data']
-		post = dat['undulation_postprocessing']
-		result = entropy_function(post['x'],post['y'],high_cutoff=high_cutoff_undulation,
-			kappa=post['kappa'],sigma=post['sigma'])
-		entropy_survey_undulations[sn] = result
+	postdat = []
+	#---compute undulations then entropy for every element of manyspectra
+	for hnum,specs in enumerate(manyspectra):
+		post = {}
+		for snum,sn in enumerate(sns):
+			uspec = calculate_undulations_wrapper(sn,**specs)
+			result = entropy_function(uspec['q_binned'],uspec['energy_binned'],
+				high_cutoff=high_cutoff_undulation,kappa=uspec['kappa'],sigma=uspec['sigma'])
+			post[sn] = dict(uspec=uspec,entropy=result)
+		postdat.append(post)
 
 if 'spectra_comparison' in routine:
 
@@ -102,49 +130,23 @@ if 'spectra_comparison' in routine:
 
 	from codes.undulate_plot import add_undulation_labels,add_axgrid,add_std_legend
 
-	data,calc = plotload('import_readymade_meso_v1_membrane',work)
-	data_average_normal,_ = plotload('undulations_average_normal',work)
-
 	def hqhq(q_raw,kappa,sigma,area,exponent=4.0):
 		return 1.0/(area/2.0*(kappa*q_raw**(exponent)+sigma*q_raw**2))
 
 	sns = work.sns()
 	sn = sns[0]
 	art = {'fs':{'legend':8}}
-
 	lims = (0.0,high_cutoff_undulation)
-	plotspecs = sweeper(**{
-		'fit_style':['band,perfect,curvefit','band,perfect,fit'][:1],
-		'midplane_method':['flat','average','average_normal'],
-		'lims':[(0.0,high_cutoff_undulation),(0.04,high_cutoff_undulation)],
-		'residual_form':['log','linear'][:1],
-		'fit_tension':[False,True]})
-
+	plotspecs = manyspectra
 	axes,fig = square_tiles(len(plotspecs),figsize=18,favor_rows=True,wspace=0.4,hspace=0.1)
 	for pnum,plotspec in enumerate(plotspecs):
 		ax = axes[pnum]
 
-		fit_style = plotspec['fit_style']
-		residual_form = plotspec['residual_form']
-		midplane_method = plotspec['midplane_method']
-		fit_tension = plotspec['fit_tension']
-		lims = plotspec['lims']
+		uspec = calculate_undulations_wrapper(**plotspec)
 
-		if midplane_method=='average_normal': 
-			custom_heights = data_average_normal[sn]['data']['average_normal_heights']
-		else: custom_heights = None
-		dat = data[sn]['data']
-		mesh = dat['mesh']
-		vecs = dat['vecs']
-		surf = np.mean(dat['mesh'],axis=0)
-
-		uspec = calculate_undulations(surf,vecs,
-			fit_style=fit_style,custom_heights=custom_heights,lims=lims,
-			midplane_method=midplane_method,residual_form=residual_form,fit_tension=fit_tension)
-
-		label = 'structure: %s'%re.sub('_',' ',midplane_method)
-		label += '\n residuals: %s'%residual_form
-		label += '\n method: \n%s'%fit_style
+		label = 'structure: %s'%re.sub('_',' ',plotspec['midplane_method'])
+		label += '\n residuals: %s'%plotspec['residual_form']
+		label += '\n method: \n%s'%plotspec['fit_style']
 		label += '\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
 		if uspec['sigma']!=0.0:
 			label += '\n'+r'$\mathrm{\sigma='+('%.3f'%uspec['sigma'])+'\:{k}_{B} T {nm}^{-2}}$'
@@ -169,11 +171,12 @@ if 'spectra_comparison' in routine:
 				area=uspec['area']),lw=1,zorder=5,c=colors[2])
 			#---inset axis shows the residuals
 			#---! note that there is a big whereby the log tick marks still show up sometimes
+			from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 			axins = inset_axes(ax,width="30%",height="30%",loc=3)
 			diffs = (energy_fit-
 				hqhq(q_fit,kappa=uspec['kappa'],sigma=uspec['sigma'],area=uspec['area']))
 			axins.set_title('residuals',fontsize=6)
-			if residual_form=='log': 
+			if plotspec['residual_form']=='log': 
 				axins.plot(10**diffs,'.-',lw=0.5,ms=1,color='k')
 				axins.set_xscale('log')
 				axins.set_yscale('log')

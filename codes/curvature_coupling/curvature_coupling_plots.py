@@ -15,18 +15,22 @@ import builtins
 for key in builtins._plotrun_specials: 
 	globals()[key] = builtins.__dict__[key]
 
-def center_by_protein(sn,surfs,static=False):
+def center_by_protein(sn,surfs,static=False,exclude_hydrogen=False):
 	"""
 	Align any field to the position of a single protein.
 	Assumes that  the protein points are available.
 	The static option moves a single field to the center by the average protein position.
 	"""
 	dat_protein = data[protein_abstractor_name][sn]['data']
-	protein_noh = np.array([ii for ii,i in enumerate(dat_protein['names']) if not re.match('^H',i)])
 	protein_pts = dat_protein['points_all']
 	if protein_pts.shape[1]!=1: raise Exception('cannot center multiple proteins!')
 	protein_pts = protein_pts.mean(axis=1)
-	protein_cogs = protein_pts[:,protein_noh].mean(axis=1)
+	if exclude_hydrogen:
+		protein_noh = np.array([ii for ii,i in enumerate(dat_protein['names']) if not re.match('^H',i)])
+		protein_cogs = protein_pts[:,protein_noh].mean(axis=1)
+	else: 
+		protein_cogs = protein_pts.mean(axis=1)
+		raise Exception('need to handle dextran case here')
 	ivecs = dat_protein['vecs']
 	protein_cogs += (protein_cogs<0.0)*ivecs - (protein_cogs>=ivecs)*ivecs
 	nframes,nx,ny = surfs.shape
