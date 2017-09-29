@@ -21,7 +21,7 @@ def undulation_panel(ax,data,keys=None,art=None,title=None,lims=None,
 		uspec = calculate_undulations(surf,vecs,chop_last=True,custom_heights=custom_heights,
 			perfect=True,lims=lims,raw=False,midplane_method=midplane_method)
 		uspecs[sn] = uspec
-		x,y = uspec['x'],uspec['y']
+		x,y = uspec['q_binned'],uspec['energy_binned']
 		label = labels[sn] if labels else sn
 		label += '\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
 		#---colors should be a dict over the keys

@@ -89,16 +89,16 @@ calculations:
               method: fixed_isotropic
               extent: 20.0
             curvature_sum: mean
-          v4:
-            style: wilderness
-            curvature_positions: 
-              method: neighborhood
-              distance_cutoff: 100.0
-              spacer: 40.0
-            extents:
-              method: fixed_isotropic
-              extent: 20.0
-            curvature_sum: mean
+          #v4:
+          #  style: wilderness
+          #  curvature_positions: 
+          #    method: neighborhood
+          #    distance_cutoff: 100.0
+          #    spacer: 40.0
+          #  extents:
+          #    method: fixed_isotropic
+          #    extent: 20.0
+          #  curvature_sum: mean
           # added midplane method here
           #v5:
           #  style: wilderness
@@ -152,24 +152,24 @@ calculations:
               method: fixed_isotropic
               extent: 50.0
             curvature_sum: mean
-          v13:
-            style: wilderness
-            curvature_positions: 
-              method: pixel
-              spacer: 80.0
-            extents:
-              method: fixed_isotropic
-              extent: 40.0
-            curvature_sum: mean
-          v14:
-            style: wilderness
-            curvature_positions: 
-              method: pixel
-              spacer: 60.0
-            extents:
-              method: fixed_isotropic
-              extent: 30.0
-            curvature_sum: mean
+          #v13:
+          #  style: wilderness
+          #  curvature_positions: 
+          #    method: pixel
+          #    spacer: 80.0
+          #  extents:
+          #    method: fixed_isotropic
+          #    extent: 40.0
+          #  curvature_sum: mean
+          #v14:
+          #  style: wilderness
+          #  curvature_positions: 
+          #    method: pixel
+          #    spacer: 60.0
+          #  extents:
+          #    method: fixed_isotropic
+          #    extent: 30.0
+          #  curvature_sum: mean
           #v15:
           #  style: wilderness
           #  curvature_positions: 
@@ -194,7 +194,21 @@ plots:
         #- height_histograms
         #- debug3d
       show_fit: False
-      midplane_method: average
+      midplane_method: average_normal
+      wavevector_limits: [0.2,0.3,1.0]
+  undulations_legacy:
+    # remove this when it becomes unnecessary!
+    collections: all
+    calculation:
+      import_readymade_meso_v1_membrane: {}
+    specs: 
+      routine:
+        - spectra
+        #- height
+        #- height_histograms
+        #- debug3d
+      show_fit: False
+      midplane_method: average_normal
       wavevector_limits: [0.2,0.3,1.0]
   # point our custom calculation to the right plot function
   curvature_undulation_coupling:
@@ -233,3 +247,6 @@ plots:
       curvature_undulation_coupling_dex:
         design: v1
     collections: all
+  mesh-improve:
+    calculation:
+      import_readymade_meso_v1_membrane: {}
