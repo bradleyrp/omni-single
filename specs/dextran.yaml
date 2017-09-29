@@ -54,6 +54,14 @@ calculations:
     collections: all
     specs:
       mapping_style: single_inducer 
+  undulations_average_normal:
+    uptype: post
+    group: all
+    slice_name: current
+    collections: all
+    specs:
+      upstream: 
+        import_readymade_meso_v1_membrane: {}
   # gently-modified version of the curvature_undulation_coupling calculation which
   # ...substitutes the MD inputs for the mesoscale inputs specific to this project
   curvature_undulation_coupling_dex:
@@ -186,7 +194,7 @@ plots:
         #- height_histograms
         #- debug3d
       show_fit: False
-      midplane_method: flat
+      midplane_method: average
       wavevector_limits: [0.2,0.3,1.0]
   # point our custom calculation to the right plot function
   curvature_undulation_coupling:

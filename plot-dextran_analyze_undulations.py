@@ -9,7 +9,7 @@ routine = [
 	'entropy_via_curvature_undulation',
 	'entropy_via_undulations',
 	'spectra_comparison',
-	][-1:]
+	][1:2]
 #---high cutoff for undulations since it lacks this setting
 high_cutoff_undulation = 0.1
 
@@ -60,11 +60,17 @@ if 'entropy_via_undulations' in routine:
 		dat = data[sn]['data']
 		surf = dat['mesh'].mean(axis=0)
 		vecs = dat['vecs']
-		#---! revisit this after deciding on how to do the fits in spectra_comparison below
-		raise Exception('update the call to calculate undulations')
-		#---! check if we really want perfect collapser
-		result = calculate_undulations(surf,vecs,chop_last=False,
-			lims=(0,high_cutoff_undulation),perfect=True,raw=False)
+		#---choose a specific fitting method
+		#---! talk this over with Ravi, others to make sure correct theory
+		fit_style = 'band,perfect,curvefit-crossover'
+		residual_form = 'log'
+		midplane_method = 'average'
+		fit_tension = True
+		lims = (0.0,high_cutoff_undulation)
+		#---compute undulations
+		result = calculate_undulations(surf,vecs,chop_last=False,residual_form=residual_form,
+			midplane_method=midplane_method,fit_style=fit_style,fit_tension=True,
+			lims=lims,perfect=True,raw=False)
 		#---save this for later
 		dat['undulation_postprocessing'] = result
 
@@ -73,7 +79,7 @@ if 'entropy_via_undulations' in routine:
 	for sn in data:
 		dat = data[sn]['data']
 		post = dat['undulation_postprocessing']
-		result = entropy_function(post['x'],post['y'],high_cutoff=high_cutoff_undulation,
+		result = entropy_function(post['q_binned'],post['energy_binned'],high_cutoff=high_cutoff_undulation,
 			kappa=post['kappa'],sigma=post['sigma'])
 		entropy_survey_undulations[sn] = result
 
@@ -114,11 +120,11 @@ if 'spectra_comparison' in routine:
 
 	lims = (0.0,high_cutoff_undulation)
 	plotspecs = sweeper(**{
-		'fit_style':['band,perfect,curvefit','band,perfect,fit'][:1],
+		'fit_style':['band,perfect,curvefit','band,perfect,curvefit-crossover'][:1],
 		'midplane_method':['flat','average','average_normal'],
 		'lims':[(0.0,high_cutoff_undulation),(0.04,high_cutoff_undulation)],
 		'residual_form':['log','linear'][:1],
-		'fit_tension':[False,True]})
+		'fit_tension':[False,True][:]})
 
 	axes,fig = square_tiles(len(plotspecs),figsize=18,favor_rows=True,wspace=0.4,hspace=0.1)
 	for pnum,plotspec in enumerate(plotspecs):
@@ -163,6 +169,12 @@ if 'spectra_comparison' in routine:
 			ax.plot(q_fit,hqhq(q_fit,kappa=uspec['kappa'],sigma=uspec['sigma'],
 				#---distinctive green color for alternate exponents
 				exponent=-1.0*exponent,area=uspec['area']),lw=3,zorder=5,c='g')
+		elif 'crossover' in uspec:
+			ax.plot(q_fit,hqhq(q_fit,kappa=uspec['kappa'],sigma=0.0,
+				area=uspec['area']),lw=3,zorder=5,c='g')
+			ax.plot(q_fit,hqhq(q_fit,kappa=0,sigma=uspec['sigma'],
+				area=uspec['area']),lw=3,zorder=5,c='g')
+			ax.axvline(uspec['crossover'],c='k',lw=1.0)
 		#---standard exponent
 		else:
 			ax.plot(q_fit,hqhq(q_fit,kappa=uspec['kappa'],sigma=uspec['sigma'],
