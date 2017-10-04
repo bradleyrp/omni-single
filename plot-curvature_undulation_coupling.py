@@ -62,10 +62,10 @@ def individual_reviews():
 				'average_height_center','average_field_center','average_field_center_smear','curvature_field_center'],
 				'figsize':(16,16)},
 		'coupling_review.simple_centered':{
-			'viewnames':['average_height_center','curvature_field_center'],
+			'viewnames':['average_height_center','curvature_field_center','coupling_review.simple'],
 			'figsize':(8,8),'horizontal':True,'wspace':0.7},}
 	#---turn some off when developing
-	for i in []: plotspec.pop(i)
+	for i in ['coupling_review.center_debug','coupling_review.simple_centered']: plotspec.pop(i)
 	global seepspace
 	seep = dict([(key,globals()[key]) for key in seepspace])
 	for out_fn,details in plotspec.items(): 

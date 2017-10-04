@@ -267,6 +267,33 @@ class InvestigateCurvature:
 				if False:
 					import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(fields_unity[0][0].T);plt.show()
 					import ipdb;ipdb.set_trace()
+		#---one field per protein, for all proteins
+		elif method=='protein_dynamic_single':
+			#---! the following code is very repetitive with the protein subselection method
+			for sn in self.sns:
+				#---points_all is nframes by proteins by beads/atoms by XYZ
+				points = self.data_prot[sn]['data']['points_all'].mean(axis=2)[...,:2].transpose(1,0,2)
+				#---save the points for later
+				self.memory[(sn,'drop_gaussians_points')] = points
+				ndrops = len(points)
+				#---get data from the memory
+				hqs = self.memory[(sn,'hqs')]
+				self.nframes = len(hqs)
+				mn = hqs.shape[1:]
+				vecs = self.memory[(sn,'vecs')]
+				vecs_mean = np.mean(vecs,axis=0)
+				#---formulate the curvature request
+				curvature_request = dict(curvature=1.0,mn=mn,sigma_a=extent,sigma_b=extent,theta=0.0)
+				#---construct unity fields
+				fields_unity = np.zeros((self.nframes,ndrops,mn[0],mn[1]))
+				reindex,looper = zip(*[((fr,ndrop),
+					dict(vecs=vecs[fr],centers=[points[ndrop][fr]/vecs[fr][:2]],**curvature_request)) 
+					for fr in range(self.nframes) for ndrop in range(ndrops)])
+				status('computing curvature fields for %s'%sn,tag='compute')
+				incoming = basic_compute_loop(make_fields,looper=looper)
+				#---! inelegant
+				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
+				self.memory[(sn,'fields_unity')] = fields_unity
 		else: raise Exception('invalid selection method')
 
 	def curvature_sum(self,cfs,curvatures,**kwargs):
@@ -291,10 +318,12 @@ class InvestigateCurvature:
 		extents_method = extents.get('method')
 		curvature_sum_method = self.design['curvature_sum']
 		#---special handling for pixel extents if None: extent is half the spacer
-		if extents['extent']==None and spec['curvature_positions']['method']:
+		#---! should this check of the curvature position method is pixel?
+		if extents.get('extent',False)==None and spec['curvature_positions']['method']:
 			extents['extent'] = spec['curvature_positions']['spacer']/2.
 		#---prepare curvature fields
 		if extents_method=='fixed_isotropic': self.drop_gaussians(**spec)
+		elif extents_method=='protein_dynamic': pass
 		else: raise Exception('invalid extents_method %s'%extents_method)
 		#---in the previous version we manually saved the data (and checked if it was already computed here)
 		#---...however this class has been ported directly into omnicalc now
@@ -369,6 +398,116 @@ class InvestigateCurvature:
 
 			Nfeval = 0
 			initial_conditions = [initial_kappa,0.0,0.01]+[0.0 for i in range(ndrops)]
+			test_ans = objective(initial_conditions)
+			if not isinstance(test_ans,np.floating): 
+				raise Exception('objective_residual function must return a scalar')
+			fit = scipy.optimize.minimize(objective,
+				x0=tuple(initial_conditions),method='SLSQP',callback=callback)
+			#---package the result
+			bundle[sn] = dict(fit,success=str(fit.success))
+			solutions['x'] = bundle[sn].pop('x')
+			solutions['jac'] = bundle[sn].pop('jac')
+			solutions['cf'] = np.array(self.curvature_sum(cfs,fit.x[3:],
+				method=curvature_sum_method).mean(axis=0))
+			solutions['cf_first'] = np.array(self.curvature_sum(cfs,fit.x[3:],
+				method=curvature_sum_method)[0])
+			#---save explicit fields
+			if spec.get('store_instantaneous_fields',False):
+				solutions['cfs'] = np.array(self.curvature_sum(cfs,fit.x[3:],method=curvature_sum_method))
+			#---we also save the dropped gaussian points here
+			if extents_method=='fixed_isotropic': 
+				solutions['drop_gaussians_points'] = self.memory[(sn,'drop_gaussians_points')]
+			else: raise Exception('invalid extents_method %s'%extents_method)
+			solutions['ratios'] = objective(fit.x,mode='ratio')
+			solutions['qs'] = q_raw
+		#---we return contributions to result,attrs for the calculation
+		return dict(result=solutions,attrs=dict(bundle=bundle,spec=spec))
+
+	def protein_dynamic_standard(self,**kwargs):
+		"""
+		Spinoff of the wilderness method which computes extents on the fly and reproduces the protein_dynamic method.
+		"""
+		raise Exception('currently abandoned!!!')
+		bundle,solutions = {},{}
+		global Nfeval
+		spec = self.design
+		extents = spec.get('extents',{})
+		extents_method = extents.get('method')
+		curvature_sum_method = self.design['curvature_sum']
+		#---optimize over simulations
+		for snum,sn in enumerate(self.sns):
+			status('starting optimization for %s %d/%d'%(sn,snum+1,len(self.sns)),tag='optimize')
+
+			#---load the source data
+
+			hqs = self.memory[(sn,'hqs')]
+			self.nframes = len(hqs)
+			### cfs = self.memory[(sn,'fields_unity')][:self.nframes]
+			vecs = self.memory[(sn,'vecs')][:self.nframes]
+			#ndrops = 
+
+			#---formulate the wavevectors
+			lenscale = 1.0
+			m,n = mn = np.shape(hqs)[1:]
+			Lx,Ly = np.mean(vecs,axis=0)[:2]
+			q2d = lenscale*np.array([[np.sqrt(
+				((i-m*(i>m/2))/((Lx)/1.)*2*np.pi)**2+
+				((j-n*(j>n/2))/((Ly)/1.)*2*np.pi)**2)
+				for j in range(0,n)] for i in range(0,m)])
+			q_raw = np.reshape(q2d,-1)[1:]
+			area = (Lx*Ly/lenscale**2)
+
+			tweak = self.fitting_parameters
+			signterm = tweak.get('inner_sign',-1.0)
+			initial_kappa = tweak.get('initial_kappa',25.0)
+			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
+			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
+			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
+			if residual_form == 'log':
+				def residual(values): 
+					return np.sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
+			elif residual_form == 'linear': 
+				def residual(values): 
+					return np.sum((values-1.0)**2)/float(len(values))
+			else: raise Exception('unclear residual form %s'%residual_form)
+
+			def multipliers(x,y): 
+				"""Multiplying complex matrices in the list of terms that contribute to the energy."""
+				return x*np.conjugate(y)
+
+			def callback(args):
+				"""Watch the optimization."""
+				global Nfeval
+				name_groups = ['kappa','gamma','vibe']+['curve(%d)'%i for i in range(ndrops)]
+				text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
+					for name,val in zip(name_groups,args)+[('error',objective(args))]])
+				status('searching! '+text,tag='optimize')
+				Nfeval += 1
+
+			def objective(args,mode='residual'):
+				"""
+				Fit parameters are defined in sequence for the optimizer.
+				They are: kappa,gamma,vibe,*curvatures-per-dimple.
+				"""
+				kappa,gamma,vibe = args[:3]
+				curvatures = args[3:]
+				composite = self.curvature_sum(cfs,curvatures,method=curvature_sum_method)
+				cqs = cctools.fft_field(composite)
+				termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
+				termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
+				#---skipping assertion and dropping imaginary
+				termlist = [np.real(k) for k in termlist]
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma*area*(termlist[0]*q_raw**2))
+				ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
+				if mode=='residual': return residual(ratio[band])
+				elif mode=='ratio': return ratio
+				else: raise Exception('invalid mode %s'%mode)
+
+			Nfeval = 0
+			#---initial extent is one, and extents follow curvatures
+			initial_conditions = [initial_kappa,0.0,0.01]+[]+[0.0 for i in range(ndrops)]
 			test_ans = objective(initial_conditions)
 			if not isinstance(test_ans,np.floating): 
 				raise Exception('objective_residual function must return a scalar')

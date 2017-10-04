@@ -1,6 +1,9 @@
 collections:
   all:
     - mk005
+    - sv004
+    - sv005
+    - sv007
 slices:
   mk001:
     readymade_namd:
@@ -21,6 +24,40 @@ slices:
       current:
         psf: "1protein_again2_autopsf.psf"
         dcds: ['BMEM_sample.dcd']
+  sv004:
+    groups: 
+      all: all
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':20000,'end':1200000,'skip':2000}
+  sv005:
+    groups: 
+      all: all
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':20000,'end':1200000,'skip':2000}
+  sv007:
+    groups: 
+      all: all
+    slices:
+      current_v1: {'pbc':'mol','groups':['all'],'start':20000,'end':520000,'skip':2000}
+      current: {'pbc':'mol','groups':['all'],'start':20000,'end':1020000,'skip':2000}
+calculation_aside:
+  #! for now you have to manipulate the names to handle cgmd/aamd
+  lipid_abstractor_aamd:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        lipid_tip: "name P"
+        monolayer_cutoff: 1.4
+        monolayer_cutoff_retry: True
+        topologize_tolerance: 0.1
 calculations:
   protein_abstractor:
     uptype: simulation
@@ -39,10 +76,10 @@ calculations:
             resnames: +selectors/resnames_lipid
             type: com
       separator: 
-        lipid_tip: "name P"
-        monolayer_cutoff: 1.4
-        monolayer_cutoff_retry: True
-        topologize_tolerance: 0.1
+        lipid_tip: "name PO4"
+        monolayer_cutoff: 1.8
+        topologize_tolerance: 0.10
+      nojumps: "z"
   undulations:
     uptype: post
     group: all
@@ -103,21 +140,124 @@ calculations:
         undulations:
           grid_spacing: 0.5
       design:
-        # added this flag but old data minus the flag still exists (what to do with it?)
-        # ...actually this was recoputed because the flag didn't trigger a recompute (!)
-        store_instantaneous_fields: True
-        style: wilderness
-        curvature_positions: 
-          method: neighborhood
-          distance_cutoff: 5.0
-          spacer: 2.5
-        extents:
-          method: fixed_isotropic
-          extent:
-            loop: 
-              - 2.5
-              - 1.0
-        curvature_sum: mean
+        loop:
+          v20:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 5.0
+              spacer: 2.5
+            extents:
+              method: fixed_isotropic
+              extent: 2.5
+            curvature_sum: mean
+          v21:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 5.0
+              spacer: 2.5
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+            curvature_sum: mean
+          v22:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 10.0
+              spacer: 2.5
+            extents:
+              method: fixed_isotropic
+              extent: 2.5
+            curvature_sum: mean
+          v3:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+            curvature_sum: mean
+          v4:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 2.0
+            curvature_sum: mean
+          v5:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+            curvature_sum: mean
+          v6:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 8.0
+            curvature_sum: mean
+deprecated_curvature_design:
+  v3:
+    store_instantaneous_fields: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single
+    extents:
+      method: fixed_isotropic
+      extent: 1.0
+    curvature_sum: mean
+  v3:
+    store_instantaneous_fields: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single
+    extents:
+      method: fixed_isotropic
+      extent: 2.0
+    curvature_sum: mean
+  v3:
+    store_instantaneous_fields: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single
+    extents:
+      method: fixed_isotropic
+      extent: 2.0
+    curvature_sum: mean
+  v3:
+    style: protein_dynamic_standard
+    extents: fixed_constant
+    curvature_sum: mean
+  # added this flag but old data minus the flag still exists (what to do with it?)
+  # ...actually this was recomputed because the flag didn't trigger a recompute (!)
+  store_instantaneous_fields: True
+  style: wilderness
+  curvature_positions: 
+    method: neighborhood
+    distance_cutoff: 5.0
+    spacer: 2.5
+  extents:
+    method: fixed_isotropic
+    extent:
+      loop: 
+        - 2.5
+        - 1.0
+  curvature_sum: mean
+calculations_on_hold:
   curvature_undulation_coupling_pixel:
     uptype: post
     group: all
@@ -234,6 +374,15 @@ meta:
   mk005: 
     label: "example mk5"
     nprots: 1
+  sv004: 
+    label: "4 helix-0, small bilayer"
+    nprots: 4
+  sv005: 
+    label: "1 helix-0, small bilayer"
+    nprots: 1
+  sv007: 
+    label: "4 helix-0, medium bilayer"
+    nprots: 4
 plots:
   undulations:
     calculation: 
