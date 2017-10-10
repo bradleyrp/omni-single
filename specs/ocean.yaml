@@ -371,6 +371,7 @@ meta:
   mk004: 
     label: "example"
     nprots: 1
+	index_top_monolayer: 1
   mk005: 
     label: "example mk5"
     nprots: 1
@@ -407,7 +408,6 @@ plots:
           upstream:
             lipid_abstractor:
               selector: lipid_com
-
   lipid_areas2d:
     calculation: lipid_areas2d
     slices: current
@@ -419,6 +419,8 @@ plots:
           upstream:
             lipid_abstractor:
               selector: lipid_com
+  ocean_lipid_areas:
+    calculation: lipid_areas3d
   # under development
   curvature_undulation_coupling:
     calculation: 
