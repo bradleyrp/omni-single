@@ -194,10 +194,11 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	topologize_tolerance=None):
 	"""
 	Identify leaflets in a bilayer by consensus.
+	Note that the time limit on the topologize call was increased from 10 to 30 for large systems.
 	"""
 	#---time limit on the tolerance checker
 	try:
-		with time_limit(10): 
+		with time_limit(30): 
 			wrapper = topologize(pts,vec,
 				**({'tol':topologize_tolerance} if topologize_tolerance else {}))
 	except TimeoutException, msg: 
@@ -218,7 +219,7 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	imono = np.zeros(nlipids)
 	nlist = []
 	for i in range(nlipids):
-		status('cataloging lipids',i=i,looplen=nlipids)
+		status('cataloging lipids',i=i,looplen=nlipids,tag='compute')
 		nlist.append(nbors[np.where(nbors[:,0]==i)[0],1])
 	iref = 0
 	mono = np.zeros(nlipids)

@@ -21,6 +21,8 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	work = kwargs['workspace']
 	parallel = kwargs.get('parallel',False)
 	#---prepare universe	
+	#---note that the universe throws a UserWarning on coarse-grained systems
+	#---...which is annoying to elevate to error stage and handled below without problems
 	uni = MDAnalysis.Universe(grofile,trajfile)
 	nframes = len(uni.trajectory)
 	#---MDAnalysis uses Angstroms not nm
@@ -71,7 +73,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 			#---the final fix is heavy-handed: leaving nothing to MDAnalysis subselections
 			allsel = uni.select_atoms('all')
 			lipids = np.where(np.in1d(allsel.resnames,np.array(selector['resnames'])))[0]
-			resid_changes = np.where(allsel[lipids].resids[1:]!=allsel[lipids].resids[:-1])[0]
+			resid_changes = np.concatenate(([-1],np.where(allsel[lipids].resids[1:]!=allsel[lipids].resids[:-1])[0]))
 			residue_atomcounts = resid_changes[1:]-resid_changes[:-1]
 			#---! this method fails
 			if False:
@@ -87,8 +89,10 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 						guess_atoms_per_residue[subs][:,1].astype(int))[0]][1].astype(int)
 					atoms_per_residue[name] = consensus_count
 			#---get the residue names for each lipid in our selection by the first atom in that lipid
-			#---! this probably skip the last residue but if everything hinges on that well oh well
-			resnames = allsel[lipids].resnames[resid_changes]
+			#---the resid_changes is prepended with -1 in the unlikely (but it happened) event that a unique lipid
+			#---...leads this list (note that a blase comment dismissed this possibility at first!) and here we correct
+			#---...the resnames list to reflect this. resnames samples the last atom in each residue from allsel 
+			resnames = np.concatenate((allsel[lipids].resnames[resid_changes[1:]],[allsel[lipids].resnames[-1]]))
 			guess_atoms_per_residue = np.array(zip(resnames,residue_atomcounts))
 			#---get consensus counts for each lipid name
 			atoms_per_residue = {}
@@ -97,13 +101,24 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 				counts,obs_counts = np.unique(guess_atoms_per_residue[:,1][
 					np.where(guess_atoms_per_residue[:,0]==name)[0]].astype(int),return_counts=True)
 				atoms_per_residue[name] = counts[obs_counts.argmax()]
-			#---iterate over the list of lipid atoms and get the indices for each N-atoms for each lipid type
-			counter,divider = 0,[]
-			while counter<len(lipids):
-				#---until the end, get the next lipid resname
-				this_resname = allsel.resnames[lipids][counter]
-				divider.append(np.arange(counter,counter+atoms_per_residue[this_resname]))
-				counter += atoms_per_residue[this_resname]
+			#---the following method is slow on large systems. it may be necessary for the ocean project?
+			if False:
+				#---iterate over the list of lipid atoms and get the indices for each N-atoms for each lipid type
+				counter,divider = 0,[]
+				while counter<len(lipids):
+					status('indexing lipids for centroid calculation',i=counter,looplen=len(lipids),tag='compute')
+					#---until the end, get the next lipid resname
+					this_resname = allsel.resnames[lipids][counter]
+					divider.append(np.arange(counter,counter+atoms_per_residue[this_resname]))
+					counter += atoms_per_residue[this_resname]
+			#---faster method
+			resid_to_start = np.transpose(np.unique(allsel.resids,return_index=True))
+			resid_to_start = np.concatenate((resid_to_start,[[resid_to_start[-1][0]+1,len(lipids)]]))
+			divider = np.array([np.arange(i,j) for i,j in np.transpose((resid_to_start[:,1][:-1],resid_to_start[:,1][1:]))])
+			#---make sure no molecules have the wrong number of atoms
+			if not set(np.unique([len(i) for i in divider]))==set(atoms_per_residue.values()):
+				import ipdb;ipdb.set_trace()
+				raise Exception('fast divider method failed')
 		else: raise Exception('residues have redundant resids and selection is not the easy one')
 
 	#---load trajectory into memory	

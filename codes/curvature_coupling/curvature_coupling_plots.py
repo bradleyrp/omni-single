@@ -15,18 +15,22 @@ import builtins
 for key in builtins._plotrun_specials: 
 	globals()[key] = builtins.__dict__[key]
 
-def center_by_protein(sn,surfs,static=False):
+def center_by_protein(sn,surfs,static=False,exclude_hydrogen=False):
 	"""
 	Align any field to the position of a single protein.
 	Assumes that  the protein points are available.
 	The static option moves a single field to the center by the average protein position.
 	"""
 	dat_protein = data[protein_abstractor_name][sn]['data']
-	protein_noh = np.array([ii for ii,i in enumerate(dat_protein['names']) if not re.match('^H',i)])
 	protein_pts = dat_protein['points_all']
 	if protein_pts.shape[1]!=1: raise Exception('cannot center multiple proteins!')
 	protein_pts = protein_pts.mean(axis=1)
-	protein_cogs = protein_pts[:,protein_noh].mean(axis=1)
+	if exclude_hydrogen:
+		protein_noh = np.array([ii for ii,i in enumerate(dat_protein['names']) if not re.match('^H',i)])
+		protein_cogs = protein_pts[:,protein_noh].mean(axis=1)
+	else: 
+		protein_cogs = protein_pts.mean(axis=1)
+		### raise Exception('need to handle dextran case here')
 	ivecs = dat_protein['vecs']
 	protein_cogs += (protein_cogs<0.0)*ivecs - (protein_cogs>=ivecs)*ivecs
 	nframes,nx,ny = surfs.shape
@@ -146,6 +150,7 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 				except: mean_prot_pts = data[protein_abstractor_name][sn][
 					'data']['points'].mean(axis=0)[:,:2]
 				plothull(ax,[mean_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
+				# data[protein_abstractor_name][sn]['data']['points_all'].mean(axis=0)[...,:2]
 				ax.set_title('height profile')
 				ax.set_xlabel('x (nm)')
 				ax.set_ylabel('y (nm)')
@@ -183,8 +188,10 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 				add_colorbar(ax,im,title=r'$\mathrm{\langle z \rangle}$')
 				#---track the protein
 				protein_pts = data[protein_abstractor_name][sn]['data']['points_all']
-				if protein_pts.shape[1]!=1: raise Exception('only one protein')
+				#### if protein_pts.shape[1]!=1: raise Exception('only one protein')
 				prot_traj = protein_pts[:,0].mean(axis=1)[:,:2]
+				#### more proteins
+				prot_traj = np.concatenate(data[protein_abstractor_name][sn]['data']['points_all'].mean(axis=0)[...,:2])
 				for shift in np.concatenate(np.transpose(np.meshgrid([-1,0,1],[-1,0,1])))*vecs[:2]:
 					ax.scatter(prot_traj[:,0]+shift[0],prot_traj[:,1]+shift[1],c='k',s=1)
 				ax.set_xlim((-vecs[0],2*vecs[0]))
