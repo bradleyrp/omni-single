@@ -65,10 +65,6 @@ def individual_reviews_ocean():
 	Not included in the default plots.
 	"""
 	plotspec = {
-		'coupling_review':{
-			'viewnames':['average_height','average_height_pbc','neighborhood_static',
-				'neighborhood_dynamic','average_field','example_field','example_field_pbc',
-				'spectrum','spectrum_zoom']},
 		'coupling_review.simple':{
 			'viewnames':['average_height','example_field'],'figsize':(6,6)},
 		'coupling_review.center_debug':{

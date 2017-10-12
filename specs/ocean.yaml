@@ -371,7 +371,7 @@ meta:
   mk004: 
     label: "example"
     nprots: 1
-	index_top_monolayer: 1
+    index_top_monolayer: 1
   mk005: 
     label: "example mk5"
     nprots: 1
@@ -423,6 +423,7 @@ plots:
     calculation: lipid_areas3d
   # under development
   curvature_undulation_coupling:
+    autoplot: True
     calculation: 
       - protein_abstractor
       - undulations
