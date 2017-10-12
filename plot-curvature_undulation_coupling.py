@@ -70,3 +70,11 @@ def individual_reviews():
 	seep = dict([(key,globals()[key]) for key in seepspace])
 	for out_fn,details in plotspec.items(): 
 		individual_reviews_plotter(out_fn=out_fn,seep=seep,**details)
+
+@autoplot(plotrun)
+def compare_curvature_estimates():
+	"""Find the best curvature estimates for each method."""
+	sns = work.sns()
+	comp = dict([(sn,(datas.keys()[i],datas.values()[i][sn]['bundle'][sn]['fun'])) 
+		for i in [np.argmin([datas[tag][sn]['bundle'][sn]['fun'] for tag in datas])] for sn in sns])
+	print(comp)
