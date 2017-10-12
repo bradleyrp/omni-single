@@ -26,7 +26,7 @@ variables:
       steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
       steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
       steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
-# multiplex slices for memory. feature is under redevelopment
+# DEV multiplex slices for memory. feature is under redevelopment
 slices_multiplex:
   membrane-v653-free:
     groups: 
@@ -113,7 +113,7 @@ meta:
     mesoscale:           True
     label:               some description
     path:                ~/omicron/dataset-project-meso/blen-1.27
-# multiplexed version
+# DEV multiplexed version
 calculations_multi:
   lipid_abstractor:
     slice_name:
@@ -167,21 +167,6 @@ calculations:
       upstream: 
         lipid_abstractor:
           selector: lipid_com
-deck:
-  undulations:
-    uptype: post
-    multiplex: False
-    group: lipids
-    slice_name: 
-      loop: +slices/steady16
-    collections:
-      - all
-    specs:
-      grid_spacing: 0.5
-      upstream: 
-        lipid_abstractor:
-          selector: lipid_com
-deck:
   curvature_undulation_coupling:
     uptype: post
     group: lipids
@@ -200,42 +185,40 @@ deck:
           grid_spacing: 0.5
       design:
         loop:
-          v22:
+          v3:
             store_instantaneous_fields: True
             style: wilderness
             curvature_positions: 
-              method: neighborhood
-              distance_cutoff: 10.0
-              spacer: 2.5
+              method: protein_dynamic_single
             extents:
               method: fixed_isotropic
-              extent: 2.5
+              extent: 1.0
             curvature_sum: mean
-  lipid_abstractor:
-    slice_name: steady16collect
-    group: lipids
+
+incoming:
+  curvature_undulation_coupling_pixel:
+    uptype: post
+    group: all
+    slice_name: current
     collections: all
     specs:
-      selector:
+      upstream:
+        undulations: {}
+      design:
         loop:
-          lipid_com:
-            resnames: +selectors/resnames_lipid
-            type: com
-      separator: 
-        lipid_tip: "name PO4"
-        monolayer_cutoff: 1.8
-        topologize_tolerance: 0.10
-  protein_abstractor:
-    slice_name: steady16
-    group: proteins
+          v16:
+            style: wilderness
+            curvature_positions: 
+              method: pixel
+              spacer: 10.0
+            extents:
+              method: fixed_isotropic
+              extent: 5.0
+            curvature_sum: mean
+plots:
+  curvature_undulation_coupling:
+    autoplot: True
     collections: protein_laden
-  undulations:
-    group: lipids
-    slice_name: steady16
-    collections:
-      - all
-    specs:
-      grid_spacing: 0.5
-      upstream: 
-        lipid_abstractor:
-          selector: lipid_com
+    calculation: 
+      - protein_abstractor
+      - undulations
