@@ -4,3 +4,5 @@ notes:
 
 passing:
   curvature_undulation_coupling: {'project':'enth','on':'2017.10.12.1400'}
+  ptdins_lipid_areas: {'project':'ptdins','on':'2017.10.12.1500'}
+  ptdins_diffusion: {'project':'ptdins','on':'2017.10.12.1500','use_seepspace':'false'}

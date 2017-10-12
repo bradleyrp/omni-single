@@ -7,10 +7,8 @@ Plot all of the upstream loops for the curvature undulation coupling analysis.
 
 from codes.curvature_coupling.curvature_coupling_plots import individual_reviews_plotter
 
-#---function names to plot or None for all
+#---autoplot settings
 plotrun.routine = ['individual_reviews']
-
-#---seeping namespaces
 global seepspace
 
 @autoload(plotrun)

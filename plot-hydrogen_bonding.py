@@ -10,6 +10,8 @@ systems, however
 
 import copy
 import brewer2mpl
+import matplotlib.image as mpimg
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 if is_live: 
 	from ipywidgets import *
 	from IPython.display import display
@@ -20,9 +22,13 @@ show_static,press = True,not is_live
 mpl.rcParams['hatch.linewidth'] = 1.5
 #---hatch color was controllable here in mpl v2.0.0 but they reverted
 mpl.rcParams['hatch.color'] = 'w'
+#---old plot behavior
+_old_school = True
 
 #---block: IMPORT THE DATA
 if 'data' not in globals(): 
+	#---! bad to declare here
+	global figsize_all,press_routine,interesting,bar_formats_style
 	sns,(data,calc) = work.sns(),plotload(plotname,work)
 	data_salt,calc_salt = plotload('salt_bridges',work)
 	#---set the plot targets in the YAML for multiuse scripts
@@ -56,6 +62,8 @@ def dimmer(bar,child):
 
 def count_hydrogen_bonds_by_sn(bonds,obs,nmols):
 	"""!!!"""
+	#---! artifacts of the new plot scheme!!! this needs revisited
+	#global relevant_resnames,nmols_recount
 	#---filter out intralipid hydrogen bonds
 	#---some simulations have no salt bridges at all
 	try: resids_d = bonds[:,1].astype(int)
@@ -125,6 +133,8 @@ def count_hydrogen_bonds(data,bonds_key='bonds'):
 		#---cut cholesterol in half because it is in both leaflets and POPC does not make hbonds
 		nmols_leaflet = 400 
 		if 'CHL1' in nmols: nmols['CHL1'] /= 2.0
+		#---! note that recent fixes to this calculation have caused CHL1-POPC to show up and you
+		#---! ... need to make sure the normalization is correct
 		#---get the proportions relative to combos
 		#---! CHECK THE MEANING OF THIS NUMBER, COMBINATORICALLY-WISE
 		#---subsample the obs matrix (frames by combos) to pick out each unique resname combo
@@ -144,7 +154,7 @@ def count_hydrogen_bonds(data,bonds_key='bonds'):
 		post[sn] = {'result':result,'result_err':result_err}
 	return post
 
-def make_bar_formats(sns,style='candy'):
+def make_bar_formats_MOVED_TO_ART(sns,style='candy'):
 	"""Make bar formats, most recently, candy-colored bars with hatches."""
 	colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
 		for key,val in {
@@ -176,11 +186,13 @@ def make_bar_formats(sns,style='candy'):
 
 def legend_maker_stylized(ax,sns_this,title=None,ncol=1,
 	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None,
-	comparison_spec=None,lipid_resnames=None,sns_explicit=None):
-	global bar_formats,comparison
+	comparison_spec=None,lipid_resnames=None,sns_explicit=None,bar_formats=None):
+	global comparison
+	if not bar_formats: bar_formats = globals()['bar_formats']
 	#---custom items in the legend based on the comparison
 	if comparison_spec:
-		ion_names,ptdins_names = [comparison_spec[i] for i in ['ion_names','ptdins_names']]
+		ion_names = comparison_spec.get('ion_names',[])
+		ptdins_names = comparison_spec.get('ptdins_names',[])
 		#---custom simulations must come in through the comparison_spec in the YAML file
 		sns_explicit = comparison_spec.get('sns_explicit',None)
 	else:
@@ -287,10 +299,16 @@ def postprep(sns):
 	"""
 	!!!
 	"""
+	empty = not sns
+	#---! very bad to have to declare like this
+	global data,count_hydrogen_bonds_by_sn,data_salt,hbonds_bardat,dimmer
 	sns_names = dict([(sn,work.meta[sn]['ptdins_resname']+' and '+
 		work.meta[sn]['cation']) for sn in sns])
 	namer = lambda ((a,b),c): ('%s-%s'%(a,b))
-	bar_formats = make_bar_formats(sns,style=bar_formats_style)
+	#---! temporary hack
+	#if 'bar_formats_style' not in globals(): bar_formats_style = 'candy'
+	global bar_formats_style
+	bar_formats = make_bar_formats(sns,work,style=bar_formats_style)
 	#---premake the data for the outline style
 	posts = dict([(key,{}) for key in ['hbonds','salt']])
 	for key,(bonds_key,data_name) in [('hbonds',('bonds','data')),('salt',('bonds_salt','data_salt'))]:
@@ -365,14 +383,75 @@ def hbonds_plotter(bars=None,checks=None,**kwargs):
 	legend_kwargs = dict(sns_this=sns)
 	#---overrides for the legendmaker
 	legend_kwargs.update(**legend_maker_specs)
+	#---! added fallback sns below but not sure if this is appropriate
 	legend,patches = legend_maker_stylized(bars.ax,
-		sns_this=legend_kwargs.pop('sns'),comparison_spec=legend_kwargs)
+		sns_this=legend_kwargs.pop('sns_this',sns),comparison_spec=legend_kwargs)
 	return legend
+
+def render_interesting_hydrogen_bonds(sns,ispec,postpreps,ax=None,fig=None,figsize=(4,6),
+	save=True,do_legend=True,style=None):
+	"""Render a subset of the hydrogen bonds which we think are 'interesting'."""
+	global bond_type
+	posts,bar_formats = [postpreps[i] for i in ['posts','bar_formats']]
+	#---whittle sns by other features
+	if ispec.get('cation',False): sns = [sn for sn in sns if 
+		ispec['cation']==work.meta[sn]['cation']]
+	#---get valid resnames
+	pairs = ispec['pairs']
+	#---organize the keys first by pairs then by simulation, for the bar grouper
+	keys = [[(sn,pair) for sn in sns] for pair in pairs]
+	if ispec.get('symmetric',False):
+		bardat = [[(((r1,r2),sn),tuple([
+			#---sum the totals but take the mean of the 
+			#---! is this the correct methodology!?
+			((posts[bond_type][sn][r][(r1,r2)]+posts[bond_type][sn][r][(r2,r1)]) if r=='result' else 
+				(posts[bond_type][sn][r][(r1,r2)]+posts[bond_type][sn][r][(r2,r1)])/2.)
+			for r in ['result','result_err']])) for sn,(r1,r2) in key] for key in keys]
+	else:
+		bardat = [[(((r1,r2),sn),tuple([posts[bond_type][sn][r][(r1,r2)] 
+			for r in ['result','result_err']])) for sn,(r1,r2) in key] for key in keys]
+	bardat = dict(
+		bardat=bardat,
+		barspec=[[dict(tl='%s\m%s'%(r1,r2),**dict(bar_formats[sn],
+			c=colorize(work.meta[sn],resname=r1))) for sn,(r1,r2) in key] for key in keys],
+		#---the label is the first in the pair since all comparisons in this block are to PtdIns
+		extras=[('xlabel',{'label':key[0][1][0],
+			'names':[((r1,r2),sn) for sn,(r1,r2) in key]}) for key in keys])
+	bars = BarGrouper(ax=ax,fig=fig,figsize=figsize,show_xticks=False,**bardat)
+	bars.plot(wait=True)		
+	bars.ax.tick_params(axis=u'both',which=u'both',length=0)
+	if style=='alt':
+		#---tag the common partner instead of using a title
+		title_text = '%s (%s)'%({'pip2':'PtdIns','chl1':'cholesterol','dope':'DOPE'}[ispec['pairname']],
+			work.meta[sns[0]]['ion_label'])
+		tb = ax.text(0.5,1.0,title_text,fontsize=12,
+			bbox=tagbox,rotation=0,ha="center",va="top",color='k',
+			transform=ax.transAxes)
+		#---cleaner numbers
+		ys = ax.get_yticks()
+		powlev = -1*np.floor(np.log10(ys[ys!=0.0]).min()).astype(int)
+		ax.set_yticklabels(['%d'%int(i*10.0**powlev) for i in ys])
+		bars.ax.set_ylabel(r'${R}_{bonds}(\times 10^{%d})$'%powlev,fontsize=14)
+		ax.set_ylim((0,ax.get_ylim()[1]*1.2))
+	else:
+		bars.ax.set_title('%s\n%s (%s)'%(
+			{'both':'hydrogen bonds + salt bridges','hbonds':'hydrogen bonds'}[bond_type],
+			{'pip2':'PtdIns','chl1':'cholesterol','dope':'DOPE'}[ispec['pairname']],
+			work.meta[sns[0]]['ion_label']))
+		bars.ax.set_ylabel(r'$\frac{\langle {N}_{bonds} \rangle}{{N}_{donor}{N}_{acceptor}}$',fontsize=14)
+	if do_legend: 
+		legend,patches = legend_maker_stylized(bars.ax,fs=10,
+			sns_this=list(set([sn for sn,pair in key for key in keys])),
+			comparison_spec={'ion_names':[],'ptdins_names':['PI2P','P35P']},
+			lipid_resnames=sorted(set([r1 for key in keys for sn,(r1,r2) in key])),bar_formats=bar_formats)
+	#---! still needs: legend, ylabel
+	if save: picturesave('fig.bonding_subset.%s.%s'%(bond_type,ispec['pairname']),work.plotdir,
+		backup=False,version=True,meta={'interesting':ispec},extras=[legend])
+	return legend if do_legend else None
 
 ###---PLOTTING
 
 #---block: static plots and plot press
-#---show a static version of the plot
 if show_static and is_live:
 	checks = dict([(sn,widgets.ToggleButton(value=False,description=sns_names[sn])) for sn in sns])
 	hbonds_plotter(bars_premade,extras=bars_premade.extras,checks=checks)
@@ -393,13 +472,15 @@ if press and 'summary' in press_routine:
 		#---put the postprep data into globals
 		globals().update(postprep(sns))
 		for tag,spec in press_specs.items():
-			bars_premade = BarGrouper(figsize=figsize_all,spacers={0:0,1:1.0,2:2.0},
+			#---set the error bar thickness below
+			bars_premade = BarGrouper(figsize=figsize_all,spacers={0:0,1:1.0,2:2.0},error_bar_lw=2,
 				dimmer=dimmer,namer=namer,show_xticks=False,
 				**hbonds_bardat(sns=sns,post=posts[spec['posts_subkey']],bar_formats=bar_formats))
 			legend = hbonds_plotter(bars_premade,title=spec['title'],checks=dict([(sn,True) for sn in sns]))
 			picturesave('fig.%s.%s'%(tag,comparison),work.plotdir,
 				backup=False,version=True,meta={},extras=[legend])
-#---batch plot the "interesting" subsets of the main plots
+
+#---block: batch plot the "interesting" subsets of the main plots
 if press and 'interesting' in press_routine:
 	#---loop over interesting panel plots, one per figure
 	for iname,ispec in interesting.items():
@@ -407,36 +488,114 @@ if press and 'interesting' in press_routine:
 		bond_type = ispec['bond_type']
 		#---get simulations for this comparison
 		sns = work.specs['collections'][comparison]
-		globals().update(postprep(sns))
-		#---whittle sns by other features
-		if ispec.get('cation',False): sns = [sn for sn in sns if 
-			ispec['cation']==work.meta[sn]['cation']]
-		#---get valid resnames
-		pairs = ispec['pairs']
-		#---organize the keys first by pairs then by simulation, for the bar grouper
-		keys = [[(sn,pair) for sn in sns] for pair in pairs]
-		bardat = dict(
-			bardat=[[(((r1,r2),sn),tuple([posts[bond_type][sn][r][(r1,r2)] 
-				for r in ['result','result_err']])) for sn,(r1,r2) in key] for key in keys],
-			barspec=[[dict(tl='%s\m%s'%(r1,r2),**dict(bar_formats[sn],
-				c=colorize(work.meta[sn],resname=r1))) for sn,(r1,r2) in key] for key in keys],
-			#---the label is the first in the pair since all comparisons in this block are to PtdIns
-			extras=[('xlabel',{'label':key[0][1][0],
-				'names':[((r1,r2),sn) for sn,(r1,r2) in key]}) for key in keys])
-		bars = BarGrouper(figsize=(4,6),show_xticks=False,**bardat)
-		bars.plot(wait=True)		
-		bars.ax.tick_params(axis=u'both',which=u'both',length=0)
-		bars.ax.set_title('%s %s with %s'%({'pip2':'PtdIns','chl1':'cholesterol'}[ispec['pairname']],
-			{'both':'hydrogen bonds + salt bridges','hbonds':'hydrogen bonds'}[bond_type],
-			work.meta[sns[0]]['ion_label']))
-		bars.ax.set_ylabel(r'$\frac{\langle {N}_{bonds} \rangle}{{N}_{donor}{N}_{acceptor}}$',fontsize=14)
-		legend,patches = legend_maker_stylized(bars.ax,fs=10,
-			sns_this=list(set([sn for sn,pair in key for key in keys])),
-			comparison_spec={'ion_names':[],'ptdins_names':['PI2P','P35P']},
-			lipid_resnames=sorted(set([r1 for key in keys for sn,(r1,r2) in key])))
-		picturesave('fig.bonding_subset.%s.%s'%(bond_type,ispec['pairname']),work.plotdir,
-			backup=False,version=True,meta={'interesting':ispec},extras=[legend])
-		#---! still needs: legend, ylabel
+		postpreps = postprep(sns)
+		render_interesting_hydrogen_bonds(ispec=ispec,sns=sns,postpreps=postpreps,save=True)
+
+#---block: batch plot of interesting results with snapshots
+if press and 'snapshot_examples' in press_routine:
+	#---loop over layouts
+	for layout_name,layout in copy.deepcopy(work.plots[plotname]['specs']['snapshot_examples'].items()):
+		matches = layout.pop('matches',{})
+		arrangement = layout.pop('arrangement',None)
+		figsize = layout.pop('figsize',None)
+		mesh_inset = layout.pop('mesh_inset',False)
+		legends = []
+		if layout: raise Exception('unprocessed layout arguments %s'%layout)
+		tagbox = dict(facecolor='w',lw=1,alpha=1.0,boxstyle="round,pad=0.5")
+		#---! deprecated. see square_tiles below
+		if arrangement=='bar_and_row':
+			npairs = len(matches)
+			if not figsize: figsize = (2*8,npairs*4)
+			axes,fig = panelplot(figsize=figsize,layout={'out':{'grid':[1,2],'wratios':[6,1],'wspace':0.0},
+				'ins':[{'grid':[npairs,1],'wspace':0.1} for i in range(2)]})
+			#---use the hybrid list/dict structure in the YAML hence the weird structure below
+			for pnum,item in enumerate(matches):
+				if len(item)!=1: raise Exception('use list/dict in YAML please')
+				(iname,fns) = item.items()[0]
+				#---first axis is the bar plot
+				ax = axes[1][pnum]
+				ispec = interesting[iname]
+				comparison = ispec['comparison']
+				bond_type = ispec['bond_type']
+				sns = work.specs['collections'][comparison]
+				legend = render_interesting_hydrogen_bonds(ispec=ispec,postpreps=postprep(sns),
+					sns=sns,fig=fig,ax=ax,save=False,do_legend=pnum==len(matches)-1)
+				if pnum==len(matches)-1: legends.append(legend)
+				#---second axis holds the exemplars
+				ax = axes[0][pnum]
+				image = sidestack_images([os.path.join(work.plotdir,fn) for fn in fns])
+				ax.imshow(image)
+				ax.axis('off')
+			picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,
+				backup=False,version=True,meta={},extras=legends)
+		#---showcase bar plots and images on a set of tiles
+		#---! note that this is somewhat repetitive with the above
+		elif arrangement in ['square_tiles','square_tiles_bars_below']:
+			nsnaps = [len(v) for i in matches for k,v in i.items()]
+			ntiles = len(matches)+sum(nsnaps)
+			axes,fig = square_tiles(ntiles=ntiles,figsize=(12,12),wspace=0.5)
+			#---use the hybrid list/dict structure in the YAML hence the weird structure below
+			for pnum,item in enumerate(matches):
+				if len(item)!=1: raise Exception('use list/dict in YAML please')
+				(iname,fns) = item.items()[0]
+				#---first axis is the bar plot
+				if arrangement=='square_tiles': axnum = pnum 
+				elif arrangement=='square_tiles_bars_below': axnum = ntiles-len(matches)+pnum
+				ax = axes[axnum]
+				ispec = interesting[iname]
+				comparison = ispec['comparison']
+				bond_type = ispec['bond_type']
+				sns = work.specs['collections'][comparison]
+				#---sometimes the legend causes a NoneType problem on get_window_extent
+				legend = render_interesting_hydrogen_bonds(ispec=ispec,postpreps=postprep(sns),
+					sns=sns,fig=fig,ax=ax,save=False,do_legend=pnum==len(matches)-1,style='alt')
+				#---! discarded: if pnum==0: legends.append(legend)
+				for fnum,fn in enumerate(fns):
+					#---second axis holds the exemplars
+					if arrangement=='square_tiles': axnum = len(matches)+sum(nsnaps[:pnum])+fnum
+					elif arrangement=='square_tiles_bars_below': axnum = sum(nsnaps[:pnum])+fnum
+					ax = axes[axnum]
+					#---previously sent a single image to sidestack but the following routine makes it square
+					image = mpimg.imread(os.path.join(work.plotdir,fn))
+					border = get_blank_border(image)
+					sizes = np.array([np.ptp(i) for i in border])
+					padding = np.array([(max(sizes)-s)/2. for s in sizes]).astype(int)
+					zooms = np.array([[border[i][0]-1*padding[i],border[i][1]+padding[i]] 
+						for i in range(2)])
+					#---note that you have to reverse the order of dimensions here
+					image_zoomed = image[zooms[1][0]:zooms[1][1],zooms[0][0]:zooms[0][1]]
+					ax.imshow(image_zoomed)
+					tb = ax.text(-0.1,0.2,chr(ord('A')+len(legends)),fontsize=14,
+						bbox=tagbox,rotation=0,ha="center",va="top",color='k',
+						transform=ax.transAxes)
+					legends.append(tb)
+					ax.axis('off')
+					#---handle inset mesh
+					if mesh_inset:
+						axins = inset_axes(ax,width="35%",height="35%",loc=3)
+						image = mpimg.imread(os.path.join(work.plotdir,
+							#---! somewhat clumsy renaming scheme to get the mesh snapshots
+							re.sub('.png$','.v1.png',re.sub('snapshot','snapshot_mesh_review_zoom',fn))))
+						#---cut the white space and add some padding
+						whites = [10,10]
+						border_lims_raw = get_blank_border(image)
+						sizes = np.array([i.ptp() for i in np.array(border_lims_raw)])
+						padding = np.array([(max(sizes)-s)/2.+whites[ss] 
+							for ss,s in enumerate(sizes)]).astype(int)
+						border_lims = np.array([[b[0]-padding[bb],b[1]+padding[bb]]
+							for bb,b in enumerate(border_lims_raw)])
+						#---swap in the full image after we use the highlights to zoom
+						image = mpimg.imread(os.path.join(work.plotdir,
+							#---! somewhat clumsy renaming scheme to get the mesh snapshots
+							re.sub('.png$','.v1.png',re.sub('snapshot','snapshot_mesh_review',fn))))
+						image_rect = image[slice(*(border_lims[1])),slice(*(border_lims[0]))]
+						axins.imshow(image_rect)
+						axins.tick_params(axis=u'both',which=u'both',length=0)
+						axins.set_xticks([])
+						axins.set_yticks([])
+			picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,
+				backup=False,version=True,meta={},extras=legends)
+		else: raise Exception('invalid arrangement %s'%arrangement)
 
 #---block: interactive plot
 if is_live:

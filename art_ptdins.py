@@ -11,7 +11,10 @@ labels = None
 
 #---CUSTOM additions to globals
 _art_words = ['colorize','barmaker']
-_art_words += ['uniquify','catalog','delve','delveset','delveset_list','BarGrouper','barspecs_stylized']
+_art_words += ['uniquify','catalog','delve','delveset','delveset_list',
+	'BarGrouper','barspecs_stylized','colorscale',
+	'make_bar_formats','legend_maker_stylized','sidestack_images','get_blank_border',
+	'ptdins_manuscript_settings']
 
 #---canonical colors for this project from brewer2mpl
 import brewer2mpl
@@ -23,8 +26,10 @@ def colorize(metadat,comparison='',resname=''):
 	Master listing of colors for different PtdIns comparisons.
 	"""
 	if resname != '':
+		#---switched CHL1 from green to gray for the hydrogen bonding plots
 		colordict = {
 			'DOPC':'grey',
+			'POPC':'grey',
 			'DOPS':'red',
 			'DOPE':'blue',
 			'PIP2':'purple',
@@ -34,7 +39,7 @@ def colorize(metadat,comparison='',resname=''):
 			'PIPP':'purple',
 			'SAPI':'purple',
 			'PtdIns':'purple',
-			'CHL1':'green'}
+			'CHL1':'grey'}
 		return palette_colors[colordict[resname]]
 	else:
 		colordict = {
@@ -163,11 +168,13 @@ class BarGrouper:
 		self.cursor,self.level = 0.0,None
 		self.extras = kwargs.get('extras',{})
 		self.routes = list(catalog(self.dat))
+		self.error_bar_lw = kwargs.get('error_bar_lw',3)
 		self.dimmer = kwargs.get('dimmer',None)
 		self.namer = kwargs.get('namer',lambda x:x)
 		self.show_xticks = kwargs.get('show_xticks',True)
 		self.empty = kwargs.get('empty',False)
 		self.ax = kwargs.get('ax',None)
+		if self.ax: self.fig = kwargs['fig']
 		#---mimic the incoming data structure and store bar properties
 		self.barsave = copy.deepcopy(self.dat)
 		#---plot specs for each bar
@@ -216,6 +223,7 @@ class BarGrouper:
 		if not self.ax:
 			fig = self.fig = plt.figure(figsize=self.figsize)
 			ax = self.ax = plt.subplot(111)
+		else: ax,fig = self.ax,self.fig
 		#---! here instead of set_ ???
 		xs,ws = [np.array([b[k] for bb,b in enumerate(self.bars)]) for k in 'lw']
 		#---incoming values are tuples of mean,std
@@ -225,7 +233,7 @@ class BarGrouper:
 		#---! ytf did they change default alignment?
 		#---no outline around the bars. the hatch colors are set below, and match the edge color
 		rendered = ax.bar(xs,ys,width=ws,align='edge',zorder=3,alpha=alpha,lw=0)
-		ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=5,alpha=1.0,lw=3,c='k',ls='none')
+		ax.errorbar(xs+self.width/2.,ys,yerr=yerrs,zorder=5,alpha=1.0,lw=self.error_bar_lw,c='k',ls='none')
 		if self.show_xticks:
 			xticks = np.mean(np.array([xs,ws+xs]),axis=0)
 			ax.set_xticks(xticks)
@@ -304,6 +312,116 @@ class BarGrouper:
 	def _change_state(self,val,*args):
 		for arg in args: self.namesdict[arg] = val
 
+def legend_maker_stylized(ax,sns_this,work,title=None,ncol=1,
+	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None,
+	comparison_spec=None,lipid_resnames=None,sns_explicit=None,bar_formats=None):
+	"""
+	############## copied from hydrogen bonding!
+	needs work compared to the original
+	"""
+	if not comparison_spec: global comparison
+	if not bar_formats: bar_formats = globals()['bar_formats']
+	#---custom items in the legend based on the comparison
+	if comparison_spec:
+		ion_names = comparison_spec.get('ion_names',[])
+		ptdins_names = comparison_spec.get('ptdins_names',[])
+		#---custom simulations must come in through the comparison_spec in the YAML file
+		sns_explicit = comparison_spec.get('sns_explicit',None)
+	else:
+		if comparison not in legend_mapper:
+			raise Exception('you must add this comparison (%s) to legend_mapper in the plot specs') 
+		ion_names,ptdins_names = [legend_mapper[comparison][k] for k in ['ion_names','ptdins_names']]
+	#---we can also add lipid types to the bar plots for the subset plots
+	lipid_resnames = [] if not lipid_resnames else lipid_resnames
+	rectangle_specs,patches,labels = {},[],[]
+	#---loop over relevant cations, PIP2 types, and lipids so they are included in the legend
+	for name,group in [('cation',ion_names),('ptdins_resname',ptdins_names),
+		('lipid_resname',lipid_resnames)]:
+		for item in group:
+			if name!='lipid_resname':
+				try: sn = next(sn for sn in sns_this if work.meta[sn][name]==item)
+				except: 
+					import ipdb;ipdb.set_trace()
+					raise Exception('cannot get a simulation for %s,%s'%(name,item))
+			#---simulation does not matter if we are adding lipids to the legend
+			else: sn = sns_this[0]
+			if sn not in sns_this: continue
+			rectangle_specs[sn] = {}
+			if name=='cation':
+				rectangle_specs[sn]['fc'] = bar_formats[sn]['edgecolor']
+				rectangle_specs[sn]['lw'] = 0
+				patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+				labels.append(work.meta[sn]['ion_label'])
+			elif name=='ptdins_resname':
+				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=1.0,fc='w',lw=3,ec='k',
+					hatch=bar_formats[sn]['hatch']*(1 if work.meta[sn]['ptdins_resname']=='PI2P' else 2)))
+				labels.append(work.meta[sn]['ptdins_label'])
+			elif name=='lipid_resname':
+				rectangle_specs[sn]['fc'] = colorize(work.meta[sn],resname=item)
+				patches.append(mpl.patches.Rectangle((-0.5,-0.5),1.5,1.5,alpha=1.0,lw=3,ec='k',
+					**rectangle_specs[sn]))
+				labels.append(item)
+	#---additional legend items for explicit simulations that come from sns_explicit
+	if sns_explicit:
+		for sn in sns_explicit:
+			if sn not in rectangle_specs: rectangle_specs[sn] = {}
+			rectangle_specs[sn]['ec'] = 'k'
+			rectangle_specs[sn]['fc'] = bar_formats[sn]['edgecolor']
+			rectangle_specs[sn]['lw'] = 0
+			rectangle_specs[sn]['hatch'] = bar_formats[sn].get('hatch','')
+			patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+			labels.append(work.meta[sn].get('label',sn))
+	#---special annotation for cholesterol 
+	###---!!!!!!!!!!!!!!!!!!!!
+	if 'bar_formats_style' in globals() and bar_formats_style=='actinlink':
+		for is_chol in [True,False]:
+			rectangle_specs[sn]['ec'] = 'k'
+			rectangle_specs[sn]['fc'] = 'w'
+			rectangle_specs[sn]['lw'] = 2
+			rectangle_specs[sn]['hatch'] = {True:'//',False:''}[is_chol]
+			patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,**rectangle_specs[sn]))
+			labels.append('%s cholesterol'%{True:'with',False:'no'}[is_chol])
+	if not patches: patches,labels = [mpl.patches.Rectangle((0,0),1.0,1.0,fc='w')],['empty']
+	legend = ax.legend(patches,labels,loc=loc,fontsize=fs,
+		ncol=ncol,title=title,bbox_to_anchor=bbox,labelspacing=1.2,
+		handleheight=2.0,markerscale=0.5,shadow=True,fancybox=True)
+	frame = legend.get_frame()
+	frame.set_edgecolor('black')
+	frame.set_facecolor('white')
+	return legend,patches
+
+def make_bar_formats(sns,work,style='candy'):
+	"""
+	Make bar formats, most recently, candy-colored bars with hatches.
+	"""
+	colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
+		for key,val in {
+		'red':0,'blue':1,'green':2,'purple':3,'orange':4,
+		'yellow':5,'brown':6,'pink':7,'grey':8,}.items()])
+	colors['pink'] = mpl.colors.ColorConverter().to_rgb("#f1948a")
+	colors['beige'] = mpl.colors.ColorConverter().to_rgb("#C3C3AA")
+	#---combine blue and green to denote the dilute Na,Cal simulation
+	bgw = 0.3
+	colors['bluegreen'] = np.average((colors['blue'],colors['green']),weights=[1-bgw,bgw],axis=0)
+	bgw2 = 0.6
+	colors['bluegreen2'] = np.average((colors['blue'],colors['green']),weights=[1-bgw2,bgw2],axis=0)
+	if style=='original':
+		out = dict([(sn,{'c':colorize(work.meta[sn],comparison=comparison)}) for sn in sns])
+	elif style=='candy':
+		colors_ions = {'NA':'green','Na,Cal':'bluegreen','MG':'pink','Cal':'blue','K':'grey',}
+		hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':''}
+		out = dict([(sn,{
+			'c':colors[colors_ions[work.meta[sn]['cation']]],
+			'hatch':hatches_lipids[work.meta[sn]['ptdins_resname']]}) for sn in sns])
+	elif style=='actinlink':
+		out = dict([(sn,{
+			#---the actinlink plots have custom colors
+			'c':colors[sns_explicit_color_names[sn]],
+			'hatch':'//' if work.meta[sn].get('cholesterol',False) else ''}) for sn in sns])
+	else: raise Exception('no bar style: %s'%style)
+	for k,v in out.items(): v.update(edgecolor=v['c'])
+	return out
+
 def figspec_to_panelplot(layout):
     """
     Convert a list of explicit "plot these sns here" into the layout expected by panelplot.
@@ -362,13 +480,13 @@ def figplacer(sn,figplace):
 
 figlayout = {}
 figlayout['4x4'] = {'out':{'grid':[1,1]},'ins':[{'grid':[2,2]}]}
-figlayout['summary1'] = {'out':{'grid':[4,1]},'ins':[
+figlayout['summary1a'] = {'out':{'grid':[4,1]},'ins':[
 	{'grid':[1,3],'wspace':0.5},
 	{'grid':[1,3],'wspace':0.5},
 	{'grid':[1,3],'wspace':0.5},
 	{'grid':[1,3],'wspace':0.5},]}
 
-figlayout['summary2'] = {'out':{'grid':[5,1]},'ins':[
+figlayout['summary1'] = {'out':{'grid':[5,1]},'ins':[
 	{'grid':[1,3],'wspace':0.5},
 	{'grid':[1,3],'wspace':0.5},
 	{'grid':[1,3],'wspace':0.5},
@@ -378,13 +496,13 @@ figlayout['summary2'] = {'out':{'grid':[5,1]},'ins':[
 #---FIGURE PLACEMENTS	
 
 figplace = {}
-figplace['summary1'] = [
+figplace['summary1a'] = [
 	['membrane-v509','membrane-v510','membrane-v511'],
 	['membrane-v530','membrane-v531','membrane-v532'],
 	['membrane-v536','membrane-v533','membrane-v534'],
 	['membrane-v538','membrane-v514','membrane-v515'],]	
 
-figplace['summary2'] = [
+figplace['summary1'] = [
 	['membrane-v509','membrane-v510','membrane-v511'],
 	['membrane-v530','membrane-v531','membrane-v532'],
 	['membrane-v536','membrane-v533','membrane-v534'],
@@ -397,3 +515,65 @@ def blank_unused_axes(axes,fig,figplace):
 		for jj,j in enumerate(i) if j==None]:
 		fig.delaxes(axes[rr][cc])
 
+def colorscale(name=None,count=256,cmap=None,bands=None,
+	reverse=False,sharp=False,zero=False,return_cmap=False,nsegs=None):
+	"""
+	Divide a matplotlib color map into discrete colors.
+	Copied from diffusion_ions_zoned.
+	"""
+	from matplotlib.colors import LinearSegmentedColormap
+	if cmap != None: thiscmap = cmap
+	elif name != None: thiscmap = plt.cm.get_cmap(name)
+	elif bands != None:
+		vmax = len(bands)-1.
+		color_list = [(ii/vmax,i) for ii,i in enumerate(bands)]
+		segs = (int(vmax)+1 if sharp else (256 if not zero else 255)) if nsegs==None else nsegs
+		thiscmap = LinearSegmentedColormap.from_list('',color_list,N=segs)
+	else: raise Exception('unclear inputs')
+	grads = [thiscmap(i) for i in np.array(range(0,count)[::(-1 if reverse else 1)])/float(count)]
+	if return_cmap: return grads,thiscmap
+	else: return grads
+
+import matplotlib.image as mpimg
+
+def get_blank_border(img):
+	"""Return the border limits for removing whitespace."""
+	nonblank = np.any(img!=1.0,axis=2)*1
+	lims = [map(lambda x:(x[0]-1,x[-1]+1),
+		[np.where(np.any(nonblank!=0,axis=j))[0]])[0] for j in range(2)]
+	return lims
+
+def sidestack_images(fns):
+	"""Combine snapshots into one image with same zoom and minimal whitespace."""
+	#---preassemble images for a particular row
+	imgs = [mpimg.imread(fn) for fn in fns]
+	borders = np.array([get_blank_border(img) for img in imgs])
+	lims = np.array([[i.min() for i in borders.T[0]]]+[[i.max() for i in borders.T[1]]]).T
+	#---stack horizontally
+	buffer_width = 100
+	imgs_zoomed = [img[slice(*lims[1]),slice(*lims[0])] for img in imgs]
+	imgs_cropped = [i[:,slice(*(get_blank_border(i)[0]))] for i in imgs_zoomed]
+	buffer_strip = np.ones((imgs_cropped[0].shape[0],buffer_width,3))
+	#---add a vertical buffer strip
+	imgs_combo = np.concatenate([np.concatenate((i,buffer_strip),axis=1) 
+		for i in imgs_cropped[:-1]]+[imgs_cropped[-1]],axis=1)
+	return imgs_combo
+
+def ptdins_manuscript_settings():
+	"""Alternate colors for late-stage ptdins manuscript preparation."""
+	colors = dict([(key,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[val])
+		for key,val in {
+		'red':0,'blue':1,'green':2,'purple':3,'orange':4,
+		'yellow':5,'brown':6,'pink':7,'grey':8,}.items()])
+	colors['white'] = mpl.colors.ColorConverter().to_rgb("#000000")
+	colors['pink'] = mpl.colors.ColorConverter().to_rgb("#f1948a")
+	colors['beige'] = mpl.colors.ColorConverter().to_rgb("#C3C3AA")
+	bgw = 0.3
+	colors['bluegreen'] = np.average((colors['blue'],colors['green']),weights=[1-bgw,bgw],axis=0)
+	bgw2 = 0.6
+	colors['bluegreen2'] = np.average((colors['blue'],colors['green']),weights=[1-bgw2,bgw2],axis=0)
+	scale = 0.5
+	colors['light_blue'] = np.average((colors['blue'],colors['white']),weights=[1-scale,scale],axis=0)
+	colors_ions = {'NA':'green','Na,Cal':'bluegreen','MG':'pink','Cal':'blue','K':'grey',}
+	hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':''}
+	return dict(colors_ions=colors_ions,colors=colors,hatches_lipids=hatches_lipids)
