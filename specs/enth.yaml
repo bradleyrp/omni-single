@@ -1,0 +1,241 @@
+variables:
+  selectors:
+    resnames_lipid: ['DOPC','DOPS','PIP2']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2)
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+  slices_intermediate:
+    steady16: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+  slices:
+    steady16:
+      - steady12
+      - steady23
+      - steady34
+      - steady45
+      - steady56
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+# multiplex slices for memory. feature is under redevelopment
+slices_multiplex:
+  membrane-v653-free:
+    groups: 
+      all: all
+      lipids: +selectors/lipid_selection
+    slices: 
+      steady12: {'pbc':'mol','groups':['lipids'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids'],'start':500000,'end':600000,'skip':160}
+  membrane-v652-enthx1:
+    groups: 
+      all: all
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices: +slices/steady16collect
+  membrane-v650-enthx4-dev:
+    groups: 
+      all: all
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices: +slices/steady16collect
+  membrane-v651-enthx8:
+    groups: 
+      all: all
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices: +slices/steady16collect   
+# single slices
+slices:
+  membrane-v653-free:
+    groups: 
+      lipids: +selectors/lipid_selection
+    slices:
+      steady16: {'pbc':'mol','groups':['lipids'],'start':100000,'end':600000,'skip':160}
+  membrane-v652-enthx1:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      steady16: +slices/steady16collectcombo
+  membrane-v650-enthx4-dev:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      steady16: +slices/steady16collectcombo
+  membrane-v651-enthx8:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      steady16: +slices/steady16collectcombo
+collections:
+  one:
+    - membrane-v651-enthx8
+  control:
+    - membrane-v653-free
+  all:
+    - membrane-v653-free
+    - membrane-v652-enthx1
+    - membrane-v650-enthx4-dev
+    - membrane-v651-enthx8
+  protein_laden:
+    - membrane-v650-enthx4-dev
+    - membrane-v651-enthx8
+    - membrane-v652-enthx1
+meta:
+  short_namer: "lambda name,spot : 'v'+re.findall('membrane-v([0-9]+)',name)[0]"
+  membrane-v653-free:
+    label:               free bilayer
+    nprots:              0
+  membrane-v651-enthx8:
+    label:               '$\mathrm{{ENTH}\ensuremath{\times}8}$'
+    nprots:              8
+  membrane-v652-enthx1:
+    label:               '$\mathrm{{ENTH}\ensuremath{\times}1}$'
+    nprots:              1
+  membrane-v650-enthx4-dev:
+    label:               '$\mathrm{{ENTH}\ensuremath{\times}4}$'
+    nprots:              4
+  meso-test:
+    mesoscale:           True
+    label:               some description
+    path:                ~/omicron/dataset-project-meso/blen-1.27
+# multiplexed version
+calculations_multi:
+  lipid_abstractor:
+    slice_name:
+      loop: +slices/steady16
+    group: lipids
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        lipid_tip: "name PO4"
+        # smaller cutoffs are more effective
+        monolayer_cutoff: 1.0
+        topologize_tolerance: 0.05
+  protein_abstractor:
+    slice_name:
+      loop: +slices/steady16
+    group: proteins
+    collections: protein_laden
+# combined version
+calculations:
+  lipid_abstractor:
+    slice_name: steady16
+    group: lipids
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        lipid_tip: "name PO4"
+        # smaller cutoffs are more effective
+        monolayer_cutoff: 1.0
+        topologize_tolerance: 0.05
+  protein_abstractor:
+    slice_name: steady16
+    group: proteins
+    collections: protein_laden
+  undulations:
+    uptype: post
+    group: lipids
+    slice_name: steady16
+    collections: all
+    specs:
+      grid_spacing: 0.5
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_com
+deck:
+  undulations:
+    uptype: post
+    multiplex: False
+    group: lipids
+    slice_name: 
+      loop: +slices/steady16
+    collections:
+      - all
+    specs:
+      grid_spacing: 0.5
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_com
+deck:
+  curvature_undulation_coupling:
+    uptype: post
+    group: lipids
+    slice_name: steady16
+    collections: protein_laden
+    specs:
+      loader_membrane:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_membrane
+      loader_protein:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_protein
+      upstream:
+        protein_abstractor: {}
+        undulations:
+          grid_spacing: 0.5
+      design:
+        loop:
+          v22:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: neighborhood
+              distance_cutoff: 10.0
+              spacer: 2.5
+            extents:
+              method: fixed_isotropic
+              extent: 2.5
+            curvature_sum: mean
+  lipid_abstractor:
+    slice_name: steady16collect
+    group: lipids
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        lipid_tip: "name PO4"
+        monolayer_cutoff: 1.8
+        topologize_tolerance: 0.10
+  protein_abstractor:
+    slice_name: steady16
+    group: proteins
+    collections: protein_laden
+  undulations:
+    group: lipids
+    slice_name: steady16
+    collections:
+      - all
+    specs:
+      grid_spacing: 0.5
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_com
