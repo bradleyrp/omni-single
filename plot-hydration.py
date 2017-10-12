@@ -339,15 +339,15 @@ if 'basic' in routine:
 		ax.set_xticklabels(['%.1f'%i for i in ax.get_xticks()],
 			fontsize=figspecs['fs_ticks'])
 		fn_fig = 'fig.hydration'
-		axtop.set_ylabel(r'$\mathrm{\langle N_{ions}(x) \rangle}$',fontsize=figspecs['fs_ylabel'])
-		ax.set_ylabel(r'$\mathrm{N_{waters}(x,t)}$',fontsize=figspecs['fs_ylabel'])
+		axtop.set_ylabel(r'$\mathrm{N_{ions}}$',fontsize=figspecs['fs_ylabel'])
+		ax.set_ylabel(r'$\mathrm{N_{waters}}$',fontsize=figspecs['fs_ylabel'])
 		ax.set_xlabel('cation-lipid distance ($\mathrm{\AA}$)',fontsize=figspecs['fs_xlabel'])
 		patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
 		patch = mpl.lines.Line2D([],[],color='k',marker='+',markersize=30,lw=0,mew=4)
 		patches.extend([
 			mpl.lines.Line2D([],[],color='k',lw=4),
 			mpl.lines.Line2D([],[],color='k',marker='+',markersize=30,lw=0,mew=4)])
-		labels.extend([r'$\mathrm{\langle N_{waters}(x,t) \rangle}$','zero\nvariance'])
+		labels.extend([r'$\mathrm{\langle N_{waters} \rangle}$','zero\nvariance'])
 		legend = ax.legend(patches,labels,loc='upper left',fontsize=figspecs['fs_legend'],
 			#---no more than 8 items in a column
 			bbox_to_anchor=(1.05,0.0,1.,1.),labelspacing=1.2,ncol=int(np.ceil(len(sns_this)/8.)),

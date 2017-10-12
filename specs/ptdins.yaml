@@ -99,6 +99,7 @@ slices:
       current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
 
 variables:
+  force_field: charmm
   art_director: art_ptdins.py
   composition_names:
     symmetric: symmetric
@@ -178,6 +179,7 @@ variables:
         - membrane-v543
         - membrane-v510
         - membrane-v511
+
 collections:
   one:
     - membrane-v530
@@ -411,8 +413,20 @@ calculations:
     specs:
       distance_cutoff: 
         loop: [2.2,3.4,4.6]
-  # note in the lab notebook taht running the plot without this tells you that it's missing pretty clearly...
   lipid_areas2d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  lipid_mesh_partners:
     uptype: simulation
     slice_name: current
     collections: all
@@ -455,9 +469,58 @@ calculations:
         loop:
           - z
           - r
+  hydration_distribution:
+    collections: all
+    slice_name: current
+    group: all
+  diffusion_lipids:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      diffusion_skip: 1
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+  lipid_areas3d:
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  electron_density_profile:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      bin_size: 0.1
+      selector:
+        monolayer_cutoff: 1.4
+        resnames: +selectors/resnames_lipid_chol
+        type: com
+  lipid_order:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: asymmetric
+  salt_bridges_lipid_lipid:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      distance_cutoff: 3.4
 
-# set aside again
-calculations_aside2:
+calculations_aside:
   ion_binding:
     group: all
     uptype: simulation
@@ -493,65 +556,20 @@ calculations_aside2:
           upstream:
             lipid_abstractor:
               selector: lipid_com
-
-
-# set aside
-calculations_aside:
-  diffusion_lipids:
-    uptype: post
-    slice_name: current
-    collections:
-      - all
-    specs:
-      diffusion_skip: 1
-      upstream:
-        lipid_abstractor:
-          selector: lipid_chol_com
-  lipid_areas2d:
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        lipid_mesh:
-          upstream:
-            lipid_abstractor:
-              selector:
-                loop:
-                  - lipid_com
-                  - lipid_chol_com
-  lipid_areas3d:
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        lipid_mesh:
-          upstream:
-            lipid_abstractor:
-              selector:
-                loop:
-                  - lipid_com
-                  - lipid_chol_com
-  electron_density_profile:
+  #! too many combinations! hits memory
+  contacts:
     group: all
-    uptype: simulation
     slice_name: current
-    collections: all
+    collections: asymmetric_all
     specs:
-      bin_size: 0.1
-      selector:
-        monolayer_cutoff: 1.4
-        resnames: +selectors/resnames_lipid_chol
-        type: com
-  lipid_order:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: asymmetric
+      subject: lipids
+      object: lipid
+      cutoff:
+        loop: [3.4]
 
 plots:
-  undulations_ptdins: undulations
+  undulations_ptdins: 
+    calculation: undulations
   undulations:
     calculation: undulations
   ion_binding:
@@ -559,23 +577,84 @@ plots:
       ion_binding: {}
       ion_binding_combinator:
         zonecut: 2.2
-      #ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
+      # ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
   hydrogen_bonding:
     calculation: hydrogen_bonding
     collections: all
     specs:
       press_routine:
-        - summary
-        #- interesting
+        # - summary
+        # - interesting
+        - snapshot_examples
+      # a set of interesting comparisons we can single-out from the large summary data
       interesting:
-        v1: {'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1',
+        v1: {'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1','symmetric':1,
           'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'both'}
-        v2: {'comparison':'position','cation':'Cal','pairname':'pip2',
+        v2: {'comparison':'position','cation':'Cal','pairname':'pip2','symmetric':1,
           'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'both'}
-        v3: {'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1',
+        v3: {'comparison':'asymmetric_all','cation':'Cal','pairname':'chl1','symmetric':1,
           'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'hbonds'}
-        v4: {'comparison':'position','cation':'Cal','pairname':'pip2',
+        v4: {'comparison':'position','cation':'Cal','pairname':'pip2','symmetric':1,
           'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'hbonds'}
+        v5: {'comparison':'position','cation':'Cal','pairname':'dope','symmetric':1,
+          'pairs':[['DOPE','DOPE'],['DOPS','DOPE'],['PtdIns','DOPE']],'bond_type':'both'}
+        v6: {'comparison':'position','cation':'Cal','pairname':'dope','symmetric':1,
+          'pairs':[['DOPE','DOPE'],['DOPS','DOPE'],['PtdIns','DOPE']],'bond_type':'hbonds'}
+      # matching up snapshots 
+      snapshot_examples:
+        # loop over groupings
+        layout_1:
+          # bar plots on the left and a row of exemplars
+          arrangement: square_tiles
+          figsize: [16,14]
+          # matches are keyed by the interesting subsets we wish to compare the examplars
+          matches: 
+            - v4:
+              - fig.hydrogen_bonding.v7_ptdins_with_chl1/fig.snapshot.membrane-v532.fr363.798_794_o6.png
+              - fig.hydrogen_bonding.v7_ptdins_with_chl1/fig.snapshot.membrane-v532.fr3.773_775_o7.png
+              - fig.hydrogen_bonding.v7_ptdins_with_chl1/fig.snapshot.membrane-v534.fr49.778_772_o8.png
+            - v6:
+              - fig.hydrogen_bonding.v7_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr16.536_770_o5.png
+              - fig.hydrogen_bonding.v7_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr0.790_644_o6.png
+              - fig.hydrogen_bonding.v7_ptdins_dope_with_chl1/fig.snapshot.membrane-v534.fr32.641_786_o4.png
+            - v3:
+              - fig.hydrogen_bonding.v7_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v532.fr63.378_791_o1.png
+              - fig.hydrogen_bonding.v7_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v532.fr487.322_774_o4.png
+              - fig.hydrogen_bonding.v7_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v534.fr1.472_790_o8.png
+        layout_2:
+          # bar plots on the left and a row of exemplars
+          arrangement: square_tiles_bars_below
+          mesh_inset: True
+          figsize: [16,14]
+          # matches are keyed by the interesting subsets we wish to compare the examplars
+          matches: 
+            - v4:
+              - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v532.fr363.798_794_o6.png
+              - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v532.fr3.773_775_o7.png
+              - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v534.fr23.793_790_o0.png
+            - v6:
+              - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr16.536_770_o5.png
+              - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr0.790_644_o6.png
+              - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v534.fr89.647_791_o4.png
+            - v3:
+              - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v532.fr63.378_791_o1.png
+              - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v532.fr487.322_774_o4.png
+              - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v534.fr1.472_790_o8.png
+        layout_3:
+          # bar plots on the left and a row of exemplars
+          arrangement: square_tiles_bars_below
+          mesh_inset: True
+          figsize: [16,14]
+          # matches are keyed by the interesting subsets we wish to compare the examplars
+          matches: 
+            - v4:
+              - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v532.fr363.798_794_o6.png
+              - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v532.fr3.773_775_o7.png
+              - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v534.fr23.793_790_o0.png
+            - v6:
+              - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr16.536_770_o5.png
+              - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr0.790_644_o6.png
+              - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v534.fr89.647_791_o4.png
       ion_order: ['K','NA','Na,Cal','MG','Cal']
       collection_sets: ['asymmetric_all','symmetric_all']
       legend_mapper:
@@ -585,11 +664,11 @@ plots:
         symmetric_all:
           ion_names: ['NA','MG','Cal']
           ptdins_names: ['PI2P','PIPU','PIPP']
-  # no plot but hydrogen_bonding uses these data via plotload to plot everything
   salt_bridges:
+    # no plot but hydrogen_bonding uses these data via plotload to plot everything
     calculation: 
       salt_bridges:
-        # RYAN DO NOT USE SPECS HERE THIS IS VERY COUNTERINTUITIVE
+        #! note that we do not use the specs keyword here (counterintuitive)
         distance_cutoff: 2.2
     collections: all
   lipid_areas2d:
@@ -601,7 +680,7 @@ plots:
       hydration:
         # use "null" for None
         atom_filter: "^O"
-        distance_metric: "z"
+        distance_metric: "r"
     collections: all
     specs:
       # set the cutoffs according to distance_metric
@@ -633,7 +712,7 @@ plots:
           - membrane-v533
           - membrane-v532
           - membrane-v534
-        zzz:
+        core_six:
           - membrane-v509
           - membrane-v510
           - membrane-v511
@@ -645,14 +724,14 @@ plots:
   ptdins_snapshots:
     collections: asymmetric_all
     calculation:
-      # are these necessary? you are plotloading tilt without adding it here
+      # note that tilt is loaded manually in the script
       hydrogen_bonding: {}
       salt_bridges:
         distance_cutoff: 2.2
       lipid_abstractor:
         selector: lipid_chol_com
-  # a one-off plot with no script to load a single mesh object
-  ptdins_snapshots_mesh:
+  load_mesh:
+    # a one-off plot with no script to load a single mesh object
     calculation:
       lipid_mesh:
         upstream: 
@@ -662,7 +741,39 @@ plots:
     collections: important_two
     calculation:
       lipid_abstractor:
-        selector:
-          lipid_chol_com
+        selector: lipid_chol_com
       hydrogen_bonding: {}
-      # how to get protein_abstractor
+  ptdins_partners:
+    collections: all
+    calculation:
+      lipid_mesh_partners: {}
+  ptdins_diffusion_legacy:
+    collections: all
+    calculation:
+      diffusion_lipids: {}
+  ptdins_diffusion:
+    autoplot: True
+    collections: all
+    calculation:
+      diffusion_lipids: {}
+  ptdins_lipid_areas:
+    autoplot: True
+    calculation:
+      lipid_areas3d:
+        upstream:
+          lipid_mesh:
+            upstream:
+              lipid_abstractor:
+                selector: lipid_com
+      lipid_areas2d:
+        upstream:
+          lipid_mesh:
+            upstream:
+              lipid_abstractor:
+                selector: lipid_com
+  ptdins_snapshots2:
+    collections: all
+    # need a calculation to get filenames
+    calculation: 
+      lipid_abstractor:
+        selector: lipid_com

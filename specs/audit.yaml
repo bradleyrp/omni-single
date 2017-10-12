@@ -1,0 +1,8 @@
+notes:
+  curvature_review: {'retired':'2017.10.12','notes':'used older methods. included interactive plot meant for old landscape surveys of the curvature coupling results. superceded by the current curvature calculation (3b) which can be reviewed with a plot called curvature_undulation_coupling'}
+  curvature_review_opt: {'retired':'2017.10.12','notes':'used older methods'}
+
+passing:
+  curvature_undulation_coupling: {'project':'enth','on':'2017.10.12.1400'}
+  ptdins_lipid_areas: {'project':'ptdins','on':'2017.10.12.1500'}
+  ptdins_diffusion: {'project':'ptdins','on':'2017.10.12.1500','use_seepspace':'false'}

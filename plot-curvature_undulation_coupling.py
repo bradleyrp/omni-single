@@ -2,16 +2,13 @@
 
 """
 Plot all of the upstream loops for the curvature undulation coupling analysis.
+
 """
 
 from codes.curvature_coupling.curvature_coupling_plots import individual_reviews_plotter
 
-#---function names to plot or None for all
-plotrun.routine = None
-
-#---seeping namespaces
-#---note that this allows variables to "seep" into the module globals later
-#---...but development should happen locally. only mature functions should be moved to modules
+#---autoplot settings
+plotrun.routine = ['individual_reviews']
 global seepspace
 
 @autoload(plotrun)
@@ -20,6 +17,7 @@ def loader():
 	#---only load once
 	if 'data' not in globals():
 		#---begin loading sequence
+		if plotname not in work.plots: raise Exception('add %s to the plots metadata'%plotname)
 		plotspecs = work.plots[plotname].get('specs',{})
 		calcname = plotspecs.get('calcname',plotname)
 		#---new method for getting all upstream calculations in the loop
@@ -48,6 +46,23 @@ def loader():
 def individual_reviews():
 	"""
 	Plot a few versions of the main figure.
+	This is the standard plot. See other functions below for spinoffs.
+	"""
+	plotspec = {
+		'coupling_review':{
+			'viewnames':['average_height','average_height_pbc','neighborhood_static',
+				'neighborhood_dynamic','average_field','example_field','example_field_pbc',
+				'spectrum','spectrum_zoom']},}
+	global seepspace
+	seep = dict([(key,globals()[key]) for key in seepspace])
+	for out_fn,details in plotspec.items(): 
+		individual_reviews_plotter(out_fn=out_fn,seep=seep,**details)
+
+@autoplot(plotrun)
+def individual_reviews_ocean():
+	"""
+	Custom version of individual_reviews for the ocean project.
+	Not included in the default plots.
 	"""
 	plotspec = {
 		'coupling_review':{
@@ -65,7 +80,7 @@ def individual_reviews():
 			'viewnames':['average_height_center','curvature_field_center','coupling_review.simple'],
 			'figsize':(8,8),'horizontal':True,'wspace':0.7},}
 	#---turn some off when developing
-	for i in ['coupling_review.center_debug','coupling_review.simple_centered']: plotspec.pop(i)
+	for i in []: plotspec.pop(i)
 	global seepspace
 	seep = dict([(key,globals()[key]) for key in seepspace])
 	for out_fn,details in plotspec.items(): 
