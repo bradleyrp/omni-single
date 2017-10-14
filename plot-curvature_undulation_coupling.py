@@ -66,17 +66,19 @@ def individual_reviews_ocean():
 	"""
 	plotspec = {
 		'coupling_review.simple':{
-			'viewnames':['average_height','example_field'],'figsize':(6,6)},
+			'viewnames':['average_height','example_field_no_neighborhood'],'figsize':(6,6),'horizontal':True},
 		'coupling_review.center_debug':{
 			'viewnames':['neighborhood_static','neighborhood_dynamic',
 				'average_height','average_height_pbc','average_field','example_field','example_field_pbc',
-				'average_height_center','average_field_center','average_field_center_smear','curvature_field_center'],
+				'average_height_center','average_field_center','average_field_center_smear',
+				'curvature_field_center'],
 				'figsize':(16,16)},
+		#---! this fails on the helix-0 tests because they have multiple proteins
 		'coupling_review.simple_centered':{
-			'viewnames':['average_height_center','curvature_field_center','coupling_review.simple'],
+			'viewnames':['average_height_center','curvature_field_center'],
 			'figsize':(8,8),'horizontal':True,'wspace':0.7},}
 	#---turn some off when developing
-	for i in []: plotspec.pop(i)
+	for i in ['coupling_review.center_debug']: plotspec.pop(i)
 	global seepspace
 	seep = dict([(key,globals()[key]) for key in seepspace])
 	for out_fn,details in plotspec.items(): 

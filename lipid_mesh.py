@@ -9,8 +9,6 @@ from codes.mesh import *
 from base.timer import checktime
 from base.tools import status,framelooper
 
-debug = False
-
 def lipid_mesh(**kwargs):
 
 	"""
@@ -25,6 +23,7 @@ def lipid_mesh(**kwargs):
 	resnames = dat['resnames']
 	monolayer_indices = dat['monolayer_indices']
 	nframes = dat['nframes']
+	debug = kwargs.pop('debug',False)
 
 	#---parallel
 	mesh = [[],[]]
