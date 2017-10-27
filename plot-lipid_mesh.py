@@ -17,7 +17,8 @@ def load():
 @autoplot(plotrun)
 def plot_curvature_maps():
 	"""Loop over simulations and make curvature plots."""
-	for sn in work.sns(): plot_curvature(sn,spacing=2.0)
+	spacing = work.plots['lipid_mesh'].get('specs',{}).get('curvature_map_spacing',2.0)
+	for sn in work.sns(): plot_curvature(sn,spacing=spacing)
 
 def plot_curvature(sn,**kwargs):
 	"""
