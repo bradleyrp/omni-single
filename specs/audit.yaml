@@ -11,9 +11,9 @@ passing:
     on: 2017.10.27.1300
     autoplot: true
     notes: |
-  	  includes colors from random or from art_director
-  	  plots only one style with all spectra on one plot
-  	  does not include the average_normal method
+      includes colors from random or from art_director
+      plots only one style with all spectra on one plot
+      does not include the average_normal method
   lipid_mesh: 
     project: collar
     on: 2017.10.27.1300
