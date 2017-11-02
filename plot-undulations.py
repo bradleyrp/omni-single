@@ -15,7 +15,9 @@ def load():
 		#---load once
 		global data,calc,data_prot
 		data,calc = plotload('undulations',work)
-		data_prot,_ = plotload('protein_abstractor',work)
+		try: data_prot,_ = plotload('protein_abstractor',work)
+		#---not all bilayers have proteins
+		except: data_prot = {}
 
 @autoplot(plotrun)
 def plot_height_profiles():
@@ -34,6 +36,7 @@ def plot_height_profiles():
 		im = ax.imshow(surf.T,origin='lower',
 			interpolation='nearest',cmap=mpl.cm.__dict__['RdBu_r'],
 			extent=[0,vecs[0],0,vecs[1]],vmax=hmax,vmin=-1*hmax)
+		#---! add a check for whether we have proteins or not
 		if sn in data_prot:
 			from render.wavevids import plothull
 			points_all = data_prot[sn]['data']['points_all'] 
@@ -122,7 +125,7 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 		raise Exception('need keys in colors %s'%colors_reqs)
 	uspec = calculate_undulations(surf,vecs,fit_style=fit_style,lims=lims,
 		midplane_method=midplane_method,fit_tension=kwargs.get('fit_tension',False))
-	label = work.meta[sn]['label']+'\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
+	label = work.meta[sn].get('label',sn)+'\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
 	q_binned,energy_binned = uspec['q_binned'][1:],uspec['energy_binned'][1:]
 	ax.plot(q_binned,energy_binned,'.',lw=0,markersize=10,markeredgewidth=0,
 		label=None,alpha=0.2,color=colors[sn]['binned'])
