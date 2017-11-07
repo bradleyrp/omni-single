@@ -125,7 +125,8 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 		raise Exception('need keys in colors %s'%colors_reqs)
 	uspec = calculate_undulations(surf,vecs,fit_style=fit_style,lims=lims,
 		midplane_method=midplane_method,fit_tension=kwargs.get('fit_tension',False))
-	label = work.meta[sn].get('label',sn)+'\n'+r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
+	label = work.meta.get(sn,{}).get('label',sn)+'\n'+\
+		r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'
 	q_binned,energy_binned = uspec['q_binned'][1:],uspec['energy_binned'][1:]
 	ax.plot(q_binned,energy_binned,'.',lw=0,markersize=10,markeredgewidth=0,
 		label=None,alpha=0.2,color=colors[sn]['binned'])
