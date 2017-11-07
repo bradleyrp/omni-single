@@ -70,7 +70,7 @@ def plot_curvature(sn,**kwargs):
 	axins = inset_axes(ax,width="5%",height="100%",loc=3,
 		bbox_to_anchor=(1.05,0.,1.,1.),bbox_transform=ax.transAxes,borderpad=0)
 	cbar = plt.colorbar(im,cax=axins,orientation="vertical")
-	cbar.set_label('$\mathrm{C_0\,({nm}^{-1})$',labelpad=-40,y=1.05,rotation=0)
+	cbar.set_label(r'$C_0\,({nm}^{-1})$',labelpad=-40,y=1.05,rotation=0)
 	ax.set_xlabel('x (nm)')
 	ax.set_ylabel('y (nm)')
 	ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
