@@ -194,7 +194,33 @@ calculations:
               method: fixed_isotropic
               extent: 1.0
             curvature_sum: mean
-
+          v4:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 2.0
+            curvature_sum: mean
+          v5:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+            curvature_sum: mean
+          v6:
+            store_instantaneous_fields: True
+            style: wilderness
+            curvature_positions: 
+              method: protein_dynamic_single
+            extents:
+              method: fixed_isotropic
+              extent: 8.0
+            curvature_sum: mean
 incoming:
   curvature_undulation_coupling_pixel:
     uptype: post
