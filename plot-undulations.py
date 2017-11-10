@@ -54,4 +54,3 @@ def plot_undulation_spectra():
 		#---! ERROR WHY IS META NOT USED?
 		tag = 'qlim.%.1f'%wavevector_limit
 		picturesave('figT',work.plotdir,backup=False,version=True,meta=plotspec)
-
