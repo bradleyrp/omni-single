@@ -2,18 +2,6 @@
 
 """
 Plot hydration distributions.
-
-Note that this is the third plot script. in the new style
-neat: https://stackoverflow.com/questions/12200580/numpy-function-for-simultaneous-max-and-min
-also neat: https://stackoverflow.com/questions/29321835/is-it-possible-to-get-color-gradients-under-curve-in-matplotlib
-
-todo:
-	1. finalize new plot style format
-	2. better color gradient
-	3. better way of specifying the zones, plus a good legend for them
-	4. breakdown with inset
-	5. no baselines please
-	6. individual normalizers
 """
 
 import scipy
@@ -23,6 +11,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 #---settings
 binsize = 0.01
 farcut = 1.05
+
 #---we must declare variables here. this should match the top of the reload function
 variables = 'sns,scanrange,distributions,distances,data,calc,normalizers,middles'.split(',')
 
@@ -31,7 +20,7 @@ from codes.looptools import basic_compute_loop
 ###---STANDARD
 
 #---declare standard variables
-required_variables = 'printers,routine'.split(',')
+required_variables = 'printers routine'.split()
 for v in variables+required_variables:
 	if v not in globals(): globals()[v] = None
 
@@ -51,10 +40,10 @@ def histogram_stack(sn,index):
 
 def reload():
 	"""Load everything for the plot only once."""
-	#---canonical globals list
-	#---!? can this be made programmatic?
+	#---canonical globals list is loaded systematically 
+	#---...but you have to load it into globals manually below
 	global sns,scanrange,distributions,distances,data,calc,normalizers,middles
-	#---reload sequence goes here
+	#---custom reload sequence goes here
 	data,calc = plotload(plotname)
 	sns = work.specs['collections']['position']+['membrane-v538']
 	#---compute distance distributions
@@ -86,8 +75,10 @@ def reload():
 		normalizers[sn] = areas*water_density
 
 def water_distribution_sweep_plot(incoming=None,fs=None):
-	"""Plot the RDFs for water near ions using a gradient that indicates proximity to lipids."""
-	global colormaps
+	"""
+	Plot the RDFs for water near ions versus distance waters.
+	Note that we copied this plot script to start over and simplify the calculation of the curves.
+	"""
 	if not fs: fs = {}
 	extras = []
 	def normalize_window(source,bulk_window_raw=(0.75,1.0),sliced=False):
@@ -98,14 +89,6 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 		#---reestimate ion-water pseudo-density at supposed bulk-like distances
 		water_density = (source[bulk_window]/areas[bulk_window]).mean()
 		return areas*water_density
-	#---other functions can run this plot on an incoming axis
-	#---choose the order for readability (must match keys above)
-	sns_ordered = ['membrane-v538','membrane-v531','membrane-v532']
-	#---defining the bins
-	fenceposts = np.arange(0.16,1.0,step=0.4)
-	fenceposts = np.linspace(0.16,1.0,num=10)
-	zones_subsel_gradient = np.array([0,1,2,3,4,5,6,7,8])
-	zones_subsubsel_gradient = [0]
 	def make_colormaps(fade_color='white'):
 		"""Colormaps for RDF curves, possibly with a gradient."""
 		colormaps = {
@@ -120,87 +103,41 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 				fade_color],return_cmap=True)[1],}
 		return colormaps
 	#---set colormaps and sns for the primary comparison. settings placed near the plotter
-	colormaps = make_colormaps()
-	#---insets benefit from repeated calls to a single plot function
-	def plot(ax,xlims=None,ylims=None,one=False,plot_line_style='many',
-		do_opacity=False,axlabels=False,normed_windows=True,is_inset=False):
-		global colormaps
-		def minmax(a): return a.min(),a.max()
-		lipid_distance_lims = minmax(np.array([minmax(data[sn]['data']['lipid_distances']) 
-			for sn in sns]).reshape(-1))
-		#---exclude some zones that have low populations for t he standard method
-		if plot_line_style=='many': zones_subsel = np.array([0,1,6,7,8])
-		elif plot_line_style=='single': zones_subsel = np.array([-1])
-		elif plot_line_style in ['gradient','simple']: 
-			zones_subsel,zones_subsubsel = zones_subsel_gradient,zones_subsubsel_gradient
-		else: raise Exception('invalid plot_line_style %s'%plot_line_style)
-		zones = dict([(sn,[np.all((data[sn]['data']['lipid_distances']>=i,
-			data[sn]['data']['lipid_distances']<=j),axis=0) 
-			for i,j in np.array(zip(fenceposts[:-1],fenceposts[1:]))[zones_subsel]]) for sn in sns])
+	colormaps = make_colormaps(fade_color='white')
+	def make_rdf(sn,lims=None):
+		"""Make the RDFs for lipids within a particular range."""
+		if lims==None: return distributions[sn].mean(axis=0)
+		else: 
+			zone = np.all((data[sn]['data']['lipid_distances']>=lims[0],
+				data[sn]['data']['lipid_distances']<=lims[1]),axis=0)
+			#---! critical concatenation step. CHECK THAT THIS IS THE RIGHT AXIS ORDER!
+			return distributions[sn][np.concatenate(zone)].mean(axis=0)
+	def plot(ax,sns,zonelist=None,xlims=None,ylims=None,
+		do_move_xlabel=False,do_peak_annotations=False,do_annotations=False,
+		do_axlabels=True,is_inset=False,lw=2,do_legend=False,zone_alpha=None,zone_color=None,
+		zone_lw=None,zone_zorder=None):
+		"""Repeatedly call the plot for the main axis and the inset."""
 		view_window = scanrange[:-1]<=farcut
-		sns_ordered_core = ['membrane-v531','membrane-v532']
+		if not zonelist: zonelist = [None]
 		#---plot the lipid distance-dependant g(r) for one simulation
-		for snum,sn in enumerate(sns_ordered if is_inset else sns_ordered_core):
-			if plot_line_style in ['many','single']:
-				for znum,zone in enumerate(zones[sn]):
-					curve = distributions[sn][np.concatenate(zone)].mean(axis=0)
-					curve = curve/(normalizers[sn] if not normed_windows else normalize_window(curve))
-					ax.plot(10*middles[view_window],curve[view_window],'-',lw=1,zorder=3,
-						color=colormaps[sn](znum/float(len(zones[sn])-1)) if plot_line_style=='many' else 
-							colormaps[sn](1))
-			elif plot_line_style in ['gradient','fill_between','simple']:
-				offset_color = 1.0
-				#---! this method is currently set for adjacent zones only
-				#---! ...the zones_subsubsel chooses the marker between adjacent zones
-				#---! ...and the zones_subsel can be adjusted for coarse/fine zones
-				#---! obviously this is clumsy but we are trying to be expedient
-				#---! it might be worth replacing this wholesale since it's an important calculation
-				for inum,index in enumerate(zones_subsubsel):
-					zonepair = [zones[sn][zones_subsel[index+i]] for i in range(2)]
-					curves = [distributions[sn][np.concatenate(z)].mean(axis=0) for z in zonepair]
-					#---normalize between the two limits, effectively normalizing the sweep
-					average_normalizer = np.array([normalize_window(c) for c in curves]).mean(axis=0)
-					curves = [c/(normalizers[sn] if not normed_windows else average_normalizer) 
-						for c in curves]
-					#---fill between works pretty well but we have discarded it
-					if plot_line_style=='fill_between':
-						ax.fill_between(10*middles[view_window],y1=curves[1][view_window],
-							y2=curves[0][view_window],
-							lw=1,zorder=3,color=colormaps[sn]((inum)/
-								float(len(zones_subsubsel)-1+offset_color)))
-					elif plot_line_style=='gradient':
-						ngrad = float(100)
-						for s in range(int(ngrad))[::-1]:
-							ys = ((curves[1][view_window]-curves[0][view_window])*float(s)/
-								ngrad+curves[0][view_window])
-							kwargs = dict(lw=1,zorder=3,
-								color=colormaps[sn](float(s)/ngrad) 
-									if not do_opacity else colormaps[sn](0.0),
-								#---power level below tells you how fast the fade is
-								alpha=((1.-s/ngrad)**2) if do_opacity else 1.0)
-							ax.plot(10*middles[view_window],ys,**kwargs)
-						ys = ((curves[1][view_window]-curves[0][view_window])*float(ngrad-1)/
-							ngrad+curves[0][view_window])
-						#---outline the mountain peaks
-						kwargs.update(alpha=0.75,lw=0.5)
-						ax.plot(10*middles[view_window],ys,**kwargs)
-					elif plot_line_style=='simple':
-						colormaps = make_colormaps(fade_color='black')
-						lw = 3 if not is_inset else 2
-						posts = [fenceposts[zones_subsel[index+i]] for i in range(2)]
-						#---! need to check if labeling is accurate
-						label = {'label':'%s $\mathrm{d_{c,l}=%.1f-%.1f\AA}$'%(work.meta[sn]['ion_label'],
-							10*fenceposts[zones_subsel][index],10*fenceposts[zones_subsel][index+1])}
-						ax.plot(10*middles[view_window],curves[0][view_window],
-							lw=lw,zorder=3,color=colormaps[sn](0.0),**(label if not is_inset else {}))
-						label = {'label':'%s $\mathrm{d_{c,l}=%.1f-%.1f\AA}$'%(work.meta[sn]['ion_label'],
-							10*fenceposts[zones_subsel][index+1],10*fenceposts[zones_subsel][index+2])}
-						if not is_inset: ax.plot(10*middles[view_window],curves[1][view_window],
-							lw=2,zorder=3,color=colormaps[sn](0.3),alpha=0.5,**label)
-					else: raise Exception('invalid plot_line_style %s'%plot_line_style)
-			else: raise Exception('invalid plot_line_style %s'%plot_line_style)
-			if is_inset and plot_line_style in ['many','single','simple']:
-				if plot_line_style=='simple': curve = curves[0]
+		for snum,sn in enumerate(sns):
+			#---index the zones for the colormap
+			for znum,zone in enumerate(zonelist):
+				curve = make_rdf(sn,lims=zone)
+				curve = curve/normalize_window(curve)
+				#---prepare settings
+				kwargs = dict()
+				if do_legend: kwargs.update(label='$\mathrm{%.1f-%.1f\AA}$%s'%(
+					zone[0]*10,zone[1]*10,' (%s)'%work.meta[sn]['ion_label'] if znum==0 else ''))
+				if zone_alpha: kwargs.update(alpha=zone_alpha(znum,len(zonelist),colormaps[sn]))
+				if zone_color: kwargs.update(color=zone_color(znum,len(zonelist),colormaps[sn]))
+				else: kwargs.update(color=colormaps[sn](0.0))
+				if zone_lw: kwargs.update(lw=zone_lw(znum,len(zonelist)))
+				else: kwargs.update(lw=lw)
+				if zone_zorder: kwargs.update(zorder=zone_zorder(znum,len(zonelist)))
+				ax.plot(10*middles[view_window],curve[view_window],'-',**kwargs)
+			#---annotate the large peaks in the inset for extra clarity
+			if do_peak_annotations:
 				peak_arg = np.argmax(curve[view_window])
 				peak_x,peak_y = 10*middles[view_window][peak_arg],curve[view_window][peak_arg]
 				bbox_props = dict(boxstyle="round",fc="w",ec="k",alpha=1.0)
@@ -209,68 +146,65 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 				extras.append(ann)
 		ax.get_yaxis().set_major_locator(mpl.ticker.MaxNLocator(prune='lower'))
 		#---move the label so it doesn't overlap with tagboxes
-		if not is_inset: ax.xaxis.set_label_coords(0.3,0.08)
-		#---???
-		if not is_inset: 
-			ann = ax.annotate('',xy=(10*0.46,1.85),xycoords='data',xytext=(10*0.46,1.4),
-				textcoords='data',arrowprops=dict(arrowstyle="<->",
-					connectionstyle="bar,fraction=1.0",
-				ec="k",shrinkA=5, shrinkB=5))
-			extras.append(ann)
+		if do_move_xlabel: ax.xaxis.set_label_coords(0.3,0.08)
+		#---annotations
+		if do_annotations: 
 			bbox_props = dict(boxstyle="round",fc="w",ec="k",alpha=1.0)
-			ann = ax.text(10*0.55,1.625,"specificity",ha="center",va="center",size=10,
-				rotation=-90,bbox=bbox_props)
-			extras.append(ann)
-			ann = ax.annotate('',xy=(10*0.42,2.1),xycoords='data',xytext=(10*0.47,2.1),
-				textcoords='data',arrowprops=dict(arrowstyle="<->",
-					connectionstyle="bar,fraction=0.4",
-				ec="k",shrinkA=5, shrinkB=5))
-			extras.append(ann)
-			ann = ax.text(10*0.445,2.35,"distance",ha="center",va="center",size=10,bbox=bbox_props)
-			extras.append(ann)
+			#---draw horizontal and vertical lines for emphasis
+			spot_l,spot_r,spot_b,spot_t,spot_m = [10*0.42,10*0.455,1.54,2.2,1.9]
+			#for i in [spot_t,spot_b,spot_m]: ax.axhline(i,c='k',lw=0.5,alpha=0.5,zorder=2)
+			for i in [spot_l,spot_r]: ax.axvline(i,c='k',lw=0.5,alpha=0.5,zorder=2)
+			#---note that the bar fraction does not count the little offset between the arrow and the point
+			for name,(i,j,k,l),rot,frac,label_move in zip(['distance','specificity','dehydration'],
+				#---position the arrows
+				[[spot_l,spot_t,spot_r,spot_t],[spot_l,spot_b,spot_l,spot_t],[spot_r,spot_m,spot_r,spot_b]],
+				#---rotations and bar offsets
+				[0,90,-90],[0.85,0.45,0.6],
+				#---move the labels
+				[[0,0.17],[-0.85,0],[0.6,0]]):
+				extras.append(ax.annotate('',xy=(i,j),xycoords='data',xytext=(k,l),
+					textcoords='data',arrowprops=dict(arrowstyle="<->",
+						connectionstyle="bar,fraction=%.2f"%frac,ec="k",shrinkA=5,shrinkB=5)))
+				extras.append(ax.text((i+k)/2.+label_move[0],(j+l)/2.+label_move[1],name,
+					ha="center",va="center",size=10,rotation=rot,bbox=bbox_props))
+			if False:
+				extras.append(ann)
+				ann = ax.annotate('',xy=(10*0.42,2.1),xycoords='data',xytext=(10*0.47,2.1),
+					textcoords='data',arrowprops=dict(arrowstyle="<->",
+						connectionstyle="bar,fraction=0.4",
+					ec="k",shrinkA=5, shrinkB=5))
+				extras.append(ann)
+				ann = ax.text(10*0.445,2.35,"distance",ha="center",va="center",size=10,bbox=bbox_props)
+				extras.append(ann)
 		if xlims: ax.set_xlim(xlims)
 		if ylims: ax.set_ylim(ylims)
-		if one: ax.axhline(1.0,c='k',lw=0.5,zorder=1,alpha=0.35)
 		ax.tick_params(axis='both',which='both',length=0)
-		if axlabels:
+		if do_axlabels:
 			ax.set_xlabel('r ($\mathrm{\AA}$)',
 				fontsize=fs.get('xlabel%s'%('_inset' if is_inset else''),14))
 			ax.set_ylabel('g(r)',fontsize=fs.get('ylabel%s'%('_inset' if is_inset else''),14))
+		if do_legend: 
+			legend = ax.legend(title='cation-lipid distance $\mathrm{({d}_{c,l})}$',loc='lower right',
+				frameon=False,fontsize=12)
+			legend.get_title().set_fontsize('12')
 	#---assemble the plot
 	if incoming==None: fig,ax = plt.subplots()
 	else: fig,ax = [incoming[i] for i in ['fig','ax']]
-	xlims,ylims = (3.0,10.0),(0.,2.8)
+	xlims,ylims = (3.0,10.0),(0.,2.5)
 	ax.set_aspect((xlims[1]-xlims[0])/(ylims[1]-ylims[0])*1.0)
-	#---key settings
-	#---note that we replaced gradient with single which required a different colormap and a legend instead of colorbar
-	plot_line_style = ['gradient','simple'][-1]
-	plot(ax,xlims=xlims,ylims=ylims,plot_line_style=plot_line_style,one=False,do_opacity=False,axlabels=True)
+	def zone_color(i,n,colormap): return colormap(float(i)/n)
+	def zone_lw(i,n): return 3.5 if i==0 else 2
+	def zone_zorder(i,n): return 4+n-i
+	plot(ax,xlims=xlims,ylims=ylims,lw=3,
+		zonelist=[(0.,0.22,),(0.22,0.46),(0.46,1)],
+		sns=['membrane-v531','membrane-v532'],
+		do_move_xlabel=True,do_legend=True,
+		do_annotations=True,zone_color=zone_color,zone_lw=zone_lw,
+		zone_zorder=zone_zorder)
 	axins = inset_axes(ax,width="45%",height="45%",loc=1)
-	plot(axins,xlims=(1,7),ylims=None,plot_line_style=plot_line_style,axlabels=True,is_inset=True)
-	#---main colorbars
-	norm = mpl.colors.Normalize(vmin=5, vmax=10)
-	for snum,sn in enumerate(sns_ordered):
-		#---inset colorbars to explain the gradient
-		if plot_line_style=='gradient':
-			sm = plt.cm.ScalarMappable(cmap=colormaps[sn],norm=plt.Normalize(vmin=0,vmax=1))
-			sm._A = []
-			axins = inset_axes(ax,width="3%",height="15%",loc=2,
-				bbox_to_anchor=(0.08*(snum+1),0.,1.,0.90),bbox_transform=ax.transAxes,borderpad=0)
-			if snum<len(sns_ordered)-1: cbar = plt.colorbar(sm,cax=axins,ticks=[])
-			else: 
-				ticks = [0.,1.]
-				#---labels are set for one zone only
-				if len(zones_subsubsel_gradient)!=1: raise Exception('labels need only one sub-sub-selection')
-				lims = [fenceposts[zones_subsel_gradient[zones_subsubsel_gradient[0]+i]] for i in range(2)]
-				cbar = plt.colorbar(sm,cax=axins,ticks=ticks)
-				axins.set_yticklabels(['%.2f'%i for i in lims],fontsize=fs.get('colorbar_label',8))
-				axins.set_xlabel('cation-lipid\ndistance ($\mathrm{\AA}$)',
-					fontsize=fs.get('colorbar_label',8),labelpad=10)
-			axins.set_title(work.meta[sn]['ion_label'],fontsize=fs.get('colorbar_label',8))
-			cbar.ax.tick_params(axis='both',which='both',length=0)
-		elif plot_line_style=='simple':
-			ax.legend(loc='lower right',frameon=False)
-		else: raise Exception('invalid plot_line_style %s'%plot_line_style)
+	plot(axins,xlims=(1,7),ylims=None,
+		sns=['membrane-v538','membrane-v531','membrane-v532'],
+		do_peak_annotations=True,is_inset=True)
 	#---only save this figure if no incoming figure
 	if incoming==None:
 		picturesave('fig.hydration_distribution',work.plotdir,backup=False,version=True,
@@ -278,39 +212,9 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 
 @register_printer
 def water_distribution_sweep_plot_with_snapshots():
-	fig = plt.figure(figsize=(12,12))
-	axes = []
-	axes.append(plt.subplot2grid((3,3),(0,0),colspan=2,rowspan=2))
-	for pos in [(0,2),(1,2),(2,2),(2,1),(2,0)]: axes.append(plt.subplot2grid((3,3),pos))
-	#---bigger fonts
-	ax = axes[0]
-	ax.tick_params(axis='both',labelsize=18)
-	ax.tick_params(axis='both',labelsize=18)
-
-	#---!!! needs centralized
-	import matplotlib.image as mpimg
-	def get_blank_border(img):
-		"""Return the border limits for removing whitespace."""
-		nonblank = np.any(img!=1.0,axis=2)*1
-		lims = [map(lambda x:(x[0]-1,x[-1]+1),
-			[np.where(np.any(nonblank!=0,axis=j))[0]])[0] for j in range(2)]
-		return lims
-	def sidestack_images(fns):
-		"""Combine snapshots into one image with same zoom and minimal whitespace."""
-		#---preassemble images for a particular row
-		imgs = [mpimg.imread(fn) for fn in fns]
-		borders = np.array([get_blank_border(img) for img in imgs])
-		lims = np.array([[i.min() for i in borders.T[0]]]+[[i.max() for i in borders.T[1]]]).T
-		#---stack horizontally
-		buffer_width = 100
-		imgs_zoomed = [img[slice(*lims[1]),slice(*lims[0])] for img in imgs]
-		imgs_cropped = [i[:,slice(*(get_blank_border(i)[0]))] for i in imgs_zoomed]
-		buffer_strip = np.ones((imgs_cropped[0].shape[0],buffer_width,3))
-		#---add a vertical buffer strip
-		imgs_combo = np.concatenate([np.concatenate((i,buffer_strip),axis=1) 
-			for i in imgs_cropped[:-1]]+[imgs_cropped[-1]],axis=1)
-		return imgs_combo
-
+	"""
+	Arrange snapshots alongside the RDF plot.
+	"""
 	#---hardcoded paths for now (switched to v15 from v12)
 	snaps = {'folder':'fig.hydrogen_bonding.v15_ptdins_solvated','files':[
 		'fig.snapshot.membrane-v531.fr703.795_796_o0.png',
@@ -319,8 +223,14 @@ def water_distribution_sweep_plot_with_snapshots():
 		'fig.snapshot.membrane-v532.fr11.779_781_o0.png',
 		'fig.snapshot.membrane-v532.fr363.798_794_o6.png',
 		'fig.snapshot.membrane-v532.fr3.773_775_o7.png',],}
-
-	extras = []
+	fig = plt.figure(figsize=(12,12))
+	axes,extras = [],[]
+	axes.append(plt.subplot2grid((3,3),(0,0),colspan=2,rowspan=2))
+	for pos in [(0,2),(1,2),(2,2),(2,1),(2,0)]: axes.append(plt.subplot2grid((3,3),pos))
+	#---bigger fonts
+	ax = axes[0]
+	ax.tick_params(axis='both',labelsize=18)
+	ax.tick_params(axis='both',labelsize=18)
 	letter_reord = [0,1,4,3,2]
 	#---ensure the order matches below
 	sns_order = ['membrane-v531' for i in range(2)]+['membrane-v532' for i in range(3)]
@@ -347,6 +257,7 @@ def water_distribution_sweep_plot_with_snapshots():
 			bbox=tagbox,rotation=0,ha="center",va="top",color='k',
 			transform=ax.transAxes)
 		extras.append(tb)
+	#---add the RDF plot
 	water_distribution_sweep_plot(incoming=dict(fig=fig,ax=axes[0]),
 		fs=dict(xlabel=20,ylabel=20,ylabel_inset=16,xlabel_inset=16,colorbar_label=12))
 	picturesave('fig.hydration_distribution.snapshots',
@@ -360,7 +271,7 @@ def printer():
 	#---reload if not all of the globals in the variables
 	if any([v not in globals() or globals()[v] is None for v in variables]): reload()
 	#---after loading we run the printers
-	printers = list(set(printers if printers!=None else []))
+	printers = list(set(printers if printers else []))
 	if routine is None: routine = list(printers)	
 	#---routine items are function names
 	for key in routine: 

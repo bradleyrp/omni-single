@@ -234,8 +234,8 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 	if np.mean(imono)==0.5: 
 		status('[STATUS] perfect split is %0.5f'%np.mean(imono))
 		return imono
-	elif monolayer_cutoff_retry and (np.all(np.array(imono)==0) or np.all(np.array(imono)==1) or \
-		np.abs(np.mean(imono)-0.5)>=max_count_asymmetry):
+	elif (monolayer_cutoff_retry and (np.all(np.array(imono)==0) or np.all(np.array(imono)==1) or 
+		np.abs(np.mean(imono)-0.5)>=max_count_asymmetry)):
 		status('[STATUS] split is %0.5f'%np.mean(imono))
 		status('[STATUS] one side has %d'%np.sum(imono))
 		status('[WARNING] leaflets were not distinguished')
@@ -264,8 +264,7 @@ def topologize(pos,vecs,tol=0.07):
 	while np.sum(np.abs(move_votes[0])>len(pos)/2)>len(pos)*tol or step == 0:
 		move_votes = np.concatenate((move_votes,np.zeros((1,natoms,3))))
 		pos = np.array(kp)
-		pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(pos[:,d:d+1])) 
-			for d in range(3)]
+		pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(pos[:,d:d+1])) for d in range(3)]
 		for ind,bead in enumerate(pos):
 			#---compute distances to the probe
 			for d in range(3):

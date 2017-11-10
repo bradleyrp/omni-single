@@ -153,6 +153,11 @@ def contacts(grofile,trajfile,**kwargs):
 	#---get the subject of the calculation, the thing we wish to study the contacts of
 	#---...typically the protein
 	#---! need to add resid redundancy checks possibly
+	if subject_selection=='lipids':
+		#---typically the subject selection goes right to MDAnalysis but this routine allows for lipid-lipid
+		#---...contacts which can be filtered for salt bridges. note that this feature is solely for ptdins
+		target_resnames = land.objects_by_category('lipid')
+		subject_selection = '(%s) and not name H*'%' or '.join(['resname %s'%i for i in target_resnames])
 	subject = uni.select_atoms(subject_selection)
 	#---get the objects
 	if object_flag=='lipid':

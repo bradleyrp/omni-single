@@ -4,30 +4,28 @@
 Plot bilayer areas for the ptdins project.
 """
 
-#---user additions here: declare global variables for reload and parallel loops
-variables = 'data,calc,sns'.split(',')
+#---autoplot settings
+plotrun.routine = None
+global seepspace
 
-###---STANDARD plot printer functions (do not modify)
+@autoload(plotrun)
+def loader():
+	"""Load data."""
+	#---only load once
+	if 'data' not in globals():
+		data,calc = plotload(plotname)
+		sns = work.sns()
+		#---autoplot exports to globals
+		global seepspace
+		seepspace = 'data,sns'.split(',')
+		for key in seepspace: globals()[key] = locals()[key]
 
-#---declare standard variables for plot printer
-required_variables = 'printers routine'.split()
-for v in variables+required_variables:
-	if v not in globals(): globals()[v] = None
-
-def register_printer(func):
-	"""Add decorated functions to a list of "printers" which are the default routine."""
-	global printers
-	if printers is None: printers = []
-	printers.append(func.__name__)
-	return func
-
-###---PLOTS
-
-@register_printer
+@autoplot(plotrun)
 def make_plots():
 	"""
 	Plot summary and comprehensive plots.
 	"""
+	import ipdb;ipdb.set_trace()
 	if False: plot_areas(out_fn='lipid_areas',lims2d=(195,210),
 		sns2d=['membrane-v%3d'%i for i in [534,532,533,531,536,530,538]],
 		sns3d=['membrane-v%3d'%i for i in [536,534,532,533,531,530,538]])
@@ -159,27 +157,3 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	fig.delaxes(axes[0][2])
 	picturesave('fig.%s'%out_fn,
 		work.plotdir,backup=False,version=True,meta={},extras=patches)
-
-def reload():
-	"""Load everything for the plot only once."""
-	#---user additions here. include a list of all of your globals and a once-only load sequence
-	global data,sns,post
-	data,calc = plotload(plotname)
-	sns = work.sns()
-
-###---STANDARD plot printer functions (do not modify)
-
-def printer():
-	"""Load once per plot session."""
-	global variables,routine,printers
-	#---reload if not all of the globals in the variables
-	if any([v not in globals() or globals()[v] is None for v in variables]): reload()
-	#---after loading we run the printers
-	printers = list(set(printers if printers else []))
-	if routine is None: routine = list(printers)	
-	#---routine items are function names
-	for key in routine: 
-		status('running routine %s'%key,tag='printer')
-		globals()[key]()
-
-if __name__=='__main__': printer()

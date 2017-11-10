@@ -65,6 +65,7 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	hydrogen_bond_ref = {}
 	#---this section relies on correct definitions from the Landscape
 	targets = land.objects_by_category('lipid')+land.objects_by_category('sterol')
+	#---!!!!!!!!!!!!!!!!!!!!!!!!!!! need to add all of the lipids here and in the charmm36.ff folder!
 	#---METHODOLOGY NOTE: we catalog all hydrogen bonding opportunities ONLY BY NAME
 	#---loop over lipid targets and scan them for hydrogen bond opportunities
 	for resname in targets:

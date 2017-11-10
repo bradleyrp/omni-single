@@ -4,7 +4,7 @@ routine = ['leaflet_area']
 
 #---block: load the calculation data
 if 'data' not in globals(): 
-	data,calcs = plotload(plotname,work)
+	data,calc = plotload(plotname,work)
 	data_prot,calcs_prot = plotload('protein_abstractor',work)
 	sns = work.sns()
 
@@ -26,6 +26,9 @@ if 'leaflet_area' in routine:
 			ax.errorbar([snum],[areas[mn]],yerr=[areas_std[mn]],alpha=1.0,lw=4.0,c='k',zorder=3)
 	ax.set_xticks(range(len(sns)))
 	ax.set_xticklabels([work.meta[sn]['label'] for sn in sns],rotation=90)
-	picturesave('fig.%s'%plotname,work.plotdir,backup=False,version=True,meta={})
+	#---save the selection method in metadata if a selector was chosen
+	picturesave('fig.%s'%plotname,work.plotdir,backup=False,version=True,
+		meta=calc.get('calcs',{}).get('specs',{}))
 	plt.close()
+	status('summary of the area differences:',tag='result')
 	print(dict([(sn,'%.3f'%(np.ptp(postdat[sn]['mean'])/np.mean(postdat[sn]['mean']))) for sn in sns]))

@@ -170,6 +170,22 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 				mean_trial = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)[example_frame]
 				ax.scatter(*mean_trial.T,s=1,c='k')
 				ax.set_title('curvature field',fontsize=10)
+			#---PLOT example curvature without the dots for the trial functions, including the protein hull
+			if 'example_field_no_neighborhood' in viewnames:
+				ax = axes[viewnames.index('example_field_no_neighborhood')]
+				example_frame = 0
+				cf_first = datas[tag][sn]['cf_first']
+				im = ax.imshow(cf_first.T,origin='lower',interpolation='nearest',
+					vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name],extent=[0,vecs[0],0,vecs[1]])
+				add_colorbar(ax,im,title=r'$\mathrm{C_0\,({nm}^{-1})}$')
+				ax.set_xlim((0,vecs[0]))
+				ax.set_ylim((0,vecs[1]))
+				ax.set_xlabel('x (nm)')
+				ax.set_ylabel('y (nm)')
+				mean_trial = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)[example_frame]
+				ax.set_title('curvature field',fontsize=10)
+				ex_prot_pts = data[protein_abstractor_name][sn]['data']['points'][example_frame][:,:2]
+				plothull(ax,[ex_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
 			#---PLOT periodic view of the example field
 			if 'example_field_pbc' in viewnames:
 				ax = axes[viewnames.index('example_field_pbc')]

@@ -2,13 +2,11 @@
 
 """
 Lipid diffusion plots.
-Written in the "plot printer" style. 
 Only change sections with "user additions here".
 """
 
 import brewer2mpl
 from codes.looptools import basic_compute_loop
-
 
 #---settings
 cutoff_time = [[1,20],[8,72]][0]
@@ -120,20 +118,3 @@ def reload():
 			qlog,rlog = msd_fit(np.log(dts),np.log(msd[:,ind]**2),cuts=cutoff_time,dims=2,factor=1)
 			post[sn][data[sn]['data']['resnames'][ind]].append(q)
 			post_log[sn][data[sn]['data']['resnames'][ind]].append(qlog)
-
-###---STANDARD plot printer functions (do not modify)
-
-def printer():
-	"""Load once per plot session."""
-	global variables,routine,printers
-	#---reload if not all of the globals in the variables
-	if any([v not in globals() or globals()[v] is None for v in variables]): reload()
-	#---after loading we run the printers
-	printers = list(set(printers if printers else []))
-	if routine is None: routine = list(printers)	
-	#---routine items are function names
-	for key in routine: 
-		status('running routine %s'%key,tag='printer')
-		globals()[key]()
-
-if __name__=='__main__': printer()
