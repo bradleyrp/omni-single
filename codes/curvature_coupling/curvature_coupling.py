@@ -355,6 +355,10 @@ class InvestigateCurvature:
 			area = (Lx*Ly/lenscale**2)
 
 			tweak = self.fitting_parameters
+			#---definition of inner sign is hard-coded here. used in one other place (below) which should
+			#---...have the same value. this term is the same sign as height. the optimizer will find the 
+			#---...right sign, so this parameter really only matters for the purposes of interpreting 
+			#---...the curvature
 			signterm = tweak.get('inner_sign',1.0)
 			initial_kappa = tweak.get('initial_kappa',25.0)
 			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
