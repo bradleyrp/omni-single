@@ -268,7 +268,7 @@ class InvestigateCurvature:
 					import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(fields_unity[0][0].T);plt.show()
 					import ipdb;ipdb.set_trace()
 		#---one field per protein, for all proteins
-		elif method=='protein_dynamic_single':
+		elif method in ['protein_dynamic_single','protein_dynamic_single_uniform']:
 			#---! the following code is very repetitive with the protein subselection method
 			for sn in self.sns:
 				#---points_all is nframes by proteins by beads/atoms by XYZ
@@ -321,6 +321,8 @@ class InvestigateCurvature:
 		#---! should this check of the curvature position method is pixel?
 		if extents.get('extent',False)==None and spec['curvature_positions']['method']:
 			extents['extent'] = spec['curvature_positions']['spacer']/2.
+		#---flag for uniform or variable curvatures
+		do_uniform_curvature = spec['curvature_positions']['method']=='protein_dynamic_single_uniform'
 		#---prepare curvature fields
 		if extents_method=='fixed_isotropic': self.drop_gaussians(**spec)
 		elif extents_method=='protein_dynamic': pass
@@ -336,6 +338,10 @@ class InvestigateCurvature:
 			cfs = self.memory[(sn,'fields_unity')][:self.nframes]
 			vecs = self.memory[(sn,'vecs')][:self.nframes]
 			ndrops = cfs.shape[1]
+			ndrops_uniform = 0
+			if do_uniform_curvature: 
+				ndrops_uniform = int(ndrops)
+				ndrops = 1
 
 			#---formulate the wavevectors
 			lenscale = 1.0
@@ -349,7 +355,7 @@ class InvestigateCurvature:
 			area = (Lx*Ly/lenscale**2)
 
 			tweak = self.fitting_parameters
-			signterm = tweak.get('inner_sign',-1.0)
+			signterm = tweak.get('inner_sign',1.0)
 			initial_kappa = tweak.get('initial_kappa',25.0)
 			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
 			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
@@ -381,7 +387,10 @@ class InvestigateCurvature:
 				They are: kappa,gamma,vibe,*curvatures-per-dimple.
 				"""
 				kappa,gamma,vibe = args[:3]
-				curvatures = args[3:]
+				#---uniform curvatures
+				if ndrops_uniform!=0: curvatures = [args[3] for i in range(ndrops_uniform)]
+				#---one curvature per field
+				else: curvatures = args[3:]
 				composite = self.curvature_sum(cfs,curvatures,method=curvature_sum_method)
 				cqs = cctools.fft_field(composite)
 				termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
@@ -397,6 +406,7 @@ class InvestigateCurvature:
 				else: raise Exception('invalid mode %s'%mode)
 
 			Nfeval = 0
+			#---either one distinct curvature per field or one curvature for all fields
 			initial_conditions = [initial_kappa,0.0,0.01]+[0.0 for i in range(ndrops)]
 			test_ans = objective(initial_conditions)
 			if not isinstance(test_ans,np.floating): 
@@ -458,7 +468,10 @@ class InvestigateCurvature:
 			area = (Lx*Ly/lenscale**2)
 
 			tweak = self.fitting_parameters
-			signterm = tweak.get('inner_sign',-1.0)
+			#---note that this is the location of the sign for the inner terms
+			#---sign error was fixed on 2017.11.12 so that curvature runs in the same direction as height
+			#---note also that there is one usage above (we never pass the sign in through tweak)
+			signterm = tweak.get('inner_sign',1.0)
 			initial_kappa = tweak.get('initial_kappa',25.0)
 			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
 			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
