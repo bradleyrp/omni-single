@@ -189,16 +189,225 @@ def makemesh(pts,vec,growsize=0.2,curvilinear_neighbors=10,
 		'areas':areas,'facenorms':facenorms,'vertnorms':vertnorms,'principals':principals,
 		'ghost_ids':ghost_indices,'gauss':gauss,'mean':mean}
 
-def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
+def identify_lipid_leaflets_legacy_dev(pts,vec,monolayer_cutoff=None,
 	monolayer_cutoff_retry=True,max_count_asymmetry=0.05,pbc_rewrap=True,
 	topologize_tolerance=None):
 	"""
 	Identify leaflets in a bilayer by consensus.
 	Note that the time limit on the topologize call was increased from 10 to 30 for large systems.
 	"""
-	#---time limit on the tolerance checker
+	#---typically we passed a monolayer_cutoff from the specs
+	if monolayer_cutoff==None: monolayer_cutoff = 2.0
+	#---time limit on the topologize function which joins broken bilayers e.g. a saddle that crosses PBCs
 	try:
 		with time_limit(30): 
+			wrapper = topologize(pts,vec,
+				**({'tol':topologize_tolerance} if topologize_tolerance else {}))
+	except TimeoutException, msg: 
+		status('topologize failed to join the bilayer. '
+			'if it is broken over PBCs e.g. a saddle, this is a serious error which may go undetected. '
+			'make sure you always inspect the topology later.',tag='error')
+		wrapper = np.zeros((len(pts),3))
+	findframe = pts + wrapper*np.array(vec)
+
+	#---ensure that all points are in the box
+	findframe += vec*(findframe<0) - vec*(findframe>vec)
+	import scipy
+	import scipy.cluster
+	cutoff = 10.0
+
+	#---make a K-D tree from the points
+	tree = scipy.spatial.ckdtree.cKDTree(findframe,boxsize=np.concatenate((vec,vec))+0.*eps)
+	#---find the nearest reference points for each instantaneous point
+	close,nns = tree.query(findframe,distance_upper_bound=cutoff,k=20)
+	#---construct the neighbor list
+	subjects = np.where(np.all((close<cutoff,close>0),axis=0))
+	#---get the pairs of neighbors
+	subjects,neighbors = subjects[0],nns[subjects]
+	nlipids = len(pts)
+
+	#---formulate a linkage matrix
+	if False:
+		if True:
+			pds = np.zeros((nlipids,nlipids))
+			pds[tuple((subjects,neighbors))] = 1.0
+			pds[tuple((neighbors,subjects))] = 1.0
+			links = scipy.cluster.hierarchy.linkage(pds)
+		else:
+			#---sparse linkage matrix
+			subject_data = np.ones(len(subjects)*2)
+			pds = scipy.sparse.coo_matrix((subject_data,(
+				np.concatenate((subjects,neighbors)),np.concatenate((neighbors,subjects)))))
+			links = scipy.cluster.hierarchy.linkage(pds.toarray())
+	if False:
+		pds = np.zeros((nlipids,nlipids))
+		pds[tuple((subjects,neighbors))] = 1.0
+		pds[tuple((neighbors,subjects))] = 1.0
+		import sklearn
+		import sklearn.cluster
+		#clusterer = sklearn.cluster.SpectralClustering(n_clusters=2,affinity='precomputed')
+		#clusterer.fit(affinity=pds)
+		#ans = sklearn.cluster.AgglomerativeClustering(n_clusters=2,affinity='precomputed').fit(pds)
+		#ans = sklearn.cluster.affinity_propagation(pds,preference=1.0)
+
+	if False:
+		pds = np.zeros((nlipids,nlipids))
+		nears = np.where(np.all((close>0,close<=cutoff),axis=0))
+		pds[tuple((nears[0],nns[nears]))] = close[nears]
+		pds[tuple((nns[nears],nears[0]))] = close[nears]
+		import sklearn;import sklearn.cluster
+		# ans = sklearn.cluster.spectral_clustering(pds)
+		# ans = sklearn.cluster.affinity_propagation(pds,preference=1.2)
+		# ans = sklearn.cluster.affinity_propagation(pds)
+
+	if False:
+		def pbcnorm(x,y):
+			dist = np.abs(x-y)
+			dist -= (dist>vec/2.)*vec/2.
+			return np.linalg.norm(dist)
+		from scipy.cluster.hierarchy import fclusterdata
+		ans = fclusterdata(findframe,1.5,metric=pbcnorm)
+
+	def pbcnorm(x,y):
+		dist = np.abs(x-y)
+		dist -= (dist>vec/2.)*vec/2.
+		return np.linalg.norm(dist)
+
+	if False:
+
+		import scipy
+		import scipy.cluster
+
+		pds = np.ones((nlipids,nlipids))*10
+		pds[tuple((np.arange(nlipids),np.arange(nlipids)))] = 0.0
+		nears = np.where(np.all((close>0,close<=cutoff),axis=0))
+		pds[tuple((nears[0],nns[nears]))] = close[nears]
+		pds[tuple((nns[nears],nears[0]))] = close[nears]
+
+		ans = scipy.cluster.hierarchy.linkage(scipy.spatial.distance.squareform(pds))
+
+		ans2 = scipy.cluster.hierarchy.fcluster(ans,t=2)
+
+	if False:
+
+		import sklearn;import sklearn.cluster
+
+		cutoff = 1.2
+
+		pds = np.ones((nlipids,nlipids))*np.inf
+		pds[tuple((np.arange(nlipids),np.arange(nlipids)))] = 0.0
+		nears = np.where(np.all((close>0,close<=cutoff),axis=0))
+		pds[tuple((nears[0],nns[nears]))] = close[nears]
+		pds[tuple((nns[nears],nears[0]))] = close[nears]
+
+		ans = sklearn.cluster.SpectralClustering(n_clusters=2,affinity='precomputed').fit(pds)
+
+	if True:
+		import sklearn
+		import sklearn.neighbors
+		import sklearn.cluster
+		if False:
+			from sklearn.datasets.samples_generator import make_swiss_roll
+			n_samples = 1500
+			noise = 0.05
+			X, _ = make_swiss_roll(n_samples, noise)
+			# Make it thinner
+			X[:, 1] *= .5
+			connectivity = sklearn.neighbors.kneighbors_graph(X,n_neighbors=10,include_self=False)
+			ward = sklearn.cluster.AgglomerativeClustering(n_clusters=6, connectivity=connectivity,linkage='ward').fit(X)
+
+		cutoff = 2.0
+
+		pds = np.ones((nlipids,nlipids))*0.0
+		pds[tuple((np.arange(nlipids),np.arange(nlipids)))] = 0.0
+		nears = np.where(np.all((close>0,close<=cutoff),axis=0))
+		pds[tuple((nears[0],nns[nears]))] = 1.0#close[nears]
+		pds[tuple((nns[nears],nears[0]))] = 1.0#close[nears]
+		con2 = sklearn.neighbors.kneighbors_graph(findframe,n_neighbors=4,include_self=False)
+		ward = sklearn.cluster.AgglomerativeClustering(n_clusters=2,connectivity=con2,linkage='complete').fit(findframe)
+
+	import ipdb;ipdb.set_trace()
+
+	#---organize neighbors
+	imono = np.zeros(nlipids)
+	nlist = []
+	for i in range(nlipids):
+		status('cataloging lipids',i=i,looplen=nlipids,tag='compute')
+		nlist.append(nbors[np.where(nbors[:,0]==i)[0],1])
+	#---algorithm to cluster the points
+	iref = 0
+	mono = np.zeros(nlipids)
+	searched = np.zeros(nlipids)
+	imono[iref],searched[iref] = 1,1
+	imono[nlist[iref]] = 1
+	while np.any(np.all((imono==1,searched==0),axis=0)):
+		for iref in np.where(np.all((imono==1,searched==0),axis=0))[0]: 
+			imono[nlist[iref]] = 1
+			searched[iref] = 1
+
+
+	#---choose a random point and make a cluster
+	#start_lipid = np.random.randint(nlipids)
+
+
+	import ipdb;ipdb.set_trace()
+	status('this step is somewhat slow. it uses scipy.spatial.pdist.',tag='warning')
+	pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(findframe[:,d:d+1])) 
+		for d in range(3)]
+	if pbc_rewrap:
+		pd3pbc = np.sqrt(np.sum(np.array([pd[d]-(pd[d]>vec[d]/2.)*vec[d]+(pd[d]<-1*vec[d]/2.)*vec[d] 
+			for d in range(3)])**2,axis=0))
+	else: pd3pbc = pd
+	nbors = np.transpose(np.where(pd3pbc<monolayer_cutoff))
+	nlipids = len(pts)
+	imono = np.zeros(nlipids)
+	nlist = []
+	for i in range(nlipids):
+		status('cataloging lipids',i=i,looplen=nlipids,tag='compute')
+		nlist.append(nbors[np.where(nbors[:,0]==i)[0],1])
+	iref = 0
+	mono = np.zeros(nlipids)
+	searched = np.zeros(nlipids)
+	imono[iref],searched[iref] = 1,1
+	imono[nlist[iref]] = 1
+	while np.any(np.all((imono==1,searched==0),axis=0)):
+		for iref in np.where(np.all((imono==1,searched==0),axis=0))[0]: 
+			imono[nlist[iref]] = 1
+			searched[iref] = 1
+	#---check that the leaflets were properly distinguished by looking at the number in each monolayer
+	if np.mean(imono)==0.5: 
+		status('[STATUS] perfect split is %0.5f'%np.mean(imono))
+		return imono
+	elif (monolayer_cutoff_retry and (np.all(np.array(imono)==0) or np.all(np.array(imono)==1) or 
+		np.abs(np.mean(imono)-0.5)>=max_count_asymmetry)):
+		status('[STATUS] split is %0.5f'%np.mean(imono))
+		status('[STATUS] one side has %d'%np.sum(imono))
+		status('[WARNING] leaflets were not distinguished')
+		status('[COMPUTE] leaflets = '+str(np.sum(imono))+'/'+str(len(imono)))
+		status('[WARNING] previous monolayer_cutoff = '+str(monolayer_cutoff))
+		monolayer_cutoff -= 0.01
+		status('[WARNING] new monolayer_cutoff = '+str(monolayer_cutoff))
+		if monolayer_cutoff < 0: raise Exception('[ERROR] cutoff failure')
+		imono = identify_lipid_leaflets(pts,vec,monolayer_cutoff=monolayer_cutoff)
+	else: status('[STATUS] some lipids might be flipped %d %.5f'%(np.sum(imono),np.mean(imono)))
+	return imono
+
+def identify_lipid_leaflets_legacy(pts,vec,monolayer_cutoff,
+	monolayer_cutoff_retry=True,max_count_asymmetry=0.05,pbc_rewrap=True,
+	topologize_tolerance=None,topologize_time_limit=30):
+	"""
+	Identify leaflets in a bilayer by consensus.
+	Note that the time limit on the topologize call was increased from 10 to 30 for large systems.
+	This is the legacy version of this algorithm. Previously it was recursive, lowering the cutoff by small
+	increments and then calling itself again if the bilayer did not appear to be split correctly. The current
+	version is called by the LeafletFinder class and throws exceptions to trigger a lower cutoff. We have
+	tried to preserve the legacy version for other users, but the cluster version is more reliable.
+	"""
+	#---previous default was somewhat high, but typically came in from specs, and we reduced it incrementally
+	if monolayer_cutoff==None: monolayer_cutoff = 2.0
+	#---time limit on the tolerance checker
+	try:
+		with time_limit(topologize_time_limit): 
 			wrapper = topologize(pts,vec,
 				**({'tol':topologize_tolerance} if topologize_tolerance else {}))
 	except TimeoutException, msg: 
@@ -241,14 +450,12 @@ def identify_lipid_leaflets(pts,vec,monolayer_cutoff=2.0,
 		status('[WARNING] leaflets were not distinguished')
 		status('[COMPUTE] leaflets = '+str(np.sum(imono))+'/'+str(len(imono)))
 		status('[WARNING] previous monolayer_cutoff = '+str(monolayer_cutoff))
-		monolayer_cutoff -= 0.01
-		status('[WARNING] new monolayer_cutoff = '+str(monolayer_cutoff))
-		if monolayer_cutoff < 0: raise Exception('[ERROR] cutoff failure')
-		imono = identify_lipid_leaflets(pts,vec,monolayer_cutoff=monolayer_cutoff)
+		raise Exception(
+			'[ERROR] failed to identify leaflets so we are returning an exception to the LeafletFinder')
 	else: status('[STATUS] some lipids might be flipped %d %.5f'%(np.sum(imono),np.mean(imono)))
 	return imono
 
-def topologize(pos,vecs,tol=0.07):
+def topologize(pos,vecs,tol=None):
 	"""
 	Join a bilayer which is broken over periodic boundary conditions by translating each point by units
 	of length equal to the box vectors so that there is a maximum amount of connectivity between adjacent
@@ -257,6 +464,7 @@ def topologize(pos,vecs,tol=0.07):
 	Note that we changed tol from 0.05 to 0.07 on 2017.08.02. We also added a timer and pass-through for 
 	belligerent systems. See RPB notes for more details.
 	"""
+	if tol==None: tol = 0.07
 	step = 0
 	kp = np.array(pos)
 	natoms = len(pos)
@@ -264,6 +472,7 @@ def topologize(pos,vecs,tol=0.07):
 	while np.sum(np.abs(move_votes[0])>len(pos)/2)>len(pos)*tol or step == 0:
 		move_votes = np.concatenate((move_votes,np.zeros((1,natoms,3))))
 		pos = np.array(kp)
+		#---! can the pdist be optimized somehow?
 		pd = [scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(pos[:,d:d+1])) for d in range(3)]
 		for ind,bead in enumerate(pos):
 			#---compute distances to the probe
@@ -280,6 +489,137 @@ def topologize(pos,vecs,tol=0.07):
 	moved = np.transpose([np.sum([1*(move_votes[it][:,d]<(-1*natoms/2.))-1*(move_votes[it][:,d]>(natoms/2.)) 
 		for it in range(step+1)],axis=0) for d in range(3)])
 	return moved
+
+class LeafletFinder:
+
+	"""
+	Manage different algorithms for detecting the separate leaflets.
+	"""
+
+	def __init__(self,atoms_separator,vecs,**kwargs):
+		#---we require the separator and vectors
+		self.atoms_separator = atoms_separator
+		#---nframes is the number of separate frames to use to attempt the separator
+		self.vecs,self.nframes = vecs,len(vecs)
+		#---new flags
+		self.cluster = kwargs.pop('cluster',False)
+		self.scan_mode = kwargs.pop('scan_mode',False)
+		#---legacy flags
+		self.monolayer_cutoff = kwargs.pop('monolayer_cutoff',None)
+		self.monolayer_cutoff_retry = kwargs.pop('monolayer_cutoff_retry',True)
+		self.topologize_tolerance = kwargs.pop('topologize_tolerance',None)
+		self.cutoff_shrink_increment = kwargs.pop('cutoff_shrink_increment',None)
+		self.cutoff_min = kwargs.pop('cutoff_min',None)
+		self.random_tries = kwargs.pop('random_tries',None)
+		if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
+		#---check for scikit-learn
+		if self.cluster:
+			try: import sklearn
+			except: 
+				status('cannot import scikit-learn so we will use legacy leaflet finder',tag='warning')
+				self.cluster = False
+		#---the persistent function tries to distinguish leaflets according to the mode
+		self.persistent()
+
+	def persistent(self):
+		"""
+		Try to find the leaflets by using multiple frames and multiple cutoffs.
+		"""
+		if self.monolayer_cutoff==None: self.monolayer_cutoff = 2.0
+		#---determine the mode and retry settings
+		if self.cutoff_shrink_increment==None: self.cutoff_shrink_increment = 0.01
+		#---previously we reduced the cutoff to zero before trying a different frame
+		if self.cutoff_min==None: self.cutoff_min = 0.8
+		#---legacy mode
+		if not self.cluster:
+			#---try multiple times
+			if self.monolayer_cutoff_retry:
+				#---legacy retry mode starts high and reduces the cutoff at each step
+				#---! we could implement a method that tries cutoffs above/below the start point
+				cutoffs = np.arange(self.cutoff_min,
+					self.monolayer_cutoff+self.cutoff_shrink_increment,self.cutoff_shrink_increment)[::-1]
+			#---only try one cutoff
+			else: cutoffs = [self.monolayer_cutoff]
+		#---cluster mode uses a default cutoff
+		else: cutoffs = [None]
+		monolayer_indices = None
+		#---recall that the caller provides frames for testing
+		for fr in range(self.nframes):
+			#---loop over cutoffs if we have multiple cutoffs
+			for cutoff in cutoffs:
+				if not self.cluster:
+					try: 
+						if not self.cluster:
+							#---call the legacy leaflet finder (outside of this class)
+							monolayer_indices = identify_lipid_leaflets_legacy(
+								self.atoms_separator[fr],self.vecs[fr],monolayer_cutoff=cutoff)
+					except: status('failed to distinguish leaflets with cluster=%s and cutoff=%s'%(
+						self.cluster,cutoff),tag='error')
+				else: monolayer_indices = self.identify_leaflets_cluster(
+					pts=self.atoms_separator[fr],vec=self.vecs[fr])
+				#---break when successful
+				if type(monolayer_indices)!=bool: 
+					self.monolayer_indices = monolayer_indices
+					import ipdb;ipdb.set_trace()
+					return
+
+	def identify_leaflets_cluster(self,pts,vec,topologize_time_limit=30,max_count_asymmetry=0.05):
+		"""
+		Use scikit-learn clustering methods to separate leaflets.
+		Note that this method can cluster a tortuous manifold and may work for complex morphologies.	
+		"""
+		import scipy
+		import sklearn
+		import sklearn.neighbors
+		import sklearn.cluster
+		nlipids = len(pts)
+		#---time limit on the topologize function which joins broken bilayers e.g. a saddle that crosses PBCs
+		try:
+			with time_limit(topologize_time_limit): 
+				wrapper = topologize(pts,vec,
+					**({'tol':self.topologize_tolerance} if self.topologize_tolerance else {}))
+		except TimeoutException, msg: 
+			status('topologize failed to join the bilayer. '
+				'if it is broken over PBCs e.g. a saddle, this is a serious error which may go undetected. '
+				'make sure you always inspect the topology later.',tag='error')
+			wrapper = np.zeros((len(pts),3))
+		findframe = pts + wrapper*np.array(vec)
+		#---ensure that all points are in the box
+		findframe += vec*(findframe<0) - vec*(findframe>vec)
+		#---previous calculation of connectivity was done manually
+		if False:
+			#---conservative cutoff gets lots of nearby points
+			cutoff = 10.0
+			cutoff_short = 2.0
+			#---make a K-D tree from the points
+			tree = scipy.spatial.ckdtree.cKDTree(findframe,boxsize=np.concatenate((vec,vec))+0.*eps)
+			#---find the nearest reference points for each instantaneous point
+			close,nns = tree.query(findframe,distance_upper_bound=cutoff,k=20)
+			#---construct the neighbor list
+			subjects = np.where(np.all((close<cutoff,close>0),axis=0))
+			#---get the pairs of neighbors
+			subjects,neighbors = subjects[0],nns[subjects]
+			pds = np.ones((nlipids,nlipids))*0.0
+			pds[tuple((np.arange(nlipids),np.arange(nlipids)))] = 0.0
+			nears = np.where(np.all((close>0,close<=cutoff_short),axis=0))
+			pds[tuple((nears[0],nns[nears]))] = 1.0#close[nears]
+			pds[tuple((nns[nears],nears[0]))] = 1.0#close[nears]
+		connectivity = sklearn.neighbors.kneighbors_graph(findframe,n_neighbors=4,include_self=False)
+		ward = sklearn.cluster.AgglomerativeClustering(n_clusters=2,
+			connectivity=connectivity,linkage='complete').fit(findframe)
+		imono = ward.labels_
+		if np.mean(imono)==0.5: 
+			status('[STATUS] perfect split is %0.5f'%np.mean(imono))
+		elif (np.all(np.array(imono)==0) or np.all(np.array(imono)==1) or 
+			np.abs(np.mean(imono)-0.5)>=max_count_asymmetry):
+			status('[STATUS] split is %0.5f'%np.mean(imono))
+			status('[STATUS] one side has %d'%np.sum(imono))
+			status('[WARNING] leaflets were not distinguished')
+			raise Exception('[ERROR] failed to identify leaflets. '
+				'DEVELOPMENT NOTE!? use legacy or a different cutoff?')
+		else: status('[STATUS] some lipids might be flipped %d %.5f'%(np.sum(imono),np.mean(imono)))
+		import ipdb;ipdb.set_trace()
+		return np.array(imono)
 
 def makemesh_regular(data,vecs,grid):
 	"""
