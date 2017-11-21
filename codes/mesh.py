@@ -357,7 +357,6 @@ class LeafletFinder:
 				#---break when successful
 				if type(monolayer_indices)!=bool: 
 					self.monolayer_indices = monolayer_indices
-					import ipdb;ipdb.set_trace()
 					return
 
 	def identify_leaflets_cluster(self,pts,vec,topologize_time_limit=30,max_count_asymmetry=0.05):
@@ -415,7 +414,6 @@ class LeafletFinder:
 			raise Exception('[ERROR] failed to identify leaflets. '
 				'DEVELOPMENT NOTE!? use legacy or a different cutoff?')
 		else: status('[STATUS] some lipids might be flipped %d %.5f'%(np.sum(imono),np.mean(imono)))
-		import ipdb;ipdb.set_trace()
 		return np.array(imono)
 
 def makemesh_regular(data,vecs,grid):
