@@ -65,7 +65,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	else:
 		if ('type' in selector) and (selector['type'] in ['com','select']) and ('resnames' in selector):
 			#---note that MDAnalysis sel.residues *cannot* handle redundant numbering
-			#---note also that the "ocean" test case has redundant residues *and* adjacent residues with
+			#---note also that some test cases have redundant residues *and* adjacent residues with
 			#---...the same numbering. previously we tried a method that used the following sequence:
 			#---......divider = [np.where(np.in1d(np.where(np.in1d(
 			#---..........uni.select_atoms('all').resnames,resnames))[0],d))[0] for d in divider_abs]
@@ -148,28 +148,31 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 			status('computing centroid',tag='compute',i=fr,looplen=nframes,start=start)
 			coms.append(codes.mesh.centroid(trajectory[fr],masses,divider))
 
+	#---identify leaflets
+	status('identify leaflets',tag='compute')
+	separator = kwargs['calc']['specs'].get('separator',{})
+	leaflet_finder_trials = separator.get('trials',3)
+	#---preselect a few frames, always including the zeroth
+	selected_frames = [0]+list(np.random.choice(np.arange(1,nframes),leaflet_finder_trials,replace=False))
     #---alternate lipid representation is useful for separating monolayers
-	monolayer_cutoff = kwargs['calc']['specs']['separator']['monolayer_cutoff']
-	monolayer_cutoff_retry = kwargs['calc']['specs']['separator'].get('monolayer_cutoff',True)
-	if 'lipid_tip' in kwargs['calc']['specs']['separator']:
-		tip_select = kwargs['calc']['specs']['separator']['lipid_tip']
+	if 'lipid_tip' in separator:
+		tip_select = separator['lipid_tip']
 		sel = uni.select_atoms(tip_select)
 		atoms_separator = []
-		for fr in range(nframes):
-			status('loading lipid tips',tag='load',i=fr,looplen=nframes)
+		for fr in selected_frames:
 			uni.trajectory[fr]
 			atoms_separator.append(sel.positions/lenscale)
-	else: atoms_separator = coms
-	#---identify monolayers
-	status('identify leaflets',tag='compute')
-	#---randomly select frames for testing monolayers
-	random_tries = 3
-	for fr in [0]+[np.random.randint(nframes) for i in range(random_tries)]:
-		finder_args = dict(monolayer_cutoff=monolayer_cutoff,monolayer_cutoff_retry=monolayer_cutoff_retry)
-		top_tol = kwargs['calc']['specs']['separator'].get('topologize_tolerance',None)
-		if top_tol: finder_args.update(topologize_tolerance=top_tol)
-		monolayer_indices = codes.mesh.identify_lipid_leaflets(atoms_separator[fr],vecs[fr],**finder_args)
-		if type(monolayer_indices)!=bool: break
+	#---default is to use the centers of mass to distinguish leaflets
+	else: atoms_separator = [coms[fr] for fr in selected_frames]
+	#---pass frames to the leaflet finder, which has legacy and cluster modes
+	leaflet_finder = codes.mesh.LeafletFinder(
+		atoms_separator=atoms_separator,
+		#---pass along the corresponding vectors for topologize
+		vecs=[vecs[i] for i in selected_frames],
+		cluster=separator.get('cluster',False),
+		topologize_tolerance=separator.get('topologize_tolerance',None))
+	#---get the indices from the leaflet finder
+	monolayer_indices = leaflet_finder.monolayer_indices
 
 	checktime()
 	coms_out = np.array(coms)
