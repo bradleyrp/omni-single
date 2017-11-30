@@ -93,7 +93,7 @@ joblib.Parallel(n_jobs=ppn,verbose=10)(
 
 #---print the film. you could add codec options here. the filter slows down the movie.
 ffmpegcmd =  ['ffmpeg','-i',tmpdir+'/'+handle+'.fr.%04d.png','-b:v','0','-crf','20']+\
-	(['-filter:v','setpts=2.0*PTS'] if False else [])+[' '+outdir+'/'+handle+'.mpeg']	
+	(['-filter:v','setpts=2.0*PTS'] if False else [])+[' '+outdir+'/'+handle+'.mp4']	
 print(' '.join(ffmpegcmd))
 #---ffmpeg is very particular
 status('calling ffmpeg via: %s'%' '.join(ffmpeg),tag='bash')
