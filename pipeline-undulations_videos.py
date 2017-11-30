@@ -96,7 +96,7 @@ ffmpegcmd =  ['ffmpeg','-i',tmpdir+'/'+handle+'.fr.%04d.png','-b:v','0','-crf','
 	(['-filter:v','setpts=2.0*PTS'] if False else [])+[' '+outdir+'/'+handle+'.mp4']	
 print(' '.join(ffmpegcmd))
 #---ffmpeg is very particular
-status('calling ffmpeg via: %s'%' '.join(ffmpeg),tag='bash')
+status('calling ffmpeg via: %s'%' '.join(ffmpegcmd),tag='bash')
 try: bash(ffmpegcmd,cwd=tmpdir)
 except Exception as e: 
 	raise Exception('failed with exception %s.\nyou may need to adjust the ffmpeg call and render manually.')
