@@ -97,7 +97,9 @@ ffmpegcmd =  ['ffmpeg','-i',tmpdir+'/'+handle+'.fr.%04d.png','-b:v','0','-crf','
 print(' '.join(ffmpegcmd))
 #---ffmpeg is very particular
 status('calling ffmpeg via: %s'%' '.join(ffmpegcmd),tag='bash')
-try: bash(ffmpegcmd,cwd=tmpdir)
+#---! subprocess dislikes the list of arguments here for some reason
+try: bash(' '.join(ffmpegcmd),cwd=tmpdir)
 except Exception as e: 
-	raise Exception('failed with exception %s.\nyou may need to adjust the ffmpeg call and render manually.')
+	raise Exception('failed with exception %s.'%e+
+		'\nyou may need to adjust the ffmpeg call and render manually.')
 status('[STATUS] video rendered to '+outdir+'/'+handle+'.mpeg')
