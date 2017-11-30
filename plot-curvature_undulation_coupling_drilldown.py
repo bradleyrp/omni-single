@@ -36,7 +36,7 @@ history:
 """
 
 #---see history notes above. the round name selects different optimmization tests
-round_name = ['r1','r2','r3','r4'][1]
+round_name = ['r1','r2','r3','r4'][0]
 
 #---all tags in the design loop in curvature.yaml
 master_tags = {
@@ -89,7 +89,6 @@ def loader():
 def individual_reviews_drilldown_height_summary():
 	"""
 	Plot height profiles once per curvature_undulation_coupling_calculation.
-	!!! Note that there might be repeats?
 	"""
 	plotspec = {
 		'coupling_review_drilldown_heights':{
@@ -99,11 +98,14 @@ def individual_reviews_drilldown_height_summary():
 	global seepspace
 	seep = dict([(key,globals()[key]) for key in seepspace])
 	for out_fn,details in plotspec.items(): 
+		#---! this currently only plots four tiles none of which have anything to do with the field
+		#---! ...hence there appear to be repeats since datas is populated with different extents
 		individual_reviews_plotter(out_fn=out_fn,seep=seep,**details)
 
 def prepare_hypotheses():
 	"""
 	Generate a list of hypotheses for testing the optimizer.
+	We generate the hypotheses in several "rounds" during development of the drilldown.
 	"""
 	#---start making hypotheses here with the blurry_explicit method
 	if round_name in ['r1','r2','r3']:
@@ -238,13 +240,14 @@ def plot(name,table):
 	if row['hypo']['design'].get('weighting_scheme',None)=='blurry_explicit':
 		color = '0.5'
 		ratios = item['ratios']
-		q_red,ratios_red,q_inds,q_mapping = blurry_binner(qs,ratios,return_mapping=True)
+		q_red,ratios_red,q_mapping = blurry_binner(qs,ratios,return_mapping=True)
 		ax.scatter(q_red,ratios_red,color='r',marker='o',s=20,zorder=3)
 		ax.set_title('%s (weighted residuals)'%sn)
 	else: 
 		ax.set_title('%s'%sn)
 		color = 'k'
 	#---plot the oscillator function
+	oscillator_function = prepare_oscillator_function()
 	ax.scatter(qs,oscillator_function(item['x'][2],qs),marker='x',s=10,color=color,zorder=2)
 	#---plot the data
 	ax.scatter(qs,item['ratios'],marker='o',s=10,color=color,zorder=2)
@@ -305,19 +308,16 @@ def summary_plots():
 	"""
 	Summarize fitted parameters and spectra for several optimizations.
 	"""
+	table = fetch_hypothesis_table(coordinator)
+	sns = work.sns()
+	props = ['kappa','gamma','vibe','error','curvature','extent']
+	ntiles = len(sns)*len(props)
+	#---divide tests by simulation
+	keysets = dict([(sn,sorted([key for key in table if table[key]['sn']==sn])) for sn in sns])
 
 	def ncolors(n,cmap='jet'):
 		"""Make a series of colors."""
 		return [mpl.cm.__dict__[cmap](i) for i in np.linspace(0,1.,n)]
-
-	table = fetch_hypothesis_table(coordinator)
-	sns = work.sns()
-
-	props = ['kappa','gamma','vibe','error','curvature','extent']
-	ntiles = len(sns)*len(props)
-
-	#---divide tests by simulation
-	keysets = dict([(sn,sorted([key for key in table if table[key]['sn']==sn])) for sn in sns])
 
 	#---plot properties on a large set of tiles
 	for snum,sn in enumerate(sns):
@@ -359,288 +359,10 @@ def summary_plots():
 		picturesave('fig.drilldown_summary.%s.spectra'%work.namer.short_namer(sn,spot='sims'),
 			work.plotdir,backup=False,version=False,meta={},extras=[])
 
-def debugger_basic(free=False):
-	"""
-	Debugging the method.
-	"""
-
-	#---! reimporting takes a while on replot
-	#---! it also says [WARNING] falling back to old-school automatic plotting
-	#---! it also runs twice?
-	#---debug in globals
-	global objective,fit,memory
-
-	###---COMPARISON TO LEGACY CODE
-	global Nfeval
-	from codes.curvature_coupling.curvature_coupling import prepare_objective,formulate_wavevectors
-	from codes.curvature_coupling.curvature_coupling import curvature_sum_function,prepare_residual
-	from codes.curvature_coupling.curvature_coupling import blurry_binner,gopher
-	from codes.curvature_coupling.tools import fft_field
-
-	loader_spec = {'module':'codes.curvature_coupling_loader',
-		'function':'curvature_coupling_loader_membrane'}
-	loader_func = gopher(loader_spec,module_name='module',variable_name='function',work=work)
-
-
-	sn = 'membrane-v651-enthx8'
-	design_name = 'v6_fixed_extent_all_frames_2'
-	design_name = 'v2_fixed_extent_2'
-	high_cutoff = 2.0
-	midplane_method = 'flat'
-	initial_kappa = 20.0
-	optimize_method = 'Nelder-Mead'
-	binner_method = 'explicit'
-	weighting_scheme = 'blurry_explicit'
-	ndrops = 8
-
-	if 'hqs' not in globals():
-		global hqs
-		#---! somewhat redundant with the InvestigateCurvature class
-		memory = loader_func(midplane_method=midplane_method,
-			data=dict(undulations=data['undulations']))
-		hqs = memory[(sn,'hqs')]
-
-	trial = 0.024
-	
-	#---assemble required data and functions for the objective
-	fft_function = fft_field
-	residual_function = prepare_residual()
-	curvature_fields = datas[design_name][sn]['fields_unity']
-	wavevectors_form = formulate_wavevectors(
-		vecs=data['undulations'][sn]['data']['vecs'],
-		dims=data['undulations'][sn]['data']['mesh'].shape[-2:])
-	wavevectors,area = wavevectors_form['wavevectors'],wavevectors_form['area']
-	curvature_sum_function = curvature_sum_function
-	#---! make this more systematic
-	#---! note that band must match binner_method (which defaults to blurry)
-	band = np.where(np.all((wavevectors>=0.,wavevectors<=high_cutoff),axis=0))[0]
-
-	#---subsample hqs for the 100-frame tests
-	if design_name in ['v2_fixed_extent_2']:
-		frameslice = np.linspace(0,len(hqs)-1,100).astype(int)
-	else: frameslice = slice(None,None)
-
-	#---return the objective function decorated for this optimization
-	objective = prepare_objective(
-		hqs=hqs[frameslice],curvature_fields=curvature_fields,
-		wavevectors=wavevectors,area=area,
-		curvature_sum_function=curvature_sum_function,fft_function=fft_field,
-		band=band,residual_function=residual_function,blurry_binner=blurry_binner,
-		binner_method=binner_method,weighting_scheme=weighting_scheme,
-		positive_vibe=True,inner_sign=1.0,
-		ndrops_uniform=ndrops,fix_curvature=trial)
-
-	def callback(args):
-		"""Watch the optimization."""
-		global Nfeval
-		print('step %s: %s'%(Nfeval,args))
-		Nfeval += 1
-
-	#---! see lab notebook
-	if False:
-		place = (19.266769802433579*2,-0.028038385839447261,-2.2881188600183653,0.024)
-		place = (19.266769802433579*2,0,0,0.024)
-		place2 = results['curvature_coupling_drilldown.%s.%s.v0'%(design_name,'v651')]['x']
-
-	def plot_spectrum(wavevectors,*specs,**kwargs):
-		name = kwargs.pop('name','DEBUG')
-		high_cutoff = kwargs.pop('high_cutoff',1.0)
-		colors = kwargs.pop('colors',None)
-		narrow = kwargs.pop('view',True)
-		if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
-		axes,fig = square_tiles(1,figsize=(8,8))
-		ax = axes[0]
-		for snum,spec in enumerate(specs):
-			if colors: color = colors[snum]
-			else: color = 'rgb'[snum%3]
-			ax.scatter(wavevectors,spec,marker='o',s=10,lw=0,color=color,zorder=2)
-		ax.axvline(high_cutoff,color='k')
-		ax.set_xscale('log')
-		ax.set_yscale('log')
-		ax.axhline(1.0,c='k',zorder=1)
-		if narrow: ax.set_ylim(0.1,10)
-		picturesave('fig.%s'%name,work.plotdir,backup=False,version=False,meta={},extras=[])
-
-	#---! previously sweeping through vibes and messing with the spectra
-	if False:
-
-		Nfeval = 0
-		initial_conditions = [initial_kappa,0.0,0.1]
-		fit = scipy.optimize.minimize(objective,x0=tuple(initial_conditions),
-			callback=callback,method=optimize_method)
-		print('fitted: %s'%fit)
-
-		spectrum = objective(fit.x,mode='elastic')
-		plot_spectrum(wavevectors,spectrum,colors='krbgybgybgy',name='DEBUG',high_cutoff=high_cutoff)
-		v=1.0
-		alt = np.array([(v*w+machine_eps)/(np.exp(v*w)-1+machine_eps) 
-			for w in wavevectors])
-		spectrum = objective(fit.x,mode='ratio')
-		#---alternate spectra with different vibes
-		specs = [objective((40,fit.x[1],i),mode='elastic') for i in [0.5,1.0,2.0,3.0]]
-		alt2 = 10**(0.0-np.log10(alt))
-		diff = 10**(np.log10(spectrum)-np.log10(alt2))
-
-	#---! previously investigating differnt functional forms of the residuals and the oscillator correction
-	if False:
-
-		Nfeval = 0
-		initial_conditions = [initial_kappa,0.0,0.1]
-		fit = scipy.optimize.minimize(objective,x0=tuple(initial_conditions),
-			callback=callback,method=optimize_method)
-		print('fitted: %s'%fit)
-
-		colors = 'krmbgybgybgy'
-		colors = ['#BBBCED','#9ADDD0','#741B00','#4A052C','#610076'][::-1]
-		colors = 'krmbgybgybgy'
-
-		spectrum = objective(fit.x,mode='elastic')
-		vibe = fit.x[2]
-		corrects,corrects_alt,mods = [],[],[]
-		for vibe in [fit.x[2],1.0,0.2]:
-			frozen = np.array([(vibe*w+machine_eps)/(np.exp(vibe*w)-1+machine_eps) for w in wavevectors])
-			mods.append(frozen)
-			undershoot = 10**(0.0-np.log10(frozen))
-			logdelta = 10**(np.log10(spectrum)-np.log10(undershoot))
-			corrects.append(logdelta)
-			logdelta_other = spectrum*frozen 
-			corrects_alt.append(logdelta_other)
-			print((np.log10(logdelta)**2).mean())
-		plot_spectrum(wavevectors,
-			spectrum,corrects[0],corrects[1],mods[0],mods[1],corrects_alt[0],corrects_alt[1],
-			colors=colors,name='INVESTIGATE',high_cutoff=high_cutoff)
-
-	#---starting to check out the undulation code
-	#---! then jumped ship to debugger_careful
-	if True:
-
-		#---current debugging view
-		axes,fig = square_tiles(2,figsize=(8,8))
-		ax = axes[0]
-
-		sn = 'membrane-v651-enthx8'
-		surf = data['undulations'][sn]['data']['mesh'].mean(axis=0)
-		vecs = data['undulations'][sn]['data']['vecs']
-
-		lims = [0.,1.]
-		colors = {sn:{'binned':'k','fitted':'r','line':'b'}}
-		midplane_method = 'flat'
-		fit_tension = True
-		fit_style = 'band,perfect,curvefit'
-		fit_style = 'band,perfect,curvefit-crossover'
-
-		uspec = calculate_undulations(surf,vecs,fit_style=fit_style,lims=lims,
-			midplane_method=midplane_method,fit_tension=fit_tension)
-		#---! label was broken here
-		label = sn+'\n'+\
-			r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'+'\n'\
-			r'$\mathrm{\gamma='+('%.3f'%uspec.get('gamma',0.0))+'\:k_BT {nm}^{-2}}$'
-		q_binned,energy_binned = uspec['q_binned'][1:],uspec['energy_binned'][1:]
-		ax.plot(q_binned,energy_binned,'.',lw=0,markersize=10,markeredgewidth=0,
-			label=None,alpha=0.2,color=colors[sn]['binned'])
-		q_fit,energy_fit = np.transpose(uspec['points'])
-		ax.plot(q_fit,energy_fit,'.',lw=0,markersize=4,markeredgewidth=0,
-			label=label,alpha=1.,zorder=4,color=colors[sn]['fitted'])
-		def hqhq(q_raw,kappa,sigma,area,exponent=4.0):
-			return 1.0/(area/2.0*(kappa*q_raw**(exponent)+sigma*q_raw**2))
-		ax.plot(q_fit,hqhq(q_fit,kappa=uspec['kappa'],sigma=uspec['sigma'],
-			area=uspec['area']),lw=1,zorder=3,color=colors[sn]['line'])
-
-		art = {'fs':{'legend':12}}
-		add_undulation_labels(ax,art=art)
-		add_std_legend(ax,loc='upper right',art=art)
-		add_axgrid(ax,art=art)
-
-		picturesave('fig.DEBUG4',work.plotdir,backup=False,version=False,meta={},extras=[])
-
-	if free:
-
-		#---return the objective function decorated for this optimization
-		objective_free = prepare_objective(
-			hqs=hqs[frameslice],curvature_fields=curvature_fields,
-			wavevectors=wavevectors,area=area,
-			curvature_sum_function=curvature_sum_function,fft_function=fft_field,
-			band=band,residual_function=residual_function,blurry_binner=blurry_binner,
-			binner_method=binner_method,weighting_scheme=weighting_scheme,
-			positive_vibe=True,inner_sign=1.0,
-			ndrops_uniform=ndrops)
-
-		Nfeval = 0
-		#---try a free optimization
-		initial_conditions = [fit.x[0],fit.x[1],fit.x[2],0.0]
-		fit = scipy.optimize.minimize(objective_free,x0=tuple(initial_conditions),
-			callback=callback,method=optimize_method)
-		spectrum = objective_free(fit.x,mode='elastic')
-		plot_spectrum(wavevectors,spectrum,colors=colors,name='INVESTIGATE3',high_cutoff=high_cutoff)
-		print(fit.x)
-
 def debugger_careful():
 	"""
-	!!!
+	Note that the development checkpoint held a longer, previous debugger function.
 	"""
-	print('!!!!!!!!!!!!')
-
-@autoplot(plotrun)
-def main(switch=0b0001):
-	"""
-	Main calculation and plot loop.
-	"""
-	nswitch = 4
-	#---decide what to run using a binary argument
-	args_switch = [(int(switch)/i%2)==1 for i in [2**i for i in range(nswitch)][::-1]]
-	compute,make_plots,make_summary,run_debugger = args_switch
-	global table
-	#---use all simulations
-	sns = work.sns()
-	tags = master_tags[round_name]
-	if not os.path.isfile(os.path.join(work.postdir,coordinator)): new_coordinator(coordinator)
-	hypos = prepare_hypotheses()
-	table = fetch_hypothesis_table(coordinator)
-	calcs_new = prepare_calcs(tags=tags,hypos=hypos,sns=sns)
-	if not compute: status('skipping calculations',tag='STATUS')
-	else:
-		#---process optimization requests
-		while calcs_new:
-			calc_this = calcs_new.pop(0)
-			if calc_this in table.values(): status('already computed %s'%calc_this,tag='status')
-			#---perform a new optimization
-			else:
-				#---get the base name
-				base_fn = calc_namer(**calc_this)
-				#---increment the number
-				version_nums = sorted([int(re.match('^%s\.v(\d+)\.dat$'%
-					base_fn,os.path.basename(i)).group(1)) 
-					for i in glob.glob(os.path.join(work.postdir,'%s*'%base_fn))])
-				if version_nums!=range(len(version_nums)):
-					raise Exception('version numbering error on %s: %s'%(base_fn,version_nums))
-				fn = '%s.v%d'%(base_fn,len(version_nums))
-				#---check if this already exists
-				if os.path.isfile(os.path.join(work.postdir,'%s.dat'%fn)):
-					raise Exception('already computed %s'%fn)
-				run_optimizer(fn=fn,**calc_this)
-				table[fn] = calc_this
-				write_hypothesis_table(fn=coordinator,table=table)
-				status('computed %s'%fn,tag='status')
-	#---load all of the results
-	#---! note that the current execution scheme means that I can work on plots and compute simultaneously
-	if make_plots or make_summary:
-		global results
-		results = dict([(name,get_drilldown(name)) for name in table])
-	#---main routes to plotters
-	if make_plots:
-		#---plot when the computations are ready
-		for key in table: 
-			status(key,tag='plot')
-			plot(key,table)
-	#---perform summary plots
-	if make_summary: 
-		individual_reviews_drilldown_height_summary()
-		summary_plots()
-	#---debugging
-	if run_debugger: return#debugger_careful()
-
-#---DEVELOPMENT TRIGGER
-if __name__=='__replotting__':
 
 	"""
 	CAREFUL FITTING STRATEGY	
@@ -651,8 +373,6 @@ if __name__=='__replotting__':
 		plot the spectra the usual way and compare the results?
 		??? find some way to merge these?
 		"""
-
-	global Nfeval
 
 	#---imports and get loaders
 	from codes.curvature_coupling.curvature_coupling import prepare_objective,formulate_wavevectors
@@ -732,6 +452,7 @@ if __name__=='__replotting__':
 		print('step %s: %s'%(Nfeval,args))
 		Nfeval += 1
 
+	global Nfeval
 	Nfeval = 0
 	initial_conditions = [initial_kappa,0.0,initial_vibe]
 	fit = scipy.optimize.minimize(objective,x0=tuple(initial_conditions),
@@ -756,12 +477,8 @@ if __name__=='__replotting__':
 	label = r'$\mathrm{\kappa='+('%.1f'%uspec['kappa'])+'\:k_BT}$'+'\n'\
 		r'$\mathrm{\gamma='+('{0:1.2E}'.format(uspec.get('sigma',0.0)))+'\:k_BT {nm}^{-2}}$'
 	q_binned,energy_binned = uspec['q_binned'][1:],uspec['energy_binned'][1:]
-	if False:
-		ax.plot(q_binned,energy_binned,'.',lw=0,markersize=10,markeredgewidth=0,
-			label=None,alpha=0.2,color=colors[sn]['binned'])
-	else:
-		ax.plot(uspec['q_raw'],uspec['energy_raw'],'.',lw=0,markersize=10,markeredgewidth=0,
-			label=None,alpha=0.2,color=colors[sn]['binned'])
+	ax.plot(uspec['q_raw'],uspec['energy_raw'],'.',lw=0,markersize=10,markeredgewidth=0,
+		label=None,alpha=0.2,color=colors[sn]['binned'])
 
 	q_fit,energy_fit = np.transpose(uspec['points'])
 	ax.plot(q_fit,energy_fit,'.',lw=0,markersize=4,markeredgewidth=0,
@@ -785,7 +502,7 @@ if __name__=='__replotting__':
 		r'$\mathrm{\gamma='+('{0:1.2E}'.format(fit.x[1]))+'\:k_BT {nm}^{-2}}$'
 	ax.scatter(wavevectors,spectrum,marker='o',s=20,lw=0,color='k',zorder=2,alpha=0.1,label=label)
 	#---blurry binner
-	qbin,ebin,_ = blurry_binner(wavevectors,spectrum)
+	qbin,ebin = blurry_binner(wavevectors,spectrum)
 	bandbin = np.where(np.all((qbin>=low_cutoff,qbin<=high_cutoff),axis=0))[0]
 	ax.scatter(qbin[bandbin],ebin[bandbin],marker='o',s=20,lw=0,color='r',zorder=3,alpha=1.0)
 	#---plot the mode-freezing expectation
@@ -794,7 +511,7 @@ if __name__=='__replotting__':
 
 	ax.scatter(wavevectors,frozen,marker='o',s=10,lw=0,color='b',zorder=3,alpha=1.0)
 	#---blurry binner
-	qbin,ebin,_ = blurry_binner(wavevectors,frozen*spectrum)
+	qbin,ebin = blurry_binner(wavevectors,frozen*spectrum)
 	bandbin = np.where(np.all((qbin>=low_cutoff,qbin<=high_cutoff),axis=0))[0]
 	ax.scatter(qbin[bandbin],ebin[bandbin],marker='o',s=20,lw=0,color='r',zorder=3,alpha=1.0)
 	#---all points, corrected in the background
@@ -821,7 +538,7 @@ if __name__=='__replotting__':
 			r'$\mathrm{\gamma='+('{0:1.2E}'.format(fit.x[1]))+'\:k_BT {nm}^{-2}}$'
 		ax.scatter(wavevectors,spectrum,marker='o',s=20,lw=0,color='k',zorder=2,alpha=0.1,label=label)
 		#---blurry binner
-		qbin,ebin,_ = blurry_binner(wavevectors,spectrum)
+		qbin,ebin = blurry_binner(wavevectors,spectrum)
 		bandbin = np.where(np.all((qbin>=low_cutoff,qbin<=high_cutoff),axis=0))[0]
 		ax.scatter(qbin[bandbin],ebin[bandbin],marker='o',s=20,lw=0,color='r',zorder=3,alpha=1.0)
 		#---plot the mode-freezing expectation
@@ -840,30 +557,85 @@ if __name__=='__replotting__':
 
 	picturesave('fig.DEBUG5',work.plotdir,backup=False,version=False,meta={},extras=[])
 
-	#---return the objective function decorated for this optimization
-	objective_free = prepare_objective(
-		hqs=hqs[frameslice],curvature_fields=curvature_fields,
-		wavevectors=wavevectors,area=area,
-		curvature_sum_function=curvature_sum_function,fft_function=fft_field,
-		band=band,residual_function=residual_function,blurry_binner=blurry_binner,
-		binner_method=binner_method,weighting_scheme=weighting_scheme,
-		positive_vibe=True,inner_sign=1.0,
-		ndrops_uniform=0)
+	#---! testing minimization here but moved to the big sweep instead
+	if False:
 
-	Nfeval = 0
-	#---try a free optimization
-	initial_conditions = [fit.x[0],fit.x[1],fit.x[2]]+[initial_curvature for i in range(ndrops)]
-	fit = scipy.optimize.minimize(objective_free,x0=tuple(initial_conditions),
-		callback=callback,method=optimize_method)
-	spectrum = objective_free(fit.x,mode='elastic')
-	print(fit.x)
+		#---return the objective function decorated for this optimization
+		objective_free = prepare_objective(
+			hqs=hqs[frameslice],curvature_fields=curvature_fields,
+			wavevectors=wavevectors,area=area,
+			curvature_sum_function=curvature_sum_function,fft_function=fft_field,
+			band=band,residual_function=residual_function,blurry_binner=blurry_binner,
+			binner_method=binner_method,weighting_scheme=weighting_scheme,
+			positive_vibe=True,inner_sign=1.0,
+			ndrops_uniform=0)
 
+		Nfeval = 0
+		#---try a free optimization
+		initial_conditions = [fit.x[0],fit.x[1],fit.x[2]]+[initial_curvature for i in range(ndrops)]
+		fit = scipy.optimize.minimize(objective_free,x0=tuple(initial_conditions),
+			callback=callback,method=optimize_method)
+		spectrum = objective_free(fit.x,mode='elastic')
+		print(fit.x)
 
+@autoplot(plotrun)
+def main(switch=0b0110):
+	"""
+	Main calculation and plot loop.
+	"""
+	nswitch = 4
+	#---decide what to run using a binary argument
+	args_switch = [(int(switch)/i%2)==1 for i in [2**i for i in range(nswitch)][::-1]]
+	compute,make_plots,make_summary,run_debugger = args_switch
+	global table
+	#---use all simulations
+	sns = work.sns()
+	tags = master_tags[round_name]
+	if not os.path.isfile(os.path.join(work.postdir,coordinator)): new_coordinator(coordinator)
+	hypos = prepare_hypotheses()
+	table = fetch_hypothesis_table(coordinator)
+	calcs_new = prepare_calcs(tags=tags,hypos=hypos,sns=sns)
+	if not compute: status('skipping calculations',tag='STATUS')
+	else:
+		#---process optimization requests
+		while calcs_new:
+			calc_this = calcs_new.pop(0)
+			if calc_this in table.values(): status('already computed %s'%calc_this,tag='status')
+			#---perform a new optimization
+			else:
+				#---get the base name
+				base_fn = calc_namer(**calc_this)
+				#---increment the number
+				version_nums = sorted([int(re.match('^%s\.v(\d+)\.dat$'%
+					base_fn,os.path.basename(i)).group(1)) 
+					for i in glob.glob(os.path.join(work.postdir,'%s*'%base_fn))])
+				if version_nums!=range(len(version_nums)):
+					raise Exception('version numbering error on %s: %s'%(base_fn,version_nums))
+				fn = '%s.v%d'%(base_fn,len(version_nums))
+				#---check if this already exists
+				if os.path.isfile(os.path.join(work.postdir,'%s.dat'%fn)):
+					raise Exception('already computed %s'%fn)
+				run_optimizer(fn=fn,**calc_this)
+				table[fn] = calc_this
+				write_hypothesis_table(fn=coordinator,table=table)
+				status('computed %s'%fn,tag='status')
+	#---load all of the results
+	#---! note that the current execution scheme means that I can work on plots and compute simultaneously
+	if make_plots or make_summary:
+		global results
+		results = dict([(name,get_drilldown(name)) for name in table])
+	#---main routes to plotters
+	if make_plots:
+		#---plot when the computations are ready
+		for key in table: 
+			status(key,tag='plot')
+			plot(key,table)
+	#---perform summary plots
+	if make_summary: 
+		individual_reviews_drilldown_height_summary()
+		summary_plots()
+	#---debugging
+	if run_debugger: debugger_careful()
 
-"""
-next up 
-	plot different cutoffs for different tiles to emphasize ambiguity
-	figure out the blurry binner bullshit
-	commit the garbage and clean things up
-	consider a brief run when you get to wiltshire to estimate curvatures please
-"""
+#---iterative development
+if __name__=='__replotting__': pass

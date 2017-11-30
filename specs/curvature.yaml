@@ -138,13 +138,13 @@ meta:
     label:               free bilayer
     nprots:              0
   membrane-v651-enthx8:
-    label:               '$\mathrm{{ENTH}\ensuremath{\times}8}$'
+    label:               '$\mathrm{{ENTH}{\times}8}$'
     nprots:              8
   membrane-v652-enthx1:
-    label:               '$\mathrm{{ENTH}\ensuremath{\times}1}$'
+    label:               '$\mathrm{{ENTH}{\times}1}$'
     nprots:              1
   membrane-v650-enthx4-dev:
-    label:               '$\mathrm{{ENTH}\ensuremath{\times}4}$'
+    label:               '$\mathrm{{ENTH}{\times}4}$'
     nprots:              4
   membrane-v1005:
     label:               'helix0x23'
@@ -255,6 +255,67 @@ calculations:
             extents:
               method: fixed_isotropic
               extent: 4.0
+          v5_fixed_extent_3:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 3.0
+          v6_fixed_extent_5:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 5.0
+          v7_fixed_extent_6:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 6.0
+          v8_fixed_extent_8:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 8.0
+          v9_fixed_extent_10:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+
 # full frame field sets cause the drilldown to go slowly
 aside:
   # upcoming tests on all frames
@@ -375,3 +436,5 @@ plots:
     collections: focus
     calculation: 
       - curvature_undulation_coupling
+  undulations_videos:
+    collections: focus

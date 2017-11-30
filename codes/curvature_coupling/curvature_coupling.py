@@ -133,15 +133,10 @@ def prepare_oscillator_function(reverse=False):
 
 def prepare_residual():
 	"""Decorate the residual function."""
-	#def residual(hel,hosc): return np.mean((np.log10(hel)+np.log10(hosc))**2)
-	#def residual(hel,hosc): return np.mean((np.log10(hel))**2)
-	#def residual(hel,hosc): return np.mean((np.log10(hel/hosc))**2) ############### WHY WORKS?
-	#see messed up vxxx def residual(hel,hosc): return np.mean((np.log10(hel*hosc-1.0))**2)
-	#def residual(hel,hosc): return np.mean((np.log10(hel*(10**(-1*np.log10(hosc)))))**2)
+	#---! document the ambiguity in function forms here
+	#---! looks the same to me really: ... x = 1./10;(10.*x);10/(10.**(-1.*np.log10(x)))
 	def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
 	return residual
-
-# shit looks the same to me really: ... x = 1./10;(10.*x);10/(10.**(-1.*np.log10(x)))
 
 def prepare_objective(
 	hqs,curvature_fields,wavevectors,area,
@@ -178,7 +173,7 @@ def prepare_objective(
 	cfs,q_raw = curvature_fields,wavevectors
 	#---compute weights for specific weighting schemes	
 	if weighting_scheme=='blurry_explicit':
-		q_raw_binned_temp,_,_,q_mapping = blurry_binner(q_raw,q_raw,return_mapping=True)
+		q_raw_binned_temp,_,q_mapping = blurry_binner(q_raw,q_raw,return_mapping=True)
 		weights = 1./np.array([len(i) for i in q_mapping])[band]
 	else: weights = None
 
@@ -226,7 +221,7 @@ def prepare_objective(
 			elif binner_method=='perfect':
 				q_binned,ratio,q_binned_inds = perfect_collapser(q_raw,hel)
 			elif binner_method=='blurry':
-				q_binned,ratio,q_binned_inds = blurry_binner(q_raw,hel)
+				q_binned,ratio = blurry_binner(q_raw,hel)
 			else: raise Exception('invalid binner_method %s'%binner_method)
 			#----compute residuals with relevant wavevectors (in the band) and return
 			if mode=='residual': 
@@ -275,7 +270,7 @@ def prepare_objective(
 		elif binner_method=='perfect':
 			q_binned,ratio,q_binned_inds = perfect_collapser(q_raw,hel)
 		elif binner_method=='blurry':
-			q_binned,ratio,q_binned_inds = blurry_binner(q_raw,hel)
+			q_binned,ratio = blurry_binner(q_raw,hel)
 		else: raise Exception('invalid binner_method %s'%binner_method)
 		#----compute residuals with relevant wavevectors (in the band) and return
 		if mode=='residual':
@@ -451,9 +446,10 @@ class InvestigateCurvature:
 				span_x,span_y = np.abs(rot).max(axis=0) + extra_distance
 				ref_grid = np.concatenate(np.transpose(np.meshgrid(
 					arange_symmetric(0,span_x,spacer),arange_symmetric(0,span_y,spacer))))
-				#import matplotlib as mpl;import matplotlib.pyplot as plt;ax = plt.subplot(111);
-				#ax.scatter(*average_pts.T);plt.show()
-				#import ipdb;ipdb.set_trace()
+				if False:
+					import matplotlib as mpl;import matplotlib.pyplot as plt;ax = plt.subplot(111);
+					ax.scatter(*average_pts.T);plt.show()
+					import ipdb;ipdb.set_trace()
 				vecs = self.memory[(sn,'vecs')]
 				vecs_mean = np.mean(vecs,axis=0)
 				#---for each frame, map the ref_grid onto the principal axis
@@ -595,12 +591,10 @@ class InvestigateCurvature:
 			if do_uniform_curvature: 
 				ndrops_uniform = int(ndrops)
 				ndrops = 1
-
 			#---formulate the wavevectors
 			Lx,Ly = np.mean(vecs,axis=0)[:2]
 			q_raw = formulate_wavevectors(lx=Lx,ly=Ly,dims=np.shape(hqs)[1:])['wavevectors']
 			area = Lx * Ly
-
 			tweak = self.fitting_parameters
 			#---definition of inner sign is hard-coded here. used in one other place (below) which should
 			#---...have the same value. this term is the same sign as height. the optimizer will find the 
@@ -611,95 +605,17 @@ class InvestigateCurvature:
 			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
 			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',2.0))
 			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
+			if residual_form!='log': raise Exception('deprecated parameter')
 			binner_method = spec.get('binner','explicit')
 			weighting_scheme = spec.get('weighting_scheme','standard')
 			if binner_method=='explicit': q_raw_binned = q_raw
 			elif binner_method=='perfect':
 				q_raw_binned,_,_ = perfect_collapser(q_raw,q_raw)
 			elif binner_method=='blurry':
-				q_raw_binned,_,_ = blurry_binner(q_raw,q_raw)
+				q_raw_binned,_ = blurry_binner(q_raw,q_raw)
 			else: raise Exception('invalid binner_method %s'%binner_method)
 			band = cctools.filter_wavevectors(q_raw_binned,low=lowcut,high=tweak.get('high_cutoff',2.0))
-			#---weighting scheme
-			if False:
-				if weighting_scheme=='blurry_explicit' and binner_method!='explicit': 
-					raise Exception('incompatible')
-				if weighting_scheme=='blurry_explicit':
-					q_raw_binned_temp,_,_,q_mapping = blurry_binner(q_raw,q_raw,return_mapping=True)
-					weights = 1./np.array([len(i) for i in q_mapping])[band]
-
-			if False:
-
-				#---! remove this
-				#---residual mode for the return format from the objective
-				if residual_form == 'log':
-					if weighting_scheme=='blurry_explicit':
-						def residual(values):
-							return np.sum(weights*np.log10(values.clip(min=machine_eps))**2)/float(len(values))
-					else: 
-						def residual(values):
-							return np.sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
-				#---deprecated residual method
-				elif residual_form == 'linear':
-					raise Exception('linear is not the right residual option') 
-					def residual(values): 
-						return np.sum((values-1.0)**2)/float(len(values))
-				else: raise Exception('unclear residual form %s'%residual_form)
-
-				def multipliers(x,y): 
-					"""Multiplying complex matrices in the list of terms that contribute to the energy."""
-					return x*np.conjugate(y)
-
-				def callback(args):
-					"""Watch the optimization."""
-					global Nfeval
-					name_groups = ['kappa','gamma','vibe']+['curve(%d)'%i for i in range(ndrops)]
-					text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
-						for name,val in zip(name_groups,args)+[('error',objective(args))]])
-					status('searching! '+text,tag='optimize')
-					Nfeval += 1
-
-				#---! phasing this out so currently renamed
-				#---! ...soon we will rerun with the at-large objective function from a decorator
-				def objective_interior(args,mode='residual'):
-					"""
-					Fit parameters are defined in sequence for the optimizer.
-					They are: kappa,gamma,vibe,*curvatures-per-dimple.
-					"""
-					kappa,gamma,vibe = args[:3]
-					vibe = np.abs(vibe)
-					#---uniform curvatures
-					if ndrops_uniform!=0: curvatures = [args[3] for i in range(ndrops_uniform)]
-					#---one curvature per field
-					else: curvatures = args[3:]
-					composite = self.curvature_sum(cfs,curvatures,method=curvature_sum_method)
-					cqs = cctools.fft_field(composite)
-					termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
-					termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
-					#---skipping assertion and dropping imaginary
-					#---! explain logic behind real/imaginary here
-					termlist = [np.real(k) for k in termlist]
-					hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
-						+signterm*termlist[2]*q_raw**2+termlist[3])
-						+gamma*area*(termlist[0]*q_raw**2))
-					#---! incorrect: ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
-					ratio = hel/((vibe*q_raw+machine_eps)/((np.exp(vibe*q_raw)-1)+machine_eps))
-					#---note that the band is prepared in advance above
-					if binner_method=='explicit': ratio = ratio
-					elif binner_method=='perfect':
-						q_binned,ratio,q_binned_inds = perfect_collapser(q_raw,ratio)
-					elif binner_method=='blurry':
-						q_binned,ratio,q_binned_inds = blurry_binner(q_raw,ratio)
-					else: raise Exception('invalid binner_method %s'%binner_method)
-					#----compute residuals and return
-					if mode=='residual': return residual(ratio[band])
-					elif mode=='ratio': return ratio
-					else: raise Exception('invalid residual mode %s'%mode)
-
-
-			def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
-
-			residual_function = residual
+			residual_function = prepare_residual()
 
 			objective = prepare_objective(
 				hqs=hqs,curvature_fields=cfs,
