@@ -124,7 +124,6 @@ collections:
   focus:
     - membrane-v651-enthx8
     - membrane-v1005
-    - membrane-v650-enthx4-dev
   all:
     - membrane-v653-free
     - membrane-v652-enthx1
@@ -208,7 +207,7 @@ calculations:
       #  set frequency or nframes in curvature_positions if wait to ensure quick
       design:
         loop:
-          v1_fixed_extent_1:
+          v6_fixed_extent_all_frames_2:
             style: wilderness
             optimize_method: wait
             store_instantaneous_fields: False
@@ -216,110 +215,10 @@ calculations:
             curvature_sum: mean
             curvature_positions: 
               method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 1.0
-          v2_fixed_extent_2:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
             extents:
               method: fixed_isotropic
               extent: 2.0
-          v3_fixed_extent_0.5:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 0.5
-          v4_fixed_extent_4:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 4.0
-          v5_fixed_extent_3:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 3.0
-          v6_fixed_extent_5:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 5.0
-          v7_fixed_extent_6:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 6.0
-          v8_fixed_extent_8:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 8.0
-          v9_fixed_extent_10:
-            style: wilderness
-            optimize_method: wait
-            store_instantaneous_fields: False
-            store_instantaneous_fields_explicit: True
-            curvature_sum: mean
-            curvature_positions: 
-              method: protein_dynamic_single_catchall
-              nframes: 100
-            extents:
-              method: fixed_isotropic
-              extent: 10.0
-
-# full frame field sets cause the drilldown to go slowly
-aside:
-  # upcoming tests on all frames
+on_deck:
   v5_fixed_extent_all_frames_1:
     style: wilderness
     optimize_method: wait
@@ -331,17 +230,6 @@ aside:
     extents:
       method: fixed_isotropic
       extent: 1.0
-  v6_fixed_extent_all_frames_2:
-    style: wilderness
-    optimize_method: wait
-    store_instantaneous_fields: False
-    store_instantaneous_fields_explicit: True
-    curvature_sum: mean
-    curvature_positions: 
-      method: protein_dynamic_single_catchall
-    extents:
-      method: fixed_isotropic
-      extent: 2.0
 upcoming:        
   v13:
     optimize_method: wait

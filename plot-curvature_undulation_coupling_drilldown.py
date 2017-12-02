@@ -14,39 +14,30 @@ from datapack import asciitree
 from omnicalc import store
 import scipy
 import scipy.optimize
+import scipy.interpolate
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import matplotlib.patheffects as path_effects
 machine_eps = eps = np.finfo(float).eps
-import copy,json,glob
+import copy,json,glob,time
+import joblib
 import h5py
 
-#---where to catalog the completed optimizations
-coordinator = 'curvature_coupling_drilldown.json'
+def stringer(x,p=5):
+	"""A nice way to print numbers."""
+	return (' '*(1*(x>0)))+('%.1e'%x 
+		if (abs(x)<10**(-1*p) or abs(x)>10**p) else ('{:>%df}'%(p+2+1*(x<0))).format(x))
 
-"""
-history:
-	started with protein_dynamic_single_catchall and had to manually fix the coordinator
-	added protein_dynamic_single_uniform
-	added extents (v3,v4) and selected only protein_dynamic_single_uniform to save time
-		the protein_dynamic_single runs for thousands of steps
-	added v5,v6 to curvature.yaml and generated fields via `make compute` for all frames
-	current batch of six tests per simulation is worth making a summary plot
-		includes two extents for protein_dynamic_single and four for protein_dynamic_single_uniform
-		otherwise lots of other combinations to try
-		but currently working on the summary plots
-"""
+if 'round_name' not in globals():
+	settings = {}
+	#---get instructions
+	exec(open('calcs/settings_curvature_undulation_coupling_drilldown.py').read(),settings)
+	master_tags,prepare_hypotheses,round_name = [settings[k] for k in 
+		'master_tags,prepare_hypotheses,round_name'.split(',')]
+	#---where to catalog the completed optimizations
+	coordinator = 'curvature_coupling_drilldown.json'
+	del settings
 
-#---see history notes above. the round name selects different optimmization tests
-round_name = ['r1','r2','r3','r4'][0]
-
-#---all tags in the design loop in curvature.yaml
-master_tags = {
-	#---several rounds use blurry_explicit binner
-	#---first round uses protein_dynamic_single
-	'r1':['v1_fixed_extent_1','v2_fixed_extent_2'],
-	#---second round uses protein_dynamic_single_uniform
-	'r2':['v1_fixed_extent_1','v2_fixed_extent_2','v3_fixed_extent_0.5','v4_fixed_extent_4'],
-	'r3':['v5_fixed_extent_all_frames_1','v6_fixed_extent_all_frames_2'],
-	'r4':['v1_fixed_extent_1','v2_fixed_extent_2','v3_fixed_extent_0.5','v4_fixed_extent_4'],}
+	global sn
 
 @autoload(plotrun)
 def loader():
@@ -101,61 +92,6 @@ def individual_reviews_drilldown_height_summary():
 		#---! this currently only plots four tiles none of which have anything to do with the field
 		#---! ...hence there appear to be repeats since datas is populated with different extents
 		individual_reviews_plotter(out_fn=out_fn,seep=seep,**details)
-
-def prepare_hypotheses():
-	"""
-	Generate a list of hypotheses for testing the optimizer.
-	We generate the hypotheses in several "rounds" during development of the drilldown.
-	"""
-	#---start making hypotheses here with the blurry_explicit method
-	if round_name in ['r1','r2','r3']:
-	    #---default parameters
-		opt_params = dict(design={
-			'optimize_method':'Nelder-Mead',
-			'store_instantaneous_fields':False,
-			'store_instantaneous_fields_explicit':False},
-			fitting={'initial_kappa':20.0})
-		opt_params['design']['binner'] = 'explicit'
-		opt_params['design']['weighting_scheme'] = 'blurry_explicit'
-		if round_name=='r1':
-			args = [{'route':('design','curvature_positions','method'),
-				'values':['protein_dynamic_single']},
-				#---! include all elements of curvature_positions or it gets overwritten
-				{'route':('design','curvature_positions','nframes'),'values':[100]},
-				{'route':('fitting','high_cutoff'),'values':[1.0]},]
-			hypos = hypothesizer(*args,default=opt_params)
-		elif round_name=='r2':
-			args = [{'route':('design','curvature_positions','method'),
-				'values':['protein_dynamic_single_uniform']},
-				{'route':('design','curvature_positions','nframes'),'values':[100]},
-				{'route':('fitting','high_cutoff'),'values':[1.0]},]
-			hypos = hypothesizer(*args,default=opt_params)
-		elif round_name=='r3':
-			args = [{'route':('design','curvature_positions','method'),
-				'values':['protein_dynamic_single_uniform']},
-				{'route':('fitting','high_cutoff'),'values':[1.0]},]
-			hypos = hypothesizer(*args,default=opt_params)
-		elif round_name=='r4':
-			args = [{'route':('design','curvature_positions','method'),
-				'values':['protein_dynamic_single_uniform']},
-				{'route':('fitting','high_cutoff'),'values':[1.0]},]
-			hypos = hypothesizer(*args,default=opt_params)
-		else: raise Exception('fail')
-	elif round_name in ['r4']:
-		if round_name=='r4':
-		    #---default parameters
-			opt_params = dict(design={
-				'optimize_method':'Nelder-Mead',
-				'store_instantaneous_fields':False,
-				'store_instantaneous_fields_explicit':False},
-				fitting={'initial_kappa':20.0})
-			opt_params['design']['binner'] = 'explicit'
-			args = [{'route':('design','curvature_positions','method'),
-				'values':['protein_dynamic_single_uniform']},
-				{'route':('fitting','high_cutoff'),'values':[1.0]},]
-			hypos = hypothesizer(*args,default=opt_params)
-	else: raise Exception('fail')
-	return hypos
 
 def new_coordinator(fn):
 	"""Make a new table."""
@@ -359,6 +295,34 @@ def summary_plots():
 		picturesave('fig.drilldown_summary.%s.spectra'%work.namer.short_namer(sn,spot='sims'),
 			work.plotdir,backup=False,version=False,meta={},extras=[])
 
+class QuickOpt:
+	def __init__(self,objective,init,**kwargs):
+		self.optimize_method = kwargs.pop('optimize_method','Nelder-Mead')
+		self.scipy_optimize_function = kwargs.pop('scipy_optimize_function','minimize')
+		self.silent = kwargs.pop('silent',False)
+		if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
+		self.stepno = 0
+		#---get the objective function from globals
+		self.objective = objective
+		if self.scipy_optimize_function=='minimize':
+			self.fit = scipy.optimize.minimize(self.objective,x0=tuple(init),
+				callback=self.callback,method=self.optimize_method)
+			self.fitted = self.fit.x
+		elif self.scipy_optimize_function=='fmin':
+			self.fit = scipy.optimize.fmin(self.objective,x0=tuple(init),disp=True)
+			self.fitted = self.fit
+		else: raise Exception('unclear optimize procedure')
+		print('\n\n')
+		status(str(self.fitted),tag='result')
+	def callback(self,args):
+		"""Watch the optimization."""
+		args_string = ' '.join([stringer(a) for a in args])
+		output = (u'\r' if self.stepno>0 else '')+'[OPTIMIZE] step %s: %s'%(self.stepno,args_string)
+		if ~self.silent:
+			sys.stdout.flush()
+			sys.stdout.write(output)
+		self.stepno += 1
+
 def debugger_careful():
 	"""
 	Note that the development checkpoint held a longer, previous debugger function.
@@ -396,7 +360,7 @@ def debugger_careful():
 	low_cutoff = 0.0
 	midplane_method = 'flat'
 	initial_kappa = 30.0
-	initial_vibe = 0.0
+	initial_vibe = 5.0
 	initial_curvature = 0.005
 	optimize_method = 'Nelder-Mead'
 	binner_method = 'explicit'
@@ -578,8 +542,398 @@ def debugger_careful():
 		spectrum = objective_free(fit.x,mode='elastic')
 		print(fit.x)
 
+def prepare_optimization_components():
+	"""
+	Import individual components for optimization.
+	"""
+	if 'loader_func' not in globals():
+		global loader_func,prepare_objective,formulate_wavevectors,curvature_sum_function
+		global prepare_residual,blurry_binner,gopher,prepare_oscillator_function,log_reverse,fft_field
+		global loader_spec,oscillator_function
+		#---imports and get loaders
+		from codes.curvature_coupling.curvature_coupling import prepare_objective,formulate_wavevectors
+		from codes.curvature_coupling.curvature_coupling import curvature_sum_function,prepare_residual
+		from codes.curvature_coupling.curvature_coupling import blurry_binner,gopher
+		from codes.curvature_coupling.curvature_coupling import prepare_oscillator_function,log_reverse
+		from codes.curvature_coupling.tools import fft_field
+		loader_spec = {'module':'codes.curvature_coupling_loader',
+			'function':'curvature_coupling_loader_membrane'}
+		loader_func = gopher(loader_spec,module_name='module',variable_name='function',work=work)
+		oscillator_function = prepare_oscillator_function()
+
+def debug_compare_alt():
+	"""
+	Compare standard and alternate master modes.
+	"""
+
+	sn = 'membrane-v651-enthx8'
+
+	prepare_optimization_components()
+
+	#---get heights
+	if 'hqs' not in globals():
+		global hqs
+		midplane_method = 'flat'
+		#---! somewhat redundant with the InvestigateCurvature class
+		memory = loader_func(midplane_method=midplane_method,
+			data=dict(undulations=data['undulations']))
+		hqs = memory[(sn,'hqs')]
+
+	#---digression
+	axes,fig = square_tiles(1,figsize=(8,8))
+	ax = axes[0]
+
+	#---settings
+	low_cutoff = 0.5
+	midplane_method = 'flat'
+	high_cutoff = high_cutoff_undulate = 4.0
+	binner_method = 'explicit'
+	weighting_scheme = [None,'explicit_blurry'][0]
+	#---! needs removed
+	initial_kappa = 20.0
+	initial_vibe = 0.0
+	#---simulation-specific settings
+	ndrops = 8
+
+	curvature = 0.04
+	
+	# make plot curvature_undulation_coupling_drilldown meta=calcs/specs/curvature_s4_all_drilldown.yaml
+	design_name = 'v6_fixed_extent_all_frames_2'
+
+	fft_function = fft_field
+	residual_function = prepare_residual()
+	wavevectors_form = formulate_wavevectors(
+		vecs=data['undulations'][sn]['data']['vecs'],
+		dims=data['undulations'][sn]['data']['mesh'].shape[-2:])
+	wavevectors,area = wavevectors_form['wavevectors'],wavevectors_form['area']
+	curvature_sum_function = curvature_sum_function
+	band = np.where(np.all((wavevectors>=low_cutoff,wavevectors<=high_cutoff),axis=0))[0]
+
+	frameslice = slice(None,None)
+
+	if 'opt' not in globals():
+
+		curvature_fields = datas[design_name][sn]['fields_unity']
+
+		objective = prepare_objective(
+			hqs=hqs[frameslice],curvature_fields=curvature_fields,
+			wavevectors=wavevectors,area=area,
+			curvature_sum_function=curvature_sum_function,fft_function=fft_field,
+			band=band,residual_function=residual_function,blurry_binner=blurry_binner,
+			binner_method=binner_method,weighting_scheme=weighting_scheme,
+			positive_vibe=True,inner_sign=1.0,
+			ndrops_uniform=ndrops,fix_curvature=curvature,
+			oscillator_function=prepare_oscillator_function(reverse=True))
+		opt = QuickOpt(objective=objective,scipy_optimize_function='minimize',
+			silent=True,init=(initial_kappa,0.0,initial_vibe))
+		spectrum = objective(opt.fitted,mode='elastic')
+
+		objective_alt = prepare_objective(
+			hqs=hqs[frameslice],curvature_fields=curvature_fields,
+			wavevectors=wavevectors,area=area,
+			curvature_sum_function=curvature_sum_function,fft_function=fft_field,
+			band=band,blurry_binner=blurry_binner,
+			residual_function=prepare_residual(mode='alt'),
+			binner_method=binner_method,weighting_scheme=weighting_scheme,
+			positive_vibe=False,inner_sign=-1.0,
+			oscillator_function=prepare_oscillator_function(reverse=False,positive_vibe=False),
+			ndrops_uniform=ndrops,fix_curvature=curvature)
+		opt_alt = QuickOpt(objective=objective_alt,scipy_optimize_function='fmin',
+			silent=True,init=(initial_kappa,0.0,5))
+		spectrum_alt = objective_alt(opt_alt.fitted,mode='elastic')
+
+	vibe = opt.fitted[2]
+	frozen = oscillator_function(vibe,wavevectors)
+	subject = spectrum*frozen
+	frozen_alt = prepare_oscillator_function(
+		positive_vibe=False)(opt_alt.fitted[2],wavevectors)
+	subject_alt = spectrum_alt/frozen_alt
+	if 0: ax.plot(wavevectors,subject,
+		markersize=5,marker='o',lw=0,color='magenta',zorder=2,alpha=1.0,
+		markeredgewidth=1.0,markeredgecolor='k')
+	xp,yp = perfect_collapser(wavevectors,subject)
+	if 1: ax.plot(xp,yp,
+		lw=2,zorder=10,color='magenta',solid_capstyle='round',
+		path_effects=[path_effects.withStroke(linewidth=4,foreground='k')])
+	xpf,ypf = perfect_collapser(wavevectors,frozen)
+	ax.plot(xpf,log_reverse(ypf),'--',c='magenta',lw=1)
+	xpf,ypf = perfect_collapser(wavevectors,spectrum)
+	ax.plot(xpf,ypf,'-',c='k',lw=1,alpha=0.6,zorder=1)
+
+	if True: 
+		if 0: ax.plot(wavevectors,subject_alt,
+			markersize=5,marker='o',lw=0,color='cyan',zorder=2,alpha=1.0,
+			markeredgewidth=1.0,markeredgecolor='k')
+		xp,yp = perfect_collapser(wavevectors,subject_alt)
+		if 1: ax.plot(xp,yp,
+			lw=2,zorder=10,color='cyan',solid_capstyle='round',
+			path_effects=[path_effects.withStroke(linewidth=4,foreground='k')])
+		xpf,ypf = perfect_collapser(wavevectors,frozen_alt)
+		ax.plot(xpf,ypf,'--',c='cyan',lw=1)
+		xpf,ypf = perfect_collapser(wavevectors,spectrum_alt)
+		ax.plot(xpf,ypf,'-',c='k',lw=1,alpha=0.6,zorder=1)
+
+	ax.set_xscale('log')
+	ax.set_yscale('log')
+	ax.axhline(1.0,c='k')
+	ax.set_ylim(0.1,10)
+	ax.axvline(high_cutoff,color='k')
+	picturesave('fig.DEBUG7b',work.plotdir,backup=False,version=False,meta={})
+
+def debug_resurvey(sn,figname='DEBUG11'):
+	"""
+	Run the survey with the alternate master mode.
+	"""
+	if 'loader_func' not in globals():
+
+		#---imports and get loaders
+		from codes.curvature_coupling.curvature_coupling import prepare_objective,formulate_wavevectors
+		from codes.curvature_coupling.curvature_coupling import curvature_sum_function,prepare_residual
+		from codes.curvature_coupling.curvature_coupling import blurry_binner,gopher
+		from codes.curvature_coupling.curvature_coupling import prepare_oscillator_function,log_reverse
+		from codes.curvature_coupling.tools import fft_field
+		loader_spec = {'module':'codes.curvature_coupling_loader',
+			'function':'curvature_coupling_loader_membrane'}
+		loader_func = gopher(loader_spec,module_name='module',variable_name='function',work=work)
+		oscillator_function = prepare_oscillator_function()
+
+	#---get heights
+	if 'hqs' not in globals():
+		global hqs
+		midplane_method = 'flat'
+		#---! somewhat redundant with the InvestigateCurvature class
+		memory = loader_func(midplane_method=midplane_method,
+			data=dict(undulations=data['undulations']))
+		hqs = memory[(sn,'hqs')]
+
+	#---define a landscape
+	extent_keys = ['v3_fixed_extent_0.5','v1_fixed_extent_1','v2_fixed_extent_2',
+		'v5_fixed_extent_3','v4_fixed_extent_4','v6_fixed_extent_5','v7_fixed_extent_6',
+		'v8_fixed_extent_8','v9_fixed_extent_10']
+	extents = np.array([datas[k][sn]['spec']['extents']['extent'] for k in extent_keys])
+	curvatures = np.arange(-0.1,0.1+0.005,0.01)
+	#---moar
+	halfsweep = np.concatenate((np.arange(0.01,0.1+0.01,0.01),np.arange(0.2,1.0+0.1,0.1)))
+	curvatures = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
+
+	#---settings
+	low_cutoff = 0.0
+	midplane_method = 'flat'
+	high_cutoff = high_cutoff_undulate = 2.0
+	binner_method = 'explicit'
+	weighting_scheme = [None,'blurry_explicit'][-1]
+	#---! needs removed
+	initial_kappa = 20.0
+	initial_vibe = 0.0
+	#---simulation-specific settings
+	ndrops = 8
+
+	#---prepare objective functions
+	if 'job_toc' not in globals():
+		job_toc = {}
+
+		fft_function = fft_field
+		residual_function = prepare_residual()
+		wavevectors_form = formulate_wavevectors(
+			vecs=data['undulations'][sn]['data']['vecs'],
+			dims=data['undulations'][sn]['data']['mesh'].shape[-2:])
+		wavevectors,area = wavevectors_form['wavevectors'],wavevectors_form['area']
+		curvature_sum_function = curvature_sum_function
+		band = np.where(np.all((wavevectors>=low_cutoff,wavevectors<=high_cutoff),axis=0))[0]
+
+		start = time.time()
+		#---prepare objective functions for each extent
+		#---! cannot pickle function objects so cannot do this in parallel
+		for ii,(design_name,extent) in enumerate(zip(extent_keys,extents)):
+			for jj,curvature in enumerate(curvatures):
+				print('\n')
+				status('preparing objective function',i=ii*len(curvatures)+jj,
+					looplen=len(extents)*len(curvatures),start=start,tag='build')
+				curvature_fields = datas[design_name][sn]['fields_unity']
+				#---! hard coded
+				frameslice = np.linspace(0,len(hqs)-1,100).astype(int)
+				if True:
+					objective = prepare_objective(
+						hqs=hqs[frameslice],curvature_fields=curvature_fields,
+						wavevectors=wavevectors,area=area,
+						curvature_sum_function=curvature_sum_function,fft_function=fft_field,
+						band=band,residual_function=residual_function,blurry_binner=blurry_binner,
+						binner_method=binner_method,weighting_scheme=weighting_scheme,
+						positive_vibe=True,inner_sign=1.0,
+						ndrops_uniform=ndrops,fix_curvature=curvature)
+					opt = QuickOpt(objective=objective,silent=True,init=(initial_kappa,0.0,initial_vibe))
+				else:
+					objective_alt = prepare_objective(
+						hqs=hqs[frameslice],curvature_fields=curvature_fields,
+						wavevectors=wavevectors,area=area,
+						curvature_sum_function=curvature_sum_function,fft_function=fft_field,
+						band=band,blurry_binner=blurry_binner,
+						residual_function=prepare_residual(mode='alt'),
+						binner_method=binner_method,weighting_scheme=weighting_scheme,
+						positive_vibe=False,inner_sign=-1.0,
+						oscillator_function=prepare_oscillator_function(
+							reverse=False,positive_vibe=False),
+						ndrops_uniform=ndrops,fix_curvature=curvature)
+					#---! no error term with fmin so using minimize. it's all the same
+					opt = QuickOpt(objective=objective_alt,scipy_optimize_function='minimize',
+						silent=True,init=(initial_kappa,0.0,5))
+				job_toc[(extent,curvature)] = opt
+
+	figsize = (12,10)
+	contour_interp_pts = 100
+	contour_line_skip = 4
+	contour_nlevels = 100
+	under_color = 'm'
+	
+	axes,fig = square_tiles(2,figsize,favor_rows=True)
+	ax = axes[0]
+	raw = np.array([[job_toc[(e,c)].fit.fun for e in extents] for c in curvatures])
+	#---literal
+	kwargs = dict(extent=[min(curvatures),max(curvatures),
+		min(extents),max(extents)],aspect=(curvatures.ptp()/extents.ptp()))
+	#---figurative
+	kwargs = dict(extent=[0,len(curvatures),0,len(extents)],aspect=(float(len(curvatures))/len(extents)))
+	ax.imshow(raw.T,origin='lower',interpolation='nearest',**kwargs)
+	ax.set_xticks(np.arange(len(curvatures))+0.5)
+	ax.set_yticks(np.arange(len(extents))+0.5)
+	ax.set_xticklabels(['%.3f'%i for i in curvatures],rotation=90)
+	ax.set_yticklabels(['%.1f'%i for i in extents])
+	#---contour
+	ax = axes[1]
+	error_min = raw.min()*0.1
+	error_max = raw.ptp()/2.+raw.min()
+	contour_line_max = raw.ptp()/4.+raw.min()
+	curvature_extent_error = np.array([(c,e,raw[cc,ee]) 
+		for cc,c in enumerate(curvatures) for ee,e in enumerate(extents)])
+	c0,c1 = min(curvatures),max(curvatures)
+	e0,e1 = min(extents),max(extents)
+	finex = np.linspace(c0,c1,contour_interp_pts)
+	finey = np.linspace(e0,e1,contour_interp_pts)
+	grid_x,grid_y = np.meshgrid(finex,finey)
+	errormap = scipy.interpolate.griddata(curvature_extent_error[:,:2],curvature_extent_error[:,2],
+		(grid_x,grid_y),method='cubic')
+	levels = np.linspace(error_min,error_max,contour_nlevels)
+	cs = ax.contourf(grid_x,grid_y,errormap,levels=levels,vmax=error_max,vmin=error_min,
+		extend='both',origin='lower',lw=2,zorder=3,cmap=mpl.cm.jet)
+	cs.cmap.set_over('w')
+	if under_color: cs.cmap.set_under(under_color)
+	levels_contour = levels[np.where(levels<=contour_line_max)][::contour_line_skip]
+	if False: cs_lines = ax.contour(grid_x,grid_y,errormap,vmax=error_max,
+		vmin=error_min,levels=levels_contour,
+		extend='both',origin='lower',linewidths=0.5,colors='k',zorder=4)
+	ax.set_aspect(curvatures.ptp()/extents.ptp())
+	picturesave('fig.%s'%figname,work.plotdir,backup=False,version=False,meta={})
+
+	i,j = np.unravel_index(raw.argmin(),raw.shape)
+	print((curvatures[i],extents[j]))
+	print(curvature_extent_error[curvature_extent_error[:,2].argmin()])
+
+def debug_search_alt():
+	"""
+	Search using the alternate master mode.
+	"""
+
+	sn = ['membrane-v651-enthx8','membrane-v1005','membrane-v650-enthx4-dev'][-1]
+	master_mode = ['standard','alt'][1]
+
+	#---! this block is getting repetitive in the debugging schemes
+	if 'loader_func' not in globals():
+		#---imports and get loaders
+		from codes.curvature_coupling.curvature_coupling import prepare_objective,formulate_wavevectors
+		from codes.curvature_coupling.curvature_coupling import curvature_sum_function,prepare_residual
+		from codes.curvature_coupling.curvature_coupling import blurry_binner,gopher
+		from codes.curvature_coupling.curvature_coupling import prepare_oscillator_function,log_reverse
+		from codes.curvature_coupling.tools import fft_field
+		loader_spec = {'module':'codes.curvature_coupling_loader',
+			'function':'curvature_coupling_loader_membrane'}
+		loader_func = gopher(loader_spec,module_name='module',variable_name='function',work=work)
+	#---! this block is getting repetitive in the debugging schemes
+	#---get heights
+	if 'hqs' not in globals():
+		global hqs
+		midplane_method = 'flat'
+		#---! somewhat redundant with the InvestigateCurvature class
+		memory = loader_func(midplane_method=midplane_method,
+			data=dict(undulations=data['undulations']))
+		hqs = memory[(sn,'hqs')]
+
+	#---settings
+	midplane_method = 'flat'
+	low_cutoff = 0.0
+	high_cutoff = high_cutoff_undulate = 1.0
+	binner_method = 'explicit'
+	weighting_scheme = [None,'explicit_blurry'][1]
+	#---! needs removed
+	initial_kappa = 20.0
+	initial_vibe = 0.0
+	#---simulation-specific settings
+	ndrops = work.meta[sn]['nprots']
+
+	use_all_frames = False
+	if use_all_frames:
+		# call with: meta=calcs/specs/curvature_s4_all_drilldown.yaml
+		design_name = 'v6_fixed_extent_all_frames_2'
+		frameslice = slice(None,None)
+	else: 
+		design_name = 'v2_fixed_extent_2'
+		frameslice = np.linspace(0,len(hqs)-1,100).astype(int)
+
+	fft_function = fft_field
+	wavevectors_form = formulate_wavevectors(
+		vecs=data['undulations'][sn]['data']['vecs'],
+		dims=data['undulations'][sn]['data']['mesh'].shape[-2:])
+	wavevectors,area = wavevectors_form['wavevectors'],wavevectors_form['area']
+	curvature_sum_function = curvature_sum_function
+	band = np.where(np.all((wavevectors>=low_cutoff,wavevectors<=high_cutoff),axis=0))[0]
+	curvature_fields = datas[design_name][sn]['fields_unity']
+
+	if 'opt' not in globals():
+		objective = prepare_objective(
+			master_mode=master_mode,
+			hqs=hqs[frameslice],curvature_fields=curvature_fields,
+			wavevectors=wavevectors,area=area,
+			curvature_sum_function=curvature_sum_function,fft_function=fft_field,
+			band=band,blurry_binner=blurry_binner,
+			binner_method=binner_method,weighting_scheme=weighting_scheme,
+			ndrops_uniform=ndrops)
+		opt = QuickOpt(objective=objective,
+			silent=False,init=(initial_kappa,0.,5.,0.))
+		spectrum = objective(opt.fitted,mode='elastic')
+
+	#---digression
+	axes,fig = square_tiles(1,figsize=(8,8))
+	ax = axes[0]
+	vibe = opt.fitted[2]
+	if master_mode=='alt':
+		frozen = prepare_oscillator_function(reverse=False,positive_vibe=False)(
+			opt.fitted[2],wavevectors)
+		subject = spectrum/frozen
+	elif master_mode=='standard':
+		frozen = prepare_oscillator_function(reverse=True,positive_vibe=True)(
+			opt.fitted[2],wavevectors)
+		subject = spectrum/frozen
+	if 0: ax.plot(wavevectors,subject,
+		markersize=5,marker='o',lw=0,color='magenta',zorder=2,alpha=1.0,
+		markeredgewidth=1.0,markeredgecolor='k')
+	xp,yp = perfect_collapser(wavevectors,subject)
+	if 1: ax.plot(xp,yp,
+		lw=2,zorder=10,color='magenta',solid_capstyle='round',
+		path_effects=[path_effects.withStroke(linewidth=4,foreground='k')])
+	xpf,ypf = perfect_collapser(wavevectors,frozen)
+	ax.plot(xpf,log_reverse(ypf),'--',c='magenta',lw=1)
+	xpf,ypf = perfect_collapser(wavevectors,spectrum)
+	ax.plot(xpf,ypf,'-',c='k',lw=1,alpha=0.6,zorder=1)
+	ax.set_xscale('log')
+	ax.set_yscale('log')
+	ax.axhline(1.0,c='k')
+	ax.set_ylim(0.1,10)
+	ax.axvline(high_cutoff,color='k')
+	picturesave('fig.DEBUG.search_master_mode_%s.%s%s'%(master_mode,sn,
+		'.all_frames' if use_all_frames else ''),
+		work.plotdir,backup=False,version=False,meta={})
+
 @autoplot(plotrun)
-def main(switch=0b0110):
+def main(switch=0b0000):
 	"""
 	Main calculation and plot loop.
 	"""
@@ -594,9 +948,9 @@ def main(switch=0b0110):
 	if not os.path.isfile(os.path.join(work.postdir,coordinator)): new_coordinator(coordinator)
 	hypos = prepare_hypotheses()
 	table = fetch_hypothesis_table(coordinator)
-	calcs_new = prepare_calcs(tags=tags,hypos=hypos,sns=sns)
 	if not compute: status('skipping calculations',tag='STATUS')
 	else:
+		calcs_new = prepare_calcs(tags=tags,hypos=hypos,sns=sns)
 		#---process optimization requests
 		while calcs_new:
 			calc_this = calcs_new.pop(0)
@@ -637,5 +991,19 @@ def main(switch=0b0110):
 	#---debugging
 	if run_debugger: debugger_careful()
 
+	compare_alt,resurvey,search_alt = 0,0,1
+	if compare_alt: debug_compare_alt()
+
 #---iterative development
-if __name__=='__replotting__': pass
+if __name__=='__replotting__':
+
+
+	sn = ['membrane-v651-enthx8','membrane-v1005'][-1]
+	compare_alt,resurvey,search_alt = 0,0,0,1
+	if compare_alt: debug_compare_alt()
+	if resurvey: debug_resurvey(sn=sn,figname='DEBUG12')
+	if search_alt: debug_search_alt()
+	if crazyfit: pass
+
+
+

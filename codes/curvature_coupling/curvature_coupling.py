@@ -120,27 +120,47 @@ def prepare_residual_DEPRECATED(residual_form='log',weighting_scheme=None):
 	else: raise Exception('unclear residual form %s'%residual_form)
 	return residual
 
-def prepare_oscillator_function(reverse=False):
+def log_reverse(raw):
+	return 10.**(-1.0*np.log10(raw))
+
+def prepare_oscillator_function(reverse=False,positive_vibe=True):
 	"""Reversible for .... !!! mysterious reasons."""
+	# TESTING TESTING thursday
 	def oscillator_function(vibe,qs):
 		"""Standard harmonic oscillator function."""
 		#---vibration must be nonnegative
-		vibe = np.abs(vibe)
-		raw = ((vibe*qs+machine_eps)/((np.exp(vibe*qs)-1)+machine_eps))
+		if positive_vibe: vibe = np.abs(vibe)
+		#raw = ((vibe*qs+machine_eps)/((np.exp(vibe*qs)-1)+machine_eps))
+		raw = (vibe*qs)*(0.+1./(np.exp(vibe*qs)-1))
 		if not reverse: return raw
-		else: return 10.**(-1.0*np.log10(raw))
+		else: return log_reverse(raw)
+	#def oscillator_function(vibe,q_raw):
+	#	#return (energy_raw(kappa,gamma)+0.)/(vibe*q_raw)/(0.+1./(np.exp(vibe*q_raw)-1))
+	#	return (vibe*q_raw)*(0.+1./(np.exp(vibe*q_raw)-1))
 	return oscillator_function
 
-def prepare_residual():
+def prepare_residual(mode='standard'):
 	"""Decorate the residual function."""
 	#---! document the ambiguity in function forms here
 	#---! looks the same to me really: ... x = 1./10;(10.*x);10/(10.**(-1.*np.log10(x)))
-	def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
+	#def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
+	# TESTING TESTING thursday
+	#def residual(hel,hosc): 
+	#	energies = hel/hosc
+	#	return sum(np.log10(energies.clip(min=machine_eps))**2)/float(len(energies))
+	if mode=='standard':
+		def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
+	elif mode=='alt':
+		def residual(hel,hosc): 
+			#return np.mean(np.log10((hel/hosc).clip(min=machine_eps))**2)
+			energies = hel/hosc
+			return sum(np.log10(energies.clip(min=machine_eps))**2)/float(len(energies))
+	else: raise Exception('unclear residual mode')
 	return residual
 
 def prepare_objective(
 	hqs,curvature_fields,wavevectors,area,
-	curvature_sum_function,fft_function,band,residual_function,
+	curvature_sum_function,fft_function,band,
 	**kwargs):
 	"""
 	Package the objective function for optimization.
@@ -159,9 +179,16 @@ def prepare_objective(
 	imaginary_mode = kwargs.pop('imaginary_mode','complex')
 	fix_curvature = kwargs.pop('fix_curvature',None)
 	oscillator_function_local = kwargs.pop('oscillator_function',None)
+	#---handle master modes
+	master_mode = kwargs.pop('master_mode','standard')
+	positive_vibe = {'standard':True,'alt':False}[master_mode]
+	signterm = {'standard':1.0,'alt':-1.0}[master_mode]
+	reverse_oscillator = {'standard':True,'alt':False}[master_mode]
+	#---get the oscillator if not explicit
 	if oscillator_function_local==None:
-		oscillator_function_local = prepare_oscillator_function(reverse=True)
-	residual = kwargs.pop('residual_function',prepare_residual())
+		oscillator_function_local = prepare_oscillator_function(reverse=reverse_oscillator,
+			positive_vibe=positive_vibe)
+	residual = kwargs.pop('residual_function',prepare_residual(mode=master_mode))
 	weighting_scheme = kwargs.pop('weighting_scheme',None)
 	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
 	#---consistency checks
@@ -214,8 +241,6 @@ def prepare_objective(
 				+signterm*termlist[2]*q_raw**2+termlist[3])
 				+gamma*area*(termlist[0]*q_raw**2))
 			hosc = oscillator_function_local(vibe,q_raw)
-			#---apply the vibration correction
-			ratio = hel*hosc
 			#---note that the band is prepared in advance above
 			if binner_method=='explicit': ratio = hel
 			elif binner_method=='perfect':
@@ -264,7 +289,6 @@ def prepare_objective(
 			+gamma*area*(termlist[0]*q_raw**2))
 		#---apply the vibration correction
 		hosc = oscillator_function_local(vibe,q_raw)
-		#ratio = hel*hosc
 		#---note that the band is prepared in advance above
 		if binner_method=='explicit': ratio = hel
 		elif binner_method=='perfect':
@@ -605,9 +629,10 @@ class InvestigateCurvature:
 			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
 			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',2.0))
 			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
+			master_mode = kwargs.get('master_mode','standard')
 			if residual_form!='log': raise Exception('deprecated parameter')
 			binner_method = spec.get('binner','explicit')
-			weighting_scheme = spec.get('weighting_scheme','standard')
+			##### weighting_scheme = spec.get('weighting_scheme','standard')
 			if binner_method=='explicit': q_raw_binned = q_raw
 			elif binner_method=='perfect':
 				q_raw_binned,_,_ = perfect_collapser(q_raw,q_raw)
@@ -615,15 +640,18 @@ class InvestigateCurvature:
 				q_raw_binned,_ = blurry_binner(q_raw,q_raw)
 			else: raise Exception('invalid binner_method %s'%binner_method)
 			band = cctools.filter_wavevectors(q_raw_binned,low=lowcut,high=tweak.get('high_cutoff',2.0))
-			residual_function = prepare_residual()
+			residual_function = prepare_residual(mode=master_mode)
+			oscillator_function = prepare_oscillator_function(
+				reverse={'standard':True,'alt':False}[master_mode])
 
 			objective = prepare_objective(
+				master_mode=master_mode,
 				hqs=hqs,curvature_fields=cfs,
 				wavevectors=q_raw,area=area,
+				oscillator_function=oscillator_function,
 				curvature_sum_function=curvature_sum_function,fft_function=cctools.fft_field,
 				band=band,residual_function=residual_function,blurry_binner=blurry_binner,
-				binner_method='explicit',positive_vibe=True,inner_sign=1.0,
-				ndrops_uniform=ndrops_uniform)
+				binner_method='explicit',ndrops_uniform=ndrops_uniform)
 
 			def callback(args):
 				"""Watch the optimization."""
