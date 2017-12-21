@@ -112,7 +112,9 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 	"""
 	mesh = data[sn]['data']['mesh']
 	surf = mesh.mean(axis=0)
-	surf = np.array([s-surf.reshape(len(surf),-1).mean(axis=1)[ss] for ss,s in enumerate(surf)])
+	#---! somewhat amazing that the following is necessary, but it is
+	surf = (surf - np.tile(surf.reshape(len(surf),-1).mean(axis=1),
+		(surf.shape[1],surf.shape[2],1)).transpose(2,0,1))
 	vecs = data[sn]['data']['vecs']
 	fit_style = kwargs.get('fit_style','band,perfect,curvefit')
 	lims = kwargs.get('lims',[0.,kwargs.get('wavevector_limit',1.0)])

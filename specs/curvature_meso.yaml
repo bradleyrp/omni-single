@@ -1,0 +1,23 @@
+director:
+  slice_structures:
+    #! trivial definition here
+    mesoscale_rwt_v1: ['mesoscale_rwt_v1']
+
+meta:
+  short_namer: "lambda name,spot : 'v'+re.findall('(?:membrane|mesomembrane)-v([0-9]+)',name)[0]"
+collections:
+  all:
+    - v2014
+slices:
+  v2014:
+    readymade_meso_v1:
+      current:
+        path: /store-delta/compbio/mesomembrane-v2014/exec/
+        directory_glob: rundir-*
+calculations:
+  import_readymade_meso_v2_membrane:
+    group: all
+    slice_name: current
+    collections: all
+    specs:
+      grid_spacing: 5.0

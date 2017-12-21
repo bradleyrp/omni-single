@@ -148,7 +148,7 @@ def prepare_residual(mode='standard'):
 	#def residual(hel,hosc): 
 	#	energies = hel/hosc
 	#	return sum(np.log10(energies.clip(min=machine_eps))**2)/float(len(energies))
-	if mode=='standard':
+	if mode in ['standard','comp','subtractor']:
 		def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
 	elif mode=='alt':
 		def residual(hel,hosc): 
@@ -175,20 +175,23 @@ def prepare_objective(
 	perfect_collapser = kwargs.pop('perfect_collapser',None)
 	blurry_binner = kwargs.pop('blurry_binner',None)
 	signterm = kwargs.pop('inner_sign',1.0)
-	positive_vibe = kwargs.pop('positive_vibe',True)
 	imaginary_mode = kwargs.pop('imaginary_mode','complex')
 	fix_curvature = kwargs.pop('fix_curvature',None)
 	oscillator_function_local = kwargs.pop('oscillator_function',None)
+	subtractor = kwargs.pop('subtractor',None)
 	#---handle master modes
 	master_mode = kwargs.pop('master_mode','standard')
-	positive_vibe = {'standard':True,'alt':False}[master_mode]
-	signterm = {'standard':1.0,'alt':-1.0}[master_mode]
-	reverse_oscillator = {'standard':True,'alt':False}[master_mode]
+	signterm = {'standard':1.0,'alt':-1.0,'comp':True}.get(master_mode,1.0)
+	positive_vibe = {'standard':True,'alt':False,'comp':True}.get(master_mode,True)
+	#---! adding this back in
+	positive_vibe = kwargs.pop('positive_vibe',False)
+	reverse_oscillator = {'standard':True,'alt':False,'comp':False,'subtractor':False}[master_mode]
 	#---get the oscillator if not explicit
 	if oscillator_function_local==None:
 		oscillator_function_local = prepare_oscillator_function(reverse=reverse_oscillator,
 			positive_vibe=positive_vibe)
-	residual = kwargs.pop('residual_function',prepare_residual(mode=master_mode))
+	residual = kwargs.pop('residual_function',
+		prepare_residual(mode={'comp':'standard'}.get(master_mode,master_mode)))
 	weighting_scheme = kwargs.pop('weighting_scheme',None)
 	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
 	#---consistency checks
@@ -218,29 +221,60 @@ def prepare_objective(
 		composite = curvature_sum_function(cfs,curvatures,method=curvature_sum_method)
 		#---Fourier transform		
 		cqs = fft_function(composite)
-		#---construct the terms in eqn 23
-		termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
+		###!!! special debugging for redev use
+		if len(hqs)!=len(cqs) and fix_curvature==0:
+			termlist = [multipliers(hqs,hqs)]+[multipliers(np.zeros(hqs.shape),np.zeros(hqs.shape)) 
+				for jj in range(3)]
+		else:
+			#---construct the terms in eqn 23
+			termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
 		#---reshape the terms into one-dimensional lists, dropping the zeroth mode
 		termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
 		#---! explain logic behind real/imaginary here
 		if imaginary_mode=='real': termlist = [np.real(k) for k in termlist]
 		elif imaginary_mode=='complex': termlist = [np.abs(k) for k in termlist]
 		else: raise Exception('invalid imaginary_mode %s'%imaginary_mode)
-		def objective(args,mode='residual',return_spectrum=False):
+		def objective(args,mode='residual',return_spectrum=False,debug=False):
 			"""
 			Fit parameters are defined in sequence for the optimizer.
 			They are: kappa,gamma,vibe,*curvatures-per-dimple.
 			"""
-			if len(args)>3: raise Exception('only send three arguments')
-			#---the first three arguments are always bending rigitidy, surface tension, vibration correction
-			kappa,gamma,vibe = args[:3]
-			#---CONSTRAINTS are enforced here
-			if positive_vibe: vibe = np.abs(vibe)
+			if master_mode in ['standard','alt']:
+				if len(args)>3: raise Exception('only send three arguments')
+				#---the first three arguments are always bending rigitidy, surface tension, vibration
+				kappa,gamma,vibe = args[:3]
+				#---CONSTRAINTS are enforced here
+				if positive_vibe: vibe = np.abs(vibe)
+			###
+			### PROTRUSION IS UNDER DEVELOPMENT HERE SEE debug_resurvey in the drilldown
+			###
+			elif master_mode=='comp':
+				kappa,gamma,gamma_p,vibe = args[:4]
+				gamma_p = np.abs(gamma_p)
+				#---! assume no macro tension for now
+				gamma = 0.0
+				if positive_vibe: vibe = np.abs(vibe)
+			elif master_mode=='subtractor':
+				kappa,gamma = args[:2]
+				kappa,gamma = np.abs(kappa),np.abs(gamma)
+			else: raise Exception('invalid master_mode %s'%master_mode)
+
 			#---constructing the elastic Hamiltonian based on the wavevectors
-			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
-				+signterm*termlist[2]*q_raw**2+termlist[3])
-				+gamma*area*(termlist[0]*q_raw**2))
-			hosc = oscillator_function_local(vibe,q_raw)
+			if master_mode in ['standard','alt']: 
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma*area*(termlist[0]*q_raw**2))
+			elif master_mode=='comp':
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma_p*area*(termlist[0]*q_raw**2))
+			elif master_mode=='subtractor':
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma*area*(termlist[0]*q_raw**2))
+			else: raise Exception('invalid master_mode %s'%master_mode)			
+			if master_mode=='subtractor': hosc = subtractor + 1.0
+			else: hosc = oscillator_function_local(vibe,q_raw)
 			#---note that the band is prepared in advance above
 			if binner_method=='explicit': ratio = hel
 			elif binner_method=='perfect':
@@ -252,25 +286,44 @@ def prepare_objective(
 			if mode=='residual': 
 				if type(weights)!=type(None): value = residual(weights*hel[band],weights*hosc[band])
 				else: value = residual(hel[band],hosc[band])
-			#elif mode=='ratio': value = ratio
 			elif mode=='elastic': value = hel
 			else: raise Exception('invalid residual mode %s'%mode)
+			if debug:
+				print('!!!!!!!!!')
+				import ipdb;ipdb.set_trace()
 			return value
 		return objective
 
-	def objective(args,mode='residual',return_spectrum=False):
+	def objective(args,mode='residual',return_spectrum=False,debug=False):
 		"""
 		Fit parameters are defined in sequence for the optimizer.
 		They are: kappa,gamma,vibe,*curvatures-per-dimple.
 		"""
-		#---the first three arguments are always bending rigitidy, surface tension, vibration correction
-		kappa,gamma,vibe = args[:3]
-		#---CONSTRAINTS are enforced here
-		if positive_vibe: vibe = np.abs(vibe)
-		#---uniform curvatures are multiplexed here
-		if ndrops_uniform!=0: curvatures = [args[3] for i in range(ndrops_uniform)]
-		#---one curvature per field
-		else: curvatures = args[3:]
+		if master_mode in ['standard','alt']:
+			if len(args)>3: raise Exception('only send three arguments')
+			#---the first three arguments are always bending rigitidy, surface tension, vibration
+			kappa,gamma,vibe = args[:3]
+			#---CONSTRAINTS are enforced here
+			if positive_vibe: vibe = np.abs(vibe)
+			#---uniform curvatures are multiplexed here
+			if ndrops_uniform!=0: curvatures = [args[3] for i in range(ndrops_uniform)]
+			#---one curvature per field
+			else: curvatures = args[3:]
+
+		###
+		### PROTRUSION IS UNDER DEVELOPMENT HERE SEE debug_resurvey in the drilldown
+		###
+		elif master_mode=='comp':
+			kappa,gamma,gamma_p,vibe = args[:4]
+			gamma_p = np.abs(gamma_p)
+			#---! assume no macro tension for now
+			gamma = 0.0
+			if positive_vibe: vibe = np.abs(vibe)
+			#---uniform curvatures are multiplexed here
+			if ndrops_uniform!=0: curvatures = [args[4] for i in range(ndrops_uniform)]
+			#---one curvature per field
+			else: curvatures = args[4:]
+		else: raise Exception('invalid master_mode %s'%master_mode)
 		#---generate a composite field from the individual fields
 		composite = curvature_sum_function(cfs,curvatures,method=curvature_sum_method)
 		#---Fourier transform		
@@ -284,11 +337,22 @@ def prepare_objective(
 		elif imaginary_mode=='complex': termlist = [np.abs(k) for k in termlist]
 		else: raise Exception('invalid imaginary_mode %s'%imaginary_mode)
 		#---constructing the elastic Hamiltonian based on the wavevectors
-		hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
-			+signterm*termlist[2]*q_raw**2+termlist[3])
-			+gamma*area*(termlist[0]*q_raw**2))
+		if master_mode in ['standard','alt']: 
+			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+		elif master_mode=='comp':
+			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+		elif master_mode=='subtractor':
+			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+		else: raise Exception('invalid master_mode %s'%master_mode)
 		#---apply the vibration correction
-		hosc = oscillator_function_local(vibe,q_raw)
+		if master_mode=='subtractor': hosc = subtractor+1.0
+		else: hosc = oscillator_function_local(vibe,q_raw)
 		#---note that the band is prepared in advance above
 		if binner_method=='explicit': ratio = hel
 		elif binner_method=='perfect':
@@ -300,9 +364,11 @@ def prepare_objective(
 		if mode=='residual':
 			if type(weights)!=type(None): value = residual(weights*ratio[band],weights*hosc[band])
 			else: value = residual(hel[band],hosc[band])
-		#elif mode=='ratio': value = ratio
 		elif mode=='elastic': value = ratio
 		else: raise Exception('invalid residual mode %s'%mode)
+		if debug:
+			print('!!!!!!!!!')
+			import ipdb;ipdb.set_trace()
 		return value
 
 	#---return the decorated function

@@ -1,0 +1,15 @@
+passing:
+  plot-undulations.py:
+  plot-lipid_mesh.py:
+    uses: ????
+
+timewise:
+  2017.12.21.1530:
+    notes: rebooting the audit after refactoring omnicalc
+  2017.12.21.1535:
+    notes: >
+      tested `make plot undulations` in omnicalc for the curvature project on dark via curvature_live.yaml
+      omnicalc is on the dev branch at 0fb7bcb88d52a0c6cc61a33529a9a501c38eb139
+      
+
+
