@@ -69,7 +69,7 @@ collections:
     - membrane-v842
     - membrane-v650-enthx4-dev
   focus:
-    #- membrane-v650-enthx4-dev
+    - membrane-v650-enthx4-dev
     - membrane-v841
     - membrane-v842
   ucc:
@@ -113,10 +113,6 @@ calculations:
           lipid_com:
             resnames: +selectors/resnames_lipid
             type: com
-          lipid_phosphate:
-            resnames: +selectors/resnames_lipid
-            selection: "name PO4"
-            type: select
       separator: 
         cluster: True
         lipid_tip: "name PO4"
@@ -133,16 +129,13 @@ calculations:
           separator:
             cluster: True
       grid_spacing:
-        loop:
-          - 0.5
-          #- 1.0
-off:
+        loop: [0.5]
   protein_abstractor:
     slice_name: current
     group: proteins
     collections: 
       - focus
-off:
+incoming:
   lipid_mesh:
     uptype: post
     slice_name: current

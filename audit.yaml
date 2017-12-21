@@ -110,10 +110,12 @@ specs:
   specs/curvature_s3.yaml:
   specs/curvature_s4_all_drilldown.yaml:
   specs/curvature_s5_all_redev.yaml:
+  specs/curvature.yaml:
   # curvature development specs
   specs/curvature_live.yaml:
+    status: development
+    notes: current version of all underway curvature calculations
   specs/curvature_ucc.yaml:
-  specs/curvature.yaml:
   specs/curvature_meso.yaml:
 
 timewise:
@@ -127,5 +129,19 @@ timewise:
       omnicalc is on dev branch at 0fb7bcb88d52a0c6cc61a33529a9a501c38eb139
       calcs at 1bf8218628253cf861d0ad629c84608b74e1c906
   2017.12.21.1645:
-    notes: > 
+    notes: >
       completed audit structure and loaded audit.yaml (this file) with filenames
+  2017.12.21.1700:
+    project: curvature
+    file: curvature_live.yaml
+    notes: |
+      removed grid_spacing loop and lipid_phosphate definition in lipid_abstractor 
+      from curvature_live.yaml in order to continue testing code on that project
+  2017.12.21.1800:
+    file: plot-undulations_ptdins.py
+    project: curvature
+    specs: curvature_live.yaml
+    notes: plots are now passing with protein abstractor data
+    passing:
+      - undulation_spectra
+      - plot_height_profiles
