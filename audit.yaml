@@ -4,7 +4,7 @@ meta:
     libs: {'pattern':'(codes|render)/.+$','do':'ignore'}
     specs: {'pattern':"^specs/(.+).yaml$",'do':'account'}
     plots: {'pattern':"^plot-(.+)\\.py$",'do':'account'}
-    #extrana: {'from':'extrana','do':'ignore'}
+    extrana: {'from':'extrana','do':'ignore'}
 
 extrana:
   art_ocean.py
@@ -89,27 +89,32 @@ plots:
   plot-leaflet_areas.py:
 
 specs:
-
   specs/actinlink.yaml:
+    status: development
   specs/banana.yaml:
-
+    status: deprecated
+    notes: see curvature project
+  specs/dextran_dark.yaml:
+    status: development
+  specs/dextran.yaml:
+    status: development
+  specs/enth.yaml:
+    status: legacy
+  specs/ocean.yaml:
+    status: demo
+  specs/ptdins.yaml:
+    status: legacy
+  # curvature series? !!! needs organized
   specs/curvature_s1.yaml:
   specs/curvature_s2_v816.yaml:
   specs/curvature_s3.yaml:
   specs/curvature_s4_all_drilldown.yaml:
   specs/curvature_s5_all_redev.yaml:
-
+  # curvature development specs
   specs/curvature_live.yaml:
   specs/curvature_ucc.yaml:
   specs/curvature.yaml:
   specs/curvature_meso.yaml:
-
-  specs/dextran_dark.yaml:
-  specs/dextran.yaml:
-
-  specs/enth.yaml:
-  specs/ocean.yaml:
-  specs/ptdins.yaml:
 
 timewise:
   2017.12.21.1530:
@@ -121,3 +126,6 @@ timewise:
       tested `make plot undulations` in omnicalc for the curvature project on dark via curvature_live.yaml
       omnicalc is on dev branch at 0fb7bcb88d52a0c6cc61a33529a9a501c38eb139
       calcs at 1bf8218628253cf861d0ad629c84608b74e1c906
+  2017.12.21.1645:
+    notes: > 
+      completed audit structure and loaded audit.yaml (this file) with filenames
