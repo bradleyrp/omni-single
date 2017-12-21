@@ -27,51 +27,42 @@ class CalcsAuditor:
 	"""
 	_ignore_files = ['.gitignore']
 	def __init__(self,**kwargs):
-		self.calcs_dn = kwargs.pop('calcs_dn','calcs')
+		self.root = 'calcs'
 		self.ledger_fn = kwargs.pop('ledger','audit.yaml')
 		if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
 		status('welcome to the auditor')
-		self.ledger = os.path.join(self.calcs_dn,self.ledger_fn)
+		self.ledger = os.path.join(self.root,self.ledger_fn)
 		if not os.path.isfile(self.ledger): raise Exception('cannot find %s'%self.ledger)
 		else: 
 			with open(self.ledger) as fp: self.raw = yaml.load(fp.read())
 		# print everything
 		asciitree(self.raw)
-		# only two default classes
-		self.classes = dict(extrana=[],calculations=[])
 		self.interpret()
 
 	def interpret(self):
-		# prepare glob patterns for organizing the files
-		self.patterns = self.raw.get('meta',{}).get('patterns',{})
-		# collect all files
+		"""
+		Collect all files on disk and classify them.
+		"""
 		self.files = []
-		# sources can be overridden in meta but they must be relative to self.calcs_dn
-		for source in self.raw.get('meta',{}).get('sources',['.','specs']):
-			for (path,dns,fns) in os.walk(os.path.join(self.calcs_dn,source)):
-				self.files.extend([os.path.relpath(os.path.join(path,f),self.calcs_dn) for f in fns])
-				break
-		# we use regex instead of globs because the sources list controls input directories
-		#! we could still use a glob to filter the sources? seems like too many options
-		#self.patterns_matched = dict([(k,glob.glob(os.path.join(self.calcs_dn,v))) 
-		#	for k,v in self.patterns.items()])
-		for key in self.patterns: 
-			if key not in self.classes: self.classes[key] = []
-		self.strays = []
-		for fn in self.files:
-			matches = [key for key,val in self.patterns.items() if re.match(val,fn)]
-			if len(matches)==0: self.strays.append(fn)
-			elif len(matches)>1: raise Exception('file %s matches multiple globs: %s'%matches)
-			else: self.classes[matches[0]].append(fn)
-		if self.classes['extrana']: raise Exception('cannot populate extrana: %s'%self.classes['extrana'])
-		self.classes['extrana'] = self.raw.get('extrana',[])
-		self.strays = [fn for fn in self.strays if fn not in self.classes['extrana'] and fn not in self._ignore_files]
-		if self.strays:
-			for i in sorted(self.strays): print(i)
-			raise Exception('stray files listed above')
-		for kind,fns in self.classes.items():
-			matched_not_named = [f for f in fns if f not in self.raw.get(kind,[])]
-			if any(matched_not_named):
-				for k in matched_not_named: print(k)
-				raise Exception('the above files were not matched to %s'%kind)
-		import ipdb;ipdb.set_trace()
+		for (path,dns,fns) in os.walk(self.root):
+			self.files.extend([os.path.relpath(os.path.join(path,f),self.root) for f in fns])
+		for kind,details in self.raw.get('meta',{}).get('kinds',{}).items():
+			if set(details.keys())=={'pattern','do'}:
+				if details['do']=='ignore':
+					self.files = [i for i in self.files if not re.match(details['pattern'],i)]
+				elif details['do']=='account':
+					accounted = [i for i in self.files if re.match(details['pattern'],i)]
+					unaccounted = [i for i in self.files 
+						if i in accounted and i not in self.raw.get(kind,[])]
+					if unaccounted: raise Exception('class %s is missing: %s'%(kind,unaccounted))
+					self.files = [i for i in self.files if i not in accounted]
+				else: raise Exception('do %s?'%details['do'])
+			elif set(details.keys())=={'from','do'}:
+				if details['do']=='ignore':
+					self.files = [i for i in self.files if i not in self.raw.get(kind,[])]
+				else: raise Exception('do %s?'%details['do'])
+			else: raise Exception('cannot interpret %s,%s'%(kind,details))
+		if self.files:
+			for f in sorted(self.files): print(f)
+			raise Exception('unaccounted files are listed above')
+
