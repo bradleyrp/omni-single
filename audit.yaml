@@ -202,3 +202,11 @@ timewise:
       modifications to the PlotSpec behavior
       addition of a renamer key in the director for use of a proper function to rename simulations
       decorator for the namer so users get a very explicit message 
+  2017.12.23.1100:
+    notes: |
+      updated auditor to note missing files and protect against repeated keys in omni-single commit 337e109 
+  2017.12.23.1300:
+    commit: 32f806f
+    notes: |
+      added backrun to compute and we print dots to the log file for each frame so it does not get bloated
+      made a `make clear_stale` method to clear error dat files if a compute job is killed which is useful

@@ -158,9 +158,7 @@ calculations:
     slice_name: current
     group: proteins
     collections: protein_laden
-incoming:
   lipid_mesh:
-    uptype: post
     slice_name: current
     collections: focus
     specs:
@@ -180,6 +178,7 @@ plots:
     # defaults to one video for the colleciton
     collections: reflectin
     autoplot: False
+
   lipid_mesh:
     autoplot: True
     collections: focus
