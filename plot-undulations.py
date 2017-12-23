@@ -36,12 +36,13 @@ def plot_height_profiles():
 		im = ax.imshow(surf.T,origin='lower',
 			interpolation='nearest',cmap=mpl.cm.__dict__['RdBu_r'],
 			extent=[0,vecs[0],0,vecs[1]],vmax=hmax,vmin=-1*hmax)
-		#---! add a check for whether we have proteins or not
 		if sn in data_prot:
-			from render.wavevids import plothull
-			points_all = data_prot[sn]['data']['points_all'] 
-			points_all_mean_time = points_all.mean(axis=0)
-			plothull(ax,points_all_mean_time[...,:2],griddims=surf.shape,vecs=vecs,c='k',lw=0)	
+			try:
+				from render.wavevids import plothull
+				points_all = data_prot[sn]['data']['points_all'] 
+				points_all_mean_time = points_all.mean(axis=0)
+				plothull(ax,points_all_mean_time[...,:2],griddims=surf.shape,vecs=vecs,c='k',lw=0)	
+			except: status('failed to get protein points for %s'%sn,tag='warning')
 		from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 		axins = inset_axes(ax,width="5%",height="100%",loc=3,
 			bbox_to_anchor=(1.05,0.,1.,1.),bbox_transform=ax.transAxes,borderpad=0)

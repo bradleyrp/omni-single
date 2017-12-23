@@ -1,5 +1,18 @@
 director:
   autoplot: True
+  renamer: |
+    def renamer(name,spot=None):
+      """Aliases for the curvature project."""
+      # standard membranes
+      regex = 'membrane-(v[0-9]+)'
+      if re.match(regex,name): return re.match(regex,name).group(1)
+      # reflectin membranes with proteins
+      regex = 'reflectin-v([0-9]+)'
+      if re.match(regex,name): return 'rv'+re.match(regex,name).group(1)
+      # reflectin membrane controls
+      regex = 'membrane-rv([0-9]+)'
+      if re.match(regex,name): return 'rmv'+re.match(regex,name).group(1)
+      else: raise Exception('renamer failed!')
 variables:
   selectors:
     resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
@@ -29,51 +42,52 @@ variables:
       steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
       steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
 meta:
-  short_namer: "lambda name,spot : 'v'+re.findall('membrane-v([0-9]+)',name)[0]"
   membrane-v653-free:
-    label:               free bilayer
-    nprots:              0
+    label: free bilayer
+    nprots:  0
   membrane-v651-enthx8:
-    label:               '$\mathrm{{ENTH}{\times}8}$'
-    nprots:              8
+    label: '$\mathrm{{ENTH}{\times}8}$'
+    nprots: 8
   membrane-v652-enthx1:
-    label:               '$\mathrm{{ENTH}{\times}1}$'
-    nprots:              1
+    label: '$\mathrm{{ENTH}{\times}1}$'
+    nprots: 1
   membrane-v650-enthx4-dev:
-    label:               '$\mathrm{{ENTH}{\times}4}$'
-    nprots:              4
+    label: '$\mathrm{{ENTH}{\times}4}$'
+    nprots: 4
   membrane-v1005:
-    label:               'helix0x23'
-    nprots:              23
+    label: 'helix0x23'
+    nprots: 23
   meso-test:
-    mesoscale:           True
-    label:               some description
-    path:                ~/omicron/dataset-project-meso/blen-1.27
+    mesoscale: True
+    label: some description
+    path: ~/omicron/dataset-project-meso/blen-1.27
   membrane-v841:
-    label:               Exo70 dimer (anti-parallel) WT
-    nprots:              2
+    label: Exo70 dimer (anti-parallel) WT
+    nprots: 2
   membrane-v842:
-    label:               Exo70 dimer (anti-parallel) ULK mutant
-    nprots:              2
+    label: Exo70 dimer (anti-parallel) ULK mutant
+    nprots: 2
+  reflectin-v08:
+    nprots: 36
+  membrane-rv07: 
+    nprots: 0
 collections:
-  # added the historical ones for reverse lookups
-  historical:
-    - membrane-v653-free
-    - membrane-v651-enthx8
-    - membrane-v652-enthx1
-    - membrane-v830
-    - membrane-v750
-    - membrane-v1005
-  all: 
-    - membrane-v841
-    - membrane-v842
-    - membrane-v650-enthx4-dev
   focus:
     - membrane-v650-enthx4-dev
     - membrane-v841
     - membrane-v842
+    - reflectin-v08
+    - membrane-rv07
+  protein_laden:
+    - membrane-v650-enthx4-dev
+    - membrane-v841
+    - membrane-v842
+    - reflectin-v08
   ucc:
     - membrane-v650-enthx4-dev
+  reflectin:
+    - membrane-rv07
+    - reflectin-v08
 slices:
   membrane-v650-enthx4-dev:
     groups: 
@@ -101,12 +115,22 @@ slices:
       proteins: +selectors/protein_selection
     slices:
       current: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':2000000,'skip':2000}
+  reflectin-v08:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':1500000,'skip':1000}
+  membrane-rv07:
+    groups: 
+      lipids: +selectors/lipid_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':100000,'end':1100000,'skip':1000}
 calculations:
   lipid_abstractor:
     slice_name: current
     group: lipids
-    collections: 
-      - focus
+    collections: focus
     specs:
       selector:
         loop:
@@ -133,8 +157,7 @@ calculations:
   protein_abstractor:
     slice_name: current
     group: proteins
-    collections: 
-      - focus
+    collections: protein_laden
 incoming:
   lipid_mesh:
     uptype: post
@@ -153,7 +176,10 @@ plots:
     slices: current
     collections: focus
   undulations_videos:
-    collections: focus
+    script: undulations_videos.py
+    # defaults to one video for the colleciton
+    collections: reflectin
+    autoplot: False
   lipid_mesh:
     autoplot: True
     collections: focus

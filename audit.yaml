@@ -3,54 +3,59 @@ meta:
     git: {'pattern':"\\.git.+",'do':'ignore'}
     libs: {'pattern':'(codes|render)/.+$','do':'ignore'}
     specs: {'pattern':"^specs/(.+).yaml$",'do':'account'}
-    plots: {'pattern':"^plot-(.+)\\.py$",'do':'account'}
+    plots: {'from':'plots','do':'account'}
     extrana: {'from':'extrana','do':'ignore'}
 
 extrana:
-  art_ocean.py
-  art_ptdins.py
-  audit.yaml
-  auditor.py
-  contacts.py
-  curvature_undulation_coupling.py
-  curvature_undulation_coupling_controls.py
-  curvature_undulation_coupling_dex.py
-  curvature_undulation_coupling_pixel.py
-  curvature_undulation_coupling_pixel_dex.py
-  head_angle.py
-  hydration.py
-  hydration_distribution.py
-  hydration_simuluxe.py
-  hydrogen_bonding.py
-  import_readymade_meso_v1_membrane.py
-  import_readymade_meso_v1_nanogel.py
-  import_readymade_meso_v2_membrane.py
-  ion_binding.py
-  ion_binding_combinator.py
-  ion_binding_norms.py
-  legacy-hbonds-plotter.py
-  lipid_abstractor.py
-  lipid_areas3d.py
-  lipid_areas2d.py
-  lipid_mesh.py
-  lipid_mesh_partners.py
-  pipeline-curvature.py
-  pipeline-curvature_coupling.py
-  pipeline-curvature_coupling_plot.py
-  pipeline-curvature_dextran.py
-  pipeline-undulations_videos.py
-  pipeline-videographer.py
-  protein_abstractor.py
-  protein_rmsd.py
-  regular_membrane_importer.py
-  salt_bridges.py
-  settings_curvature_undulation_coupling_drilldown.py
-  specs/colors.py
-  specs/figures.py
-  undulations.py
-  undulations_average_normal.py
+  - art_ocean.py
+  - art_ptdins.py
+  - audit.yaml
+  - auditor.py
+  - contacts.py
+  - curvature_undulation_coupling.py
+  - curvature_undulation_coupling_controls.py
+  - curvature_undulation_coupling_dex.py
+  - curvature_undulation_coupling_pixel.py
+  - curvature_undulation_coupling_pixel_dex.py
+  - head_angle.py
+  - hydration.py
+  - hydration_distribution.py
+  - hydration_simuluxe.py
+  - hydrogen_bonding.py
+  - import_readymade_meso_v1_membrane.py
+  - import_readymade_meso_v1_nanogel.py
+  - import_readymade_meso_v2_membrane.py
+  - ion_binding.py
+  - ion_binding_combinator.py
+  - ion_binding_norms.py
+  - legacy-hbonds-plotter.py
+  - lipid_abstractor.py
+  - lipid_areas2d.py
+  - lipid_areas3d.py
+  - lipid_mesh.py
+  - lipid_mesh_partners.py
+  - pipeline-curvature.py
+  - pipeline-curvature_coupling.py
+  - pipeline-curvature_coupling_plot.py
+  - pipeline-curvature_dextran.py
+  - pipeline-videographer.py
+  - protein_abstractor.py
+  - protein_rmsd.py
+  - regular_membrane_importer.py
+  - salt_bridges.py
+  - settings_curvature_undulation_coupling_drilldown.py
+  - specs/colors.py
+  - specs/figures.py
+  - undulations.py
+  - undulations_average_normal.py
 
 plots:
+  # passing
+  plot-undulations.py:
+    - undulation_spectra
+    - plot_height_profiles
+  undulations_videos.py: passing
+  # testing next
   plot-actinlink_videos.py:
   plot-ucc.py:
   plot-martini_video.py:
@@ -59,7 +64,6 @@ plots:
   plot-hydration_distribution.py:
   plot-curvature_undulation_coupling_drilldown_prev.py:
   plot-dextran_analyze_undulations.py:
-  plot-undulations.py:
   plot-ucc-meso.py:
   plot-head_angle.py:
   plot-ptdins_diffusion.py:
@@ -137,11 +141,64 @@ timewise:
     notes: |
       removed grid_spacing loop and lipid_phosphate definition in lipid_abstractor 
       from curvature_live.yaml in order to continue testing code on that project
-  2017.12.21.1800:
-    file: plot-undulations_ptdins.py
+  2017.12.22.0915:
+    project: curvature
+    notes: |
+      modifications last night to ensure newly-made slices are saved for immediate calculation
+      removed keyboard exception handling on compute loop failure
+        instead we write 'error':'error' to the dat file and catch that the first time it would be loaded 
+        which occurs via plotloda during plotting
+        this eliminates the problem of doing a proper traceback after the exception
+  2017.12.22.1000:
+    file: plot-undulations.py
     project: curvature
     specs: curvature_live.yaml
-    notes: plots are now passing with protein abstractor data
+    notes: |
+      plots are now passing with protein abstractor data used to make protein hulls
+      fixed the plot loop so that we use interactive mode for autoplot scripts with no arguments
     passing:
       - undulation_spectra
       - plot_height_profiles
+  2017.12.22.1330:
+    project: curvature
+    specs: curvature_live.yaml
+    notes: |
+      used `make look times` to inspect new simulations and added them to curvature_live.yaml
+      sucessfully tested the slicer and compute loop
+      fixed problems with autoplot and tested the plot-undulations.py
+      outstanding issue is one of simulation nameing since not all simulations were plotted
+  2017.12.22.1450:
+    file: plot-undulations.py
+    project: curvature
+    specs: curvature_live.yaml
+    notes: |
+      plotspec has a cursor which retains focus on the original plot during repeated plotload calls
+      various minor tweaks including a more readable plot environment on commit f3512c7
+      retested undulations and finished the fix with commit ea85b59
+    passing:
+      - undulation_spectra
+      - plot_height_profiles
+  2017.12.22.1500:
+    notes: |
+      commit 4f6f880 removes requirements to name old simulations with dat/spec files by making parse lax
+      this change is necessary when using new metafiles which must ignore some old dat/spec files
+  2017.12.22.2200:
+    file: undulations_videos.py
+    project: curvature
+    specs: curvature_live.yaml
+    notes: |
+      tested a two-panel undulations videos plot after fixing problems with timestamp ambiguity 
+      timestamp ambiguity fix and other changes will be logged on the next commit
+      users will have to be careful about the collection they use or there will be too many panels
+    passing: all
+  2017.12.23.0900:
+    notes: |
+      many minor fixes for testing in this commit fcd3db9
+      recently added `make go` as an alias for `make plot`
+      relaxed name requirements for plots
+      strict regex for the word autoplot because running a legacy plot with global autoplot causes problems
+      recently recovered legacy plot mode for interactive plotting to ensure you get a terminal on autoplot
+      major fix to the slicer to try only the last step to avoid timestamp ambiguity
+      modifications to the PlotSpec behavior
+      addition of a renamer key in the director for use of a proper function to rename simulations
+      decorator for the namer so users get a very explicit message 
