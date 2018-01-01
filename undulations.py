@@ -33,9 +33,9 @@ def undulations(**kwargs):
 	grid = np.array([round(i) for i in np.mean(vecs,axis=0)/grid_spacing])[:2]
 	#---! removed timeseries from result for new version of omnicalc
 	#---parallel
-	start = time.time()
 	mesh = [[],[]]
 	for mn in range(2):
+		start = time.time()
 		mesh[mn] = Parallel(n_jobs=work.nprocs,verbose=0)(
 			delayed(makemesh_regular,has_shareable_memory)(
 				trajectory[fr][np.where(monolayer_indices==mn)],vecs[fr],grid)

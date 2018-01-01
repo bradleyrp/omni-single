@@ -25,7 +25,6 @@ the folders if you want to repeat it. Use print_review to check the aesthetics b
 sns = work.sns()
 data,calc = plotload('undulations',work)
 data_protein,calc = plotload('protein_abstractor',work)
-
 #---prepare average surfaces
 surfs = [data[sn]['data']['mesh'].mean(axis=0) - 
 	data[sn]['data']['mesh'].mean(axis=0).mean() for sn in sns]
@@ -57,13 +56,18 @@ if not all([framecounts[0]==framecounts[i] for i in range(len(framecounts))]):
 	status('[NOTE] defaulting to lowest number of frames: '+str(nframes))
 frameset = np.arange(0,nframes,frameskipper)
 surfs = [s[:nframes] for s in surfs]
-nprots_list = [work.meta[sn].get('nprots',1) for sn in sns]
-protein_pts_all = np.array([data_protein[sn]['data']['points_all'] for sn in sns])
-#---reformulate these for clarity in the joblib call below
-protein_pts = [[protein_pts_all[ii][fr][...,:2] for ii,sn in enumerate(sns)] for fr in range(nframes)]
+nprots_list = [work.meta.get(sn,{}).get('nprots',1) for sn in sns]
+#---some simulations have no proteins
+try:
+	#---dimensions for points_all is frames, proteins, beads/atoms, XYZ
+	#---note that if you didn't have nprots set in metadata (meta dictionary) before running the
+	#---...protein abstractor then it will assume one protein. otherwise the following step is necessary to
+	#---...index the protein points for the renderer. we use lists because of different numbers of beads
+	protein_pts = [[data_protein[sn]['data']['points_all'][fr][...,:2] 
+		for ii,sn in enumerate(sns)] for fr in range(nframes)]
+except: protein_pts = [None for fr in range(nframes)]
 mvecs = np.array([data[sn]['data']['vecs'][:nframes] for sn in sns])
-titles = [work.meta[sn]['label'] for sn in sns]
-
+titles = [work.meta.get(sn,{}).get('label',sn) for sn in sns]
 #---parallel render
 tmpdir = os.path.join(outdir,handle)
 if os.path.isdir(tmpdir): raise Exception('refusing to rerender to %s'%tmpdir+' delete it to continue.')

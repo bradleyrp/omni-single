@@ -36,12 +36,13 @@ def plot_height_profiles():
 		im = ax.imshow(surf.T,origin='lower',
 			interpolation='nearest',cmap=mpl.cm.__dict__['RdBu_r'],
 			extent=[0,vecs[0],0,vecs[1]],vmax=hmax,vmin=-1*hmax)
-		#---! add a check for whether we have proteins or not
 		if sn in data_prot:
-			from render.wavevids import plothull
-			points_all = data_prot[sn]['data']['points_all'] 
-			points_all_mean_time = points_all.mean(axis=0)
-			plothull(ax,points_all_mean_time[...,:2],griddims=surf.shape,vecs=vecs,c='k',lw=0)	
+			try:
+				from render.wavevids import plothull
+				points_all = data_prot[sn]['data']['points_all'] 
+				points_all_mean_time = points_all.mean(axis=0)
+				plothull(ax,points_all_mean_time[...,:2],griddims=surf.shape,vecs=vecs,c='k',lw=0)	
+			except: status('failed to get protein points for %s'%sn,tag='warning')
 		from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 		axins = inset_axes(ax,width="5%",height="100%",loc=3,
 			bbox_to_anchor=(1.05,0.,1.,1.),bbox_transform=ax.transAxes,borderpad=0)
@@ -112,7 +113,9 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 	"""
 	mesh = data[sn]['data']['mesh']
 	surf = mesh.mean(axis=0)
-	surf = np.array([s-surf.reshape(len(surf),-1).mean(axis=1)[ss] for ss,s in enumerate(surf)])
+	#---! somewhat amazing that the following is necessary, but it is
+	surf = (surf - np.tile(surf.reshape(len(surf),-1).mean(axis=1),
+		(surf.shape[1],surf.shape[2],1)).transpose(2,0,1))
 	vecs = data[sn]['data']['vecs']
 	fit_style = kwargs.get('fit_style','band,perfect,curvefit')
 	lims = kwargs.get('lims',[0.,kwargs.get('wavevector_limit',1.0)])

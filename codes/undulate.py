@@ -19,7 +19,7 @@ def fftwrap(dat):
 	"""
 	return np.fft.fft2(np.array(dat))
 
-def perfect_collapser(xs,ys,trim=False):
+def perfect_collapser(xs,ys,trim=False,return_indices=False):
 	"""
 	Return two arrays for a "perfect" collapse.
 	"""
@@ -29,8 +29,8 @@ def perfect_collapser(xs,ys,trim=False):
 	#---! future warning below
 	if type(ys)==type(None): col = None
 	else: col = np.array([np.mean(ys[np.where(inds==i)]) for i in range(len(xsort))])
-	#---! NOTE FROM BLURRY: REMOVE THIRD RETURN VALUE INDICES FROM PERFECT_COLLAPSER PLEASE
-	return xsort,col,inds
+	if return_indices: return xsort,col,inds
+	else: return xsort,col
 
 def blurry_binner_deprecated(xs,ys,bin_width=0.05,trim=True,return_mapping=False):
 	"""

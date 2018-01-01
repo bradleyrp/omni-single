@@ -22,7 +22,7 @@ from base.store import datmerge
 
 from codes.readymade_meso_v1 import import_membrane_mesh
 
-def import_readymade_meso_v1_membrane(**kwargs):
+def import_readymade_meso_v2_membrane(**kwargs):
 	"""
 	Compute bilayer midplane structures for studying undulations.
 	Adapted from `undulations.py`.
