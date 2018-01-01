@@ -1,0 +1,94 @@
+
+variables:
+  force_field: charmm
+  art_director: art_ptdins.py
+  composition_names:
+    symmetric: symmetric
+    asymmetric: asymmetric
+    position: asymmetric
+    charge: symmetric
+  selectors:
+    ions: (name NA or name CL or name MG or name Cal or name K)
+    cations: (name NA or name MG or name Cal or name K)
+    resnames_lipid: ['POPC','DOPC','DOPS','DOPE','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
+    resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_protein: ["GLH", "ILE", "ALAD", "GLUH", "GLN", "HISH", "ASN1", "HYP", "GLY", "HIP", "ARGN", "MSE", "CYS1", "GLU", "CYS2", "CYS", "HISE", "ASP", "SER", "HSD", "HSE", "PRO", "CYX", "ASPH", "ORN", "HSP", "HID", "HIE", "LYN", "DAB", "ASN", "CYM", "HISD", "VAL", "THR", "HISB", "HIS", "HIS1", "HIS2", "TRP", "HISA", "ACE", "ASH", "CYSH", "PGLU", "LYS", "PHE", "ALA", "QLN", "MET", "LYSH", "NME", "LEU", "ARG", "TYR"]
+  slices:
+    steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
+    current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
+    current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
+  names:
+    proper_residue_names_long:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PtdIns(4,5)P$_2$"
+      P35P: "PtdIns(3,5)P$_2$"
+      PIPP: "PtdIns(4,5)P$_2^{-3}$"
+      PIPU: "PtdIns(4,5)P$_2^{-5}$"
+  protein_itp_loader_hidden: 
+    module: "codes.protein_itp_loader"
+    variable: "protein_itp_loader"
+
+collections:
+  cursor:
+    - mdia2bilayerphys
+
+meta:
+  #! note that this short_namer must be compatible with the spots prefixer!
+  #! removing the "v" here hence breaking compatibility with the previous slices
+  #! ... 
+  #short_namer: "lambda sn,spot : 'v'+re.findall('(.+)',sn)[0]"
+  #short_namer: "lambda sn,spot: sn"
+  mdia2bilayerphys:
+    name:               "mdia2bilayerphys"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 (r1)"
+
+slices:
+  mdia2bilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      video: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':201000,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':201000,'skip':100}
+
+calculations:
+  lipid_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: cursor
+    specs:
+      separator:
+        cluster: True 
+      selector:
+        loop:
+          lipid_com:
+            monolayer_cutoff: 1.85
+            resnames: +selectors/resnames_lipid
+            lipid_tip: "name P"
+            type: com
+          lipid_chol_com:
+            monolayer_cutoff: 1.4
+            resnames: +selectors/resnames_lipid_chol
+            lipid_tip: "name P or name H3'"
+            type: com
+plots:
+  actinlink_video:
+    autoplot: True
+    collections: cursor
+    calculation:
+      lipid_abstractor:
+        selector: lipid_com
