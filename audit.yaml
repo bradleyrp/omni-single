@@ -5,6 +5,10 @@ meta:
     specs: {'pattern':"^specs/(.+).yaml$",'do':'account'}
     plots: {'from':'plots','do':'account'}
     extrana: {'from':'extrana','do':'ignore'}
+    vmdmake: {'pattern':'vmdmake.+','do':'ignore'}
+    swaps: {'pattern':"^\\..+\\.swp$",'do':'ignore'}
+    webm: {'pattern':"^.+\\.webm$",'do':'ignore'}
+    ipynb: {'pattern':"^\\.ipynb_checkpoints",'do':'ignore'}
 
 extrana:
   - art_ocean.py
@@ -48,6 +52,10 @@ extrana:
   - specs/figures.py
   - undulations.py
   - undulations_average_normal.py
+  - look-times.ipynb
+  # actinlink dev files
+  - actinlink_video_viewer.ipynb
+  - script-check-times.py
 
 plots:
   # passing
@@ -55,6 +63,9 @@ plots:
     - undulation_spectra
     - plot_height_profiles
   undulations_videos.py: passing
+  # testing next, actinlink
+  plot-actinlink_video.py:
+  plot-actinlink_video_interactive.py:
   # testing next
   plot-actinlink_videos.py:
   plot-ucc.py:
@@ -95,6 +106,8 @@ plots:
 specs:
   specs/actinlink.yaml:
     status: development
+  specs/actinlink.current.yaml:
+    status: development, on remote
   specs/banana.yaml:
     status: deprecated
     notes: see curvature project
