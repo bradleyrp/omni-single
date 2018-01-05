@@ -21,7 +21,7 @@ import brewer2mpl
 
 palette_colors = dict([(val,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[key]) for key,val in enumerate('red blue green purple orange yellow brown pink grey'.split())])
 	
-def colorize(metadat,comparison='',resname=''):
+def colorize(metadat,comparison='',resname='',named=False,overrides=None):
 	"""
 	Master listing of colors for different PtdIns comparisons.
 	"""
@@ -40,7 +40,9 @@ def colorize(metadat,comparison='',resname=''):
 			'SAPI':'purple',
 			'PtdIns':'purple',
 			'CHL1':'grey'}
-		return palette_colors[colordict[resname]]
+		if overrides: colordict.update(**overrides)
+		if named: return colordict[resname]
+		else: return palette_colors[colordict[resname]]
 	else:
 		colordict = {
 			'ions':{
@@ -90,7 +92,8 @@ def colorize(metadat,comparison='',resname=''):
 		colordict['symmetric_all'] = dict(colordict['protonation'])
 		colordict['asymmetric_all'] = dict(colordict['protonation'])
 		descriptor = tuple([metadat[i] for i in compare_to_value[comparison]])
-		return palette_colors[colordict[comparison][descriptor]]
+		if named: return colordict[resname]
+		else: return palette_colors[colordict[comparison][descriptor]]
 
 def barmaker(ax,yvals,**kwargs):
 
