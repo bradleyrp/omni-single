@@ -35,17 +35,23 @@ variables:
     variable: "protein_itp_loader"
 
 collections:
+  single:
+    - mdia2bilayerphys
   cursor:
     - mdia2bilayerphys
+    - mdia2bilayerphys2
+    - mdia2bilayer_nochl2
+    - mdia2bilayer_nochl3 
+    - mdia2bilayer10
+    - mdia2bilayer30
 
 meta:
   #! note that this short_namer must be compatible with the spots prefixer!
   #! removing the "v" here hence breaking compatibility with the previous slices
-  #! ... 
   #short_namer: "lambda sn,spot : 'v'+re.findall('(.+)',sn)[0]"
   #short_namer: "lambda sn,spot: sn"
   mdia2bilayerphys:
-    name:               "mdia2bilayerphys"
+    name:               "mdia2bilayerphys r1"
     ptdins_resname:     "PI2P"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ion_label:          "$\\mathrm{{Na}^{+}}$"
@@ -54,15 +60,88 @@ meta:
     cations:            ['NA']
     cation:              NA
     label:              "mDia2 (r1)"
+  mdia2bilayerphys2:
+    name:               "mdia2bilayerphys r2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 (r2)"
+  mdia2bilayer_nochl2:
+    name:               "mdia2bilayer nochl r2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 no CHOL (r1)"
+  mdia2bilayer_nochl3:
+    name:               "mdia2bilayer nochl r1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 no CHOL (r2)"
+  mdia2bilayer10:
+    name:               "mdia2bilayer10"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 with 10% PIP2"
+  mdia2bilayer30:
+    name:               "mdia2bilayer30"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 with 30% PIP2"
 
 slices:
-  mdia2bilayerphys:
-    groups: 
-      all: all
-      protein: protein
+  # mdia2bilayerphys -> ../lolabu/simulations/mdia2bilayerphys
+  mdia2bilayerphys: 
+    groups: {'all':'all'}
     slices:
-      video: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':201000,'skip':100}
-      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':201000,'skip':100}
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':201000,'skip':100}
+  # mdia2bilayerphys2 -> /home/ololade/simulations/mdia2bilayerphys2
+  mdia2bilayerphys2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':151000,'skip':100}
+  # mdia2bilayer_nochl2 -> ../lolabu/simulations/mdia2bilayer_nochl2
+  mdia2bilayer_nochl2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
+  # mdia2bilayer_nochl3 -> ../lola-home-simulations/mdia2bilayer_nochl3
+  mdia2bilayer_nochl3:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
+  # mdia2bilayer30 -> /home/ololade/simulations/mdia2bilayer30
+  mdia2bilayer30:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
+  # mdia2bilayer10 -> /home/ololade/simulations/mdia2bilayer10
+  mdia2bilayer10:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
 
 calculations:
   lipid_abstractor:
@@ -73,6 +152,7 @@ calculations:
     specs:
       separator:
         cluster: True 
+        cluster_neighbors: 3
       selector:
         loop:
           lipid_com:
@@ -85,10 +165,80 @@ calculations:
             resnames: +selectors/resnames_lipid_chol
             lipid_tip: "name P or name H3'"
             type: com
+  contacts:
+    group: all
+    uptype: simulationTR
+    slice_name: current
+    collections: cursor
+    specs:
+      subject: protein
+      object: lipid
+      cutoff: 5.0
+  hydrogen_bonding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: cursor
+    specs:
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
+      protein: true
+incoming:
+  hydrogen_bonding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: cursor
+    specs:
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
+      protein: true
 plots:
+  actinlink_videos:
+    autoplot: True
+    collections: single
+    #! calculation only for slices
+    calculation:
+      lipid_abstractor:
+        selector: lipid_com
+    specs:
+      scene: video_scene_actinlink.py
+  #! almost deprecated
   actinlink_video:
     autoplot: True
     collections: cursor
     calculation:
       lipid_abstractor:
         selector: lipid_com
+  actinlink_bonds:
+    collections: cursor
+    calculation: 
+      contacts:
+        cutoff: 5.0
+  hydrogen_bonding:
+    calculation: hydrogen_bonding
+    collections: cursor
+    specs:
+      press_routine:
+        - summary
+      interesting: {}
+      ion_order: ['NA']
+      collection_sets: ['cursor']
+      legend_mapper:
+        cursor:
+          ion_names: ['NA']
+          ptdins_names: ['PI2P']
+      # we filter out protein resnames here
+      relevant_resnames: ['PI2P','DOPE','DOPC','DOPS','CHL1']
+      # semi-soft-coded the color scheme
+      bar_formats_style: actinlink
+      legend_maker_specs:
+        sns: []
+        ion_names: []
+        ptdins_names: []
+        # the legend maker typically shows PIP2 isomers and cation identities
+        # ...however in this case we want legends for the distinct protein simulations
+        sns_explicit: ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayerphys',]
+      figsize_all: [20,8]
+      sns_explicit_color_names: {}
+      nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
