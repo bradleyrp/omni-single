@@ -170,6 +170,7 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		#---pass along the corresponding vectors for topologize
 		vecs=[vecs[i] for i in selected_frames],
 		cluster=separator.get('cluster',False),
+		cluster_neighbors=separator.get('cluster_neighbors',None),
 		topologize_tolerance=separator.get('topologize_tolerance',None))
 	#---get the indices from the leaflet finder
 	monolayer_indices = leaflet_finder.monolayer_indices
