@@ -73,7 +73,7 @@ class CalcsAuditor:
 					accounted = [i for i in self.files if re.match(details['pattern'],i)]
 					unaccounted = [i for i in self.files 
 						if i in accounted and i not in self.raw.get(kind,[])]
-					if unaccounted: raise Exception('class %s is missing: %s'%(kind,unaccounted))
+					if unaccounted: raise Exception('cannot account for class %s, items %s'%(kind,unaccounted))
 					self.files = [i for i in self.files if i not in accounted]
 				else: raise Exception('do %s?'%details['do'])
 			elif set(details.keys())=={'from','do'}:
