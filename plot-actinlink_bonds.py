@@ -10,10 +10,12 @@ from joblib import Parallel,delayed
 from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper,dictsum
 from base.compute_loop import basic_compute_loop
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 #---block: what to plot
 avail = ['contact_maps','histograms','bars']
-routine = work.plots.get(plotname,{}).get('routine',avail)
+#---! deprecatedd: routine = work.plots.get(plotname,{}).get('routine',avail)
+routine = ['contact_map','histograms','bars']
 residue_types = {'ARG':'basic','HIS':'basic','LYS':'basic',
 	'ASP':'acidic','GLU':'acidic','SER':'polar','THR':'polar','ASN':'polar','GLN':'polar',
 	'ALA':'hydrophobic','VAL':'hydrophobic','ILE':'hydrophobic','LEU':'hydrophobic',
@@ -44,8 +46,8 @@ special_protein_parts = {'nwaspbilayernochl':np.arange(0,22+1).astype(int)}
 
 #---which combinations of simulations to plot, and how to name them 
 specs = {
-	'all':{'plotspec':dictsum(plotspec,dict(figsize=(8,16),fs_ylabel=10))},
-	'mDia2':{'lipid_resnames':['DOPS','PI2P'],'tag':'.PS_PIP2',
+	'all':{'plotspec':dictsum(plotspec,dict(figsize=(8,16),fs_ylabel=10))},}
+specs_others = {'mDia2':{'lipid_resnames':['DOPS','PI2P'],'tag':'.PS_PIP2',
 		'sns':['mdia2bilayer_nochl2','mdia2bilayerphys'],
 		'plotspec':dictsum(plotspec_small,dict(figsize=(8,8),fs_ylabel=10))},
 	'gelsolin':{'lipid_resnames':['DOPS','PI2P'],'tag':'.PS_PIP2',
@@ -56,10 +58,10 @@ specs = {
 		'plotspec':dictsum(plotspec_small,dict(figsize=(8,14),fs_ylabel=10))},}
 #---which types of data to plot
 bond_mappings = [
-	#{'name':'explicit','post_key':'counts_resid_resname','upstream':'contacts'},
-	#{'name':'reduced','post_key':'counts_resid_resname_singleton','upstream':'contacts'},
-	#{'name':'hbonds','post_key':'hbonds_compacted','upstream':'hbonds'},
-	{'name':'salt','post_key':'salt_compacted','upstream':'contacts'},]
+	{'name':'reduced','post_key':'counts_resid_resname_singleton','upstream':'contacts'},
+	{'name':'explicit','post_key':'counts_resid_resname','upstream':'contacts'},
+	{'name':'hbonds','post_key':'hbonds_compacted','upstream':'hbonds'},
+	{'name':'salt','post_key':'salt_compacted','upstream':'contacts'},][:]
 
 #---block: mimic the coda in contacts.py
 def hydrogen_bond_compactor():
@@ -113,7 +115,7 @@ def salt_bridge_filter():
 		#---set global bonds and obs so they only contain salt bridges and then run the bond_counter
 		bonds = bonds_all[salt_inds]
 		obs = obs_all[:,salt_inds]
-		print('nbonds for %s is %d'%(sn,len(salt_inds)))
+		status('salt nbonds for %s is %d'%(sn,len(salt_inds)))
 		#---! get resids for the protein and lipid_resnames from contact maps
 		lipid_resnames = np.unique(
 			data_contacts[sn]['data']['bonds'][:,rowspec.index('target_resname')])
@@ -194,7 +196,7 @@ def colorstreak_contact_map(sns,postdat,bond_name,plotspec,fn,**kwargs):
 			resnames = postdat[sn]['subject_residues_resnames']
 			if rr==0: 
 				ax.set_ylabel(sn_title(sn),fontsize=plotspec['fs_ylabel'])
-				if work.plots[plotname].get('settings',{}).get('show_residue_names',True):
+				if True: #! hack work.plots[plotname].get('settings',{}).get('show_residue_names',True):
 					#---never set the ticklabels before the ticks
 					ax.set_yticks(np.arange(len(resnames[resnums]))+0.5)
 					ax.set_yticklabels([residue_codes[r] for r in resnames[resnums]],
@@ -219,9 +221,13 @@ def colorstreak_contact_map(sns,postdat,bond_name,plotspec,fn,**kwargs):
 				image_data[np.where(scores==0.0)] = [1.,1.,1.]
 			else: image_data = postdat[sn][bond_name][resname][resnums]
 			duration = (postdat[sn]['times'].max()-postdat[sn]['times'].min())*10**-3
-			xtick_interval = work.plots[plotname].get('settings',{}).get('xtick_interval',
-				plotspec['time_tick_interval'])
-			ax.set_xticks(np.arange(xtick_interval,duration,xtick_interval))
+			xtick_interval = plotspec['time_tick_interval'] 
+			#! hack removing some tick interval stuff? work.plots[plotname].get('settings',{}).get('xtick_interval',plotspec['time_tick_interval'])
+			#if sn=='mdia2bilayerphys2':
+			#	import ipdb;ipdb.set_trace()
+			#print image_data.shape
+			#ax.set_xticks(np.arange(xtick_interval,duration,xtick_interval))
+			ax.get_xaxis().set_major_locator(mpl.ticker.MaxNLocator(nbins=4,prune='lower'))
 			ax.set_xlabel('time (ns)',fontsize=plotspec['fs_xlabel'])
 			#---! removed division by the following, designed to make things lighter when reduced
 			#---! ...{'explicit':1.0,'reduced':plotspec['binary_color_intensity']}[mode]
@@ -258,6 +264,8 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 	"""
 	Final resting place for the contact map code.
 	"""
+	max_nbins = kwargs.get('max_nbins',40)
+	landscape = kwargs.get('landscape',False)
 	style = kwargs.get('style','histogram')
 	#---same residue comparisons
 	lipid_resnames = list(set([tuple(postdat[sn]['lipid_resnames']) for sn in sns]))
@@ -269,7 +277,7 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 
 	#---plot
 	maxcount,maxx = 0,0
-	axes,fig = square_tiles(len(sns),figsize=plotspec['figsize'],hspace=0.4,wspace=0.4)
+	axes,fig = square_tiles(len(sns),figsize=plotspec['figsize'],hspace=0.4,wspace=0.4,favor_rows=landscape)
 	for snum,sn in enumerate(sns):
 		ax = axes[snum]
 		ax.set_title(sn_title(sn))
@@ -281,6 +289,8 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 				#---! deprecated: step_size = 10**(np.ceil(np.log10(raw2.max()))-2)
 				step_size = 1.0
 				bins = np.arange(0,raw2.max()+step_size,step_size)
+				#---limit the number of bins
+				if len(bins)>max_nbins: bins = np.linspace(0,raw2.max()+step_size,max_nbins)
 				maxx = max([maxx,raw2.max()+step_size])
 				counts,bins = np.histogram(raw2,bins=bins)
 				subs = counts>0
@@ -297,7 +307,8 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 				if resname==lipid_subselection:
 					#---bars show the mean number of contacts per frame
 					#---override the protein selections
-					resnums = special_protein_parts.get(sn,np.arange(postdat[sn][bond_name][resname].shape[0]))
+					resnums = special_protein_parts.get(sn,np.arange(
+						postdat[sn][bond_name][resname].shape[0]))
 					raw2 = raw.mean(axis=1)
 					colors_this = [mpl.cm.__dict__[residue_type_colors[residue_types[name]]](
 						plotspec['legend_color_strength']) 
@@ -313,7 +324,7 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 		for snum,sn in enumerate(sns):
 			ax = axes[snum]
 			ax.set_ylim(0,maxcount*1.05)
-			if False: ax.set_xlim(0,maxx)
+			ax.set_xlim(0,maxx)
 			ax.set_xlabel('bonds per frame')
 			ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 			ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
@@ -331,7 +342,8 @@ def plot_histograms_or_occupancy(sns,postdat,bond_name,plotspec,fn,**kwargs):
 			#---never set the ticklabels before the ticks
 			resnames = postdat[sn]['subject_residues_resnames']
 			ax.set_xticks(np.arange(len(resnums)))
-			ax.set_xticklabels([residue_codes[r] for r in resnames[resnums]],fontsize=plotspec['fs_xticks_bars'])
+			ax.set_xticklabels([residue_codes[r] for r in resnames[resnums]],
+				fontsize=plotspec['fs_xticks_bars'])
 			for label in ax.get_xticklabels():
 				label.set_color(mpl.cm.__dict__[
 					residue_colors.get(residue_codes_reverse[label._text],
@@ -381,7 +393,7 @@ if 'data_contacts' not in globals():
 		'all lipids':'black','DOPE':'blue'}
 	colors.update(**dict([(sn,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[sns.index(sn)]) 
 		for sn in sns]))
-	lipid_label = lambda x: dict([(i,'$$\mathrm{{PIP}_{2}}$$') 
+	lipid_label = lambda x: dict([(i,r'$\mathrm{{PIP}_{2}}$') 
 		for i in work.vars.get('selectors',{}).get('resnames_PIP2',{})]).get(x,x)
 	sn_title = lambda sn: '%s%s'%(work.meta[sn].get('label',re.sub('_','-',sn)),
 		'' if not work.meta[sn].get('cholesterol',False) else '\n(cholesterol)')
