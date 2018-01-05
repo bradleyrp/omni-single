@@ -308,6 +308,8 @@ class LeafletFinder:
 		self.cutoff_shrink_increment = kwargs.pop('cutoff_shrink_increment',None)
 		self.cutoff_min = kwargs.pop('cutoff_min',None)
 		self.random_tries = kwargs.pop('random_tries',None)
+		self.cluster_neighbors = kwargs.pop('cluster_neighbors',None)
+		if self.cluster_neighbors==None: self.cluster_neighbors = 4
 		if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
 		#---check for scikit-learn
 		if self.cluster:
@@ -400,7 +402,8 @@ class LeafletFinder:
 			nears = np.where(np.all((close>0,close<=cutoff_short),axis=0))
 			pds[tuple((nears[0],nns[nears]))] = 1.0#close[nears]
 			pds[tuple((nns[nears],nears[0]))] = 1.0#close[nears]
-		connectivity = sklearn.neighbors.kneighbors_graph(findframe,n_neighbors=4,include_self=False)
+		connectivity = sklearn.neighbors.kneighbors_graph(findframe,
+			n_neighbors=self.cluster_neighbors,include_self=False)
 		ward = sklearn.cluster.AgglomerativeClustering(n_clusters=2,
 			connectivity=connectivity,linkage='complete').fit(findframe)
 		imono = ward.labels_
