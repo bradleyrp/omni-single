@@ -34,7 +34,8 @@ def hbonder_framewise(fr,**kwargs):
 	pts_fore = boxstuff(pts_fore_unstuffed,vec)
 
 	#---! why does vec need to be twice as long? (tested that the limits work though)
-	try: tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=np.concatenate((vec,vec)))
+	#try: tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=np.concatenate((vec,vec)))
+	try: tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=vec)
 	#---KDTree failures are blanked
 	except: return {'donors':np.array([]),'acceptors':np.array([])}
 	close,nns = tree.query(pts_fore,k=10,distance_upper_bound=distance_cutoff/lenscale)
