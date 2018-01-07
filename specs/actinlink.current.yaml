@@ -194,7 +194,8 @@ incoming:
       distance_cutoff: 3.4
       protein: true
 plots:
-  actinlink_videos:
+  video_maker:
+    script: video_maker.py
     autoplot: True
     collections: single
     #! calculation only for slices
