@@ -72,6 +72,8 @@ meta:
   membrane-rv07: 
     nprots: 0
 collections:
+  one:
+    - membrane-v841
   focus:
     - membrane-v650-enthx4-dev
     - membrane-v841
@@ -178,13 +180,13 @@ plots:
     # defaults to one video for the colleciton
     collections: reflectin
     autoplot: False
-
   lipid_mesh:
     autoplot: True
-    collections: focus
+    collections: one
     specs:
-      curvature_map_spacing: 0.5
+      curvature_map_spacing: 2.0
       curvature_map_blur: 4.0
+  # incoming
   ucc:
     autoplot: True
     collections: ucc
