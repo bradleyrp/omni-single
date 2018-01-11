@@ -61,7 +61,7 @@ def render_from_json(request_fn='video_requests.json',catalog_fn='video_catalog.
 				if step<1: raise Exception('negative step size')
 			else: step = 1
 			view = vmdmake.VMDWrap(site=tempdir,gro=gro,xtc=xtc,tpr=tpr,
-				frames='',xres=4000,yres=4000,step=step,**cut_spec.get('kwargs',{}))
+				frames='',res=cut_spec.pop('resolution',(1000,1000)),step=step,**cut_spec.get('kwargs',{}))
 			view.do('load_dynamic','standard',*cut_spec.get('does',[]))
 			for sel in cut_spec.get('selections',[]): 
 				#! elaborate color handling here
@@ -80,7 +80,8 @@ def render_from_json(request_fn='video_requests.json',catalog_fn='video_catalog.
 			view.command('scale by %s'%cut_spec.get('zoom',1.2))
 			if not cut_spec.get('debug',False): view.video()
 			view.command('animate goto last')
-			view.command('')
+			# render in higher detail
+			view.command('display resize %d %d'%tuple(cut_spec.pop('resolution_snapshot',(4000,4000))))
 			view['snapshot_filename'] = 'snap.%s.%s'%(cut_name,sn)
 			view.do('snapshot')
 			#---no repeats 
