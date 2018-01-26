@@ -55,17 +55,13 @@ def render_from_json(request_fn='video_requests.json',catalog_fn='video_catalog.
 			#! limit the number of frames if it is excessive. overridden by step in kwargs in cut_spec
 			nframes_max = cut_spec.get('nframes_max',None)
 			if nframes_max:
-				#try:
 				nframes = ((calc['extras'][sn]['end']-calc['extras'][sn]['start'])/calc['extras'][sn]['skip'])
 				# get the largest integer step size that will keep the number of frames below the max
 				step = int(np.ceil(float(nframes)/nframes_max))
-				if step<1: raise Exception
-				#except: 
-				#	import ipdb;ipdb.set_trace()
-				#	raise Exception('failed to limit the number of frames')
+				if step<1: raise Exception('negative step size')
 			else: step = 1
 			view = vmdmake.VMDWrap(site=tempdir,gro=gro,xtc=xtc,tpr=tpr,
-				frames='',xres=4000,yres=4000,step=step,**cut_spec.get('kwargs',{}))
+				frames='',res=cut_spec.pop('resolution',(1000,1000)),step=step,**cut_spec.get('kwargs',{}))
 			view.do('load_dynamic','standard',*cut_spec.get('does',[]))
 			for sel in cut_spec.get('selections',[]): 
 				#! elaborate color handling here
@@ -84,7 +80,8 @@ def render_from_json(request_fn='video_requests.json',catalog_fn='video_catalog.
 			view.command('scale by %s'%cut_spec.get('zoom',1.2))
 			if not cut_spec.get('debug',False): view.video()
 			view.command('animate goto last')
-			view.command('')
+			# render in higher detail
+			view.command('display resize %d %d'%tuple(cut_spec.pop('resolution_snapshot',(4000,4000))))
 			view['snapshot_filename'] = 'snap.%s.%s'%(cut_name,sn)
 			view.do('snapshot')
 			#---no repeats 
