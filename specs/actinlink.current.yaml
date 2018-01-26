@@ -20,7 +20,7 @@ variables:
     current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
     current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
   names:
-    proper_residue_names_long:
+    long:
       CHL1: Cholesterol
       DOPC: DOPC
       DOPS: DOPS
@@ -30,6 +30,16 @@ variables:
       P35P: "PtdIns(3,5)P$_2$"
       PIPP: "PtdIns(4,5)P$_2^{-3}$"
       PIPU: "PtdIns(4,5)P$_2^{-5}$"
+    short:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PI(4,5)P$_2$"
+      P35P: "PI(3,5)P$_2$"
+      PIPP: "PI(4,5)P$_2^{-3}$"
+      PIPU: "PI(4,5)P$_2^{-5}$"
   protein_itp_loader_hidden: 
     module: "codes.protein_itp_loader"
     variable: "protein_itp_loader"
@@ -44,6 +54,8 @@ collections:
     - mdia2bilayer_nochl3 
     - mdia2bilayer10
     - mdia2bilayer30
+    - mdia2bilayer10_2
+    - mdia2bilayer30_2
 
 meta:
   #! note that this short_namer must be compatible with the spots prefixer!
@@ -59,7 +71,8 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 (r1)"
+    label:              "mDia2, 20% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\n20% $PIP_2$ (r1)"
   mdia2bilayerphys2:
     name:               "mdia2bilayerphys r2"
     ptdins_resname:     "PI2P"
@@ -69,7 +82,8 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 (r2)"
+    label:              "mDia2, 20% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\n20% $PIP_2$ (r2)"
   mdia2bilayer_nochl2:
     name:               "mdia2bilayer nochl r2"
     ptdins_resname:     "PI2P"
@@ -80,6 +94,7 @@ meta:
     cations:            ['NA']
     cation:              NA
     label:              "mDia2 no CHOL (r1)"
+    label_compact:      "mDia2\nno CHOL (r1)"
   mdia2bilayer_nochl3:
     name:               "mdia2bilayer nochl r1"
     ptdins_resname:     "PI2P"
@@ -90,8 +105,9 @@ meta:
     cations:            ['NA']
     cation:              NA
     label:              "mDia2 no CHOL (r2)"
+    label_compact:      "mDia2\nno CHOL (r2)"
   mdia2bilayer10:
-    name:               "mdia2bilayer10"
+    name:               "mdia2bilayer10 (r1)"
     ptdins_resname:     "PI2P"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ion_label:          "$\\mathrm{{Na}^{+}}$"
@@ -99,9 +115,21 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 with 10% PIP2"
+    label:              "mDia2, 10% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\n10% $PIP_2$ (r1)"
+  mdia2bilayer10_2:
+    name:               "mdia2bilayer10 (r2)"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 10% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\n10% $PIP_2$ (r2)"
   mdia2bilayer30:
-    name:               "mdia2bilayer30"
+    name:               "mdia2bilayer30 (r1)"
     ptdins_resname:     "PI2P"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ion_label:          "$\\mathrm{{Na}^{+}}$"
@@ -109,10 +137,22 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 with 30% PIP2"
+    label:              "mDia2, 30% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\n30% $PIP_2$ (r1)"
+  mdia2bilayer30_2:
+    name:               "mdia2bilayer30 (r2)"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 30% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\n30% $PIP_2$ (r2)"
 
 slices:
-  # mdia2bilayerphys -> ../lolabu/simulations/mdia2bilayerphys
+  # mdia2bilayerphys -> /home/share/lolabu/simulations/mdia2bilayerphys
   mdia2bilayerphys: 
     groups: {'all':'all'}
     slices:
@@ -122,12 +162,12 @@ slices:
     groups: {'all':'all'}
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':151000,'skip':100}
-  # mdia2bilayer_nochl2 -> ../lolabu/simulations/mdia2bilayer_nochl2
+  # mdia2bilayer_nochl2 -> /home/share/lolabu/simulations/mdia2bilayer_nochl2
   mdia2bilayer_nochl2:
     groups: {'all':'all'}
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
-  # mdia2bilayer_nochl3 -> ../lola-home-simulations/mdia2bilayer_nochl3
+  # mdia2bilayer_nochl3 -> /home/ololade/simulations/mdia2bilayer_nochl3
   mdia2bilayer_nochl3:
     groups: {'all':'all'}
     slices:
@@ -137,11 +177,21 @@ slices:
     groups: {'all':'all'}
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
+  # mdia2bilayer30_2 -> /home/ololade/simulations/mdia2bilayer30_2
+  mdia2bilayer30_2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
   # mdia2bilayer10 -> /home/ololade/simulations/mdia2bilayer10
   mdia2bilayer10:
     groups: {'all':'all'}
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
+  # mdia2bilayer10_2 -> /home/ololade/simulations/mdia2bilayer10_2
+  mdia2bilayer10_2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
 
 calculations:
   lipid_abstractor:
@@ -167,13 +217,13 @@ calculations:
             type: com
   contacts:
     group: all
-    uptype: simulationTR
     slice_name: current
     collections: cursor
     specs:
       subject: protein
       object: lipid
-      cutoff: 5.0
+      cutoff: 
+        loop: [2.2, 3.4, 5.0]
   hydrogen_bonding:
     group: all
     uptype: simulation
@@ -214,7 +264,18 @@ plots:
     collections: cursor
     calculation: 
       contacts:
-        cutoff: 5.0
+        cutoff: 2.2
+  actinlink_bonds_analysis:
+    autoplot: True
+    script: actinlink_bonds_analysis.py
+    collections: cursor
+    calculation:
+      contacts:
+        cutoff:
+          loop: [2.2,5.0]
+    specs:
+      cutoff_salt_bridge: 3.4
+      cutoff_hydrogen_bonds: 3.4
   hydrogen_bonding:
     calculation: hydrogen_bonding
     collections: cursor

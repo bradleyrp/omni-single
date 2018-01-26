@@ -73,12 +73,12 @@ rowspec = ['subject_resname','subject_resid','subject_atom',
 # common colors
 colors = {'DOPC':'blue','DOPS':'red','POP2':'magenta','PI2P':'magenta',
 	'all lipids':'black','DOPE':'blue'}
-colors = {'DOPE':'#808080','DOPS':'#000080','PI2P':'#FF0000'}
+colors = {'DOPE':'#808080','DOPS':'#000080','PI2P':'#FF0000','CHL1':'#181818','POPC':'#33cc33'}
 lipid_label = lambda x: dict([(i,r'$\mathrm{{PIP}_{2}}$') 
 	for i in work.vars.get('selectors',{}).get('resnames_PIP2',{})]).get(x,x)
 sn_title = lambda sn,which='label': work.meta.get(sn,{}).get(which,re.sub('_','-',sn))
 #! hardcoding lipid types here
-lipid_types_ref = ['PI2P','DOPS','DOPE']
+lipid_types_ref = ['PI2P','DOPS','DOPE','CHL1','POPC']
 
 @autoload(plotrun)
 def load():
@@ -110,10 +110,11 @@ class ActinlinkPlotter:
 	def get_data_bonds(self,kind,combine_replicates=False):
 		"""Get the bond data from globals."""
 		# filtering steps
+		status('fetching bond data for kind: %s'%kind)
 		if kind in ['data_salt','data_salt_hbonds'] and 'data_salt' not in globals(): 
 			compute_salt_bridges_from_contacts()
-		if kind=='data_salt_hbonds' and 'data_salt_hbonds' not in globals(): 
-			merge_salt_hbonds()
+		if kind=='data_salt_hbonds' and 'data_salt_hbonds' not in globals():  merge_salt_hbonds()
+		if kind=='data_hbonds': check_subject_residues()
 		self.data_bonds = globals()[kind]
 		if kind=='data_contacts':
 			# detect and select multiple cutoffs
@@ -125,6 +126,13 @@ class ActinlinkPlotter:
 					raise Exception(
 						'cannot find contacts with cutoff %s in data_contacts'%self.contacts_cutoff)
 				else: self.data_bonds = data_contacts[keys[0]]
+		# confirm that all subjects and targets are accounted
+		resnames_all = np.unique(np.concatenate([self.data_bonds[sn]['data']['bonds'][:,rowspec.index(k)]  
+			for k in ['target_resname','subject_resname'] for sn in self.sns]))
+		if not all([r in residue_codes.keys() or r in lipid_types_ref for r in resnames_all]):
+			raise Exception(
+				'some residues are not in the protein residue list (%s) or lipid_types_ref (%s): %s'%
+				(residue_codes.keys(),lipid_types_ref,resnames_all))
 		# combine replicates
 		if combine_replicates:
 			#! soft code this in the yaml
@@ -139,6 +147,11 @@ class ActinlinkPlotter:
 					self.data_bonds[supkey]['data']['valid_frames'] = \
 						self.data_bonds[sn]['data']['valid_frames']
 				else: valid_frames = range(len(reduced['observations']))
+				for key in ['subject_residues_resnames','subject_residues_resids']:
+					if not all([np.all(self.data_bonds[sns_sub[0]]['data'][key]==
+						self.data_bonds[sn]['data'][key]) for sn in sns_sub]):
+						raise Exception('mismatch between replicates on key %s'%key)
+					else: self.data_bonds[supkey]['data'][key] = self.data_bonds[sns_sub[0]]['data'][key]
 			self.sns = zip(*self.replicate_mapping)[0]
 	def get_function(self,name):
 		"""Get compute funcitons from globals."""
@@ -180,7 +193,7 @@ def compute_reduced_bonds(bonds,obs):
 	bonds_this = bonds[:,cols_red]
 	idx,counts = uniquify(bonds_this)
 	# note that you missed the innermost all in the following resulting in confoundingly high multivalency
-	obs_this = np.array([obs.T[np.where(np.all(bonds[:,cols_red]==b,axis=1))[0]].any(axis=0) for 
+	obs_this = np.array([obs.T[np.where(np.all(bonds_this==b,axis=1))[0]].any(axis=0) for 
 		b in bonds[idx][:,cols_red]]).T
 	return bonds_this[idx],obs_this
 
@@ -198,12 +211,15 @@ def compute_contact_maps(self,explicit=False):
 		postdat[sn]['lipid_resnames'] = lipid_resnames
 		#! get data from salt. note that we sometimes combine salt and hbonds and they must be identical
 		#! ... anyway. admittedly the following is ugly
-		try: resids = postdat[sn]['resids'] = self.data_bonds[sn]['data']['subject_residues_resids']
-		except: resids = postdat[sn]['resids'] = data_salt[sn]['data']['subject_residues_resids']
-		try: protein_resnames = postdat[sn]['subject_residues_resnames'] = \
+		#try: 
+		resids = postdat[sn]['resids'] = self.data_bonds[sn]['data']['subject_residues_resids']
+		#except: resids = postdat[sn]['resids'] = data_salt[sn]['data']['subject_residues_resids']
+		#try: 
+		protein_resnames = postdat[sn]['subject_residues_resnames'] = \
 			self.data_bonds[sn]['data']['subject_residues_resnames']
-		except: protein_resnames = postdat[sn]['subject_residues_resnames'] = \
-			data_salt[sn]['data']['subject_residues_resnames']
+		#except: protein_resnames = postdat[sn]['subject_residues_resnames'] = \
+		#	data_salt[sn]['data']['subject_residues_resnames']
+		#! unavoidable at this stage
 		try: postdat[sn]['times'] = self.data_bonds[sn]['data']['times']
 		except: postdat[sn]['times'] = data_contacts.values()[0][sn]['data']['times']
 		bonds,obs = [self.data_bonds[sn]['data'][k] for k in ['bonds','observations']]
@@ -305,6 +321,18 @@ def compute_salt_bridges_from_contacts():
 		for key in ['subject_residues_resnames','subject_residues_resids']:
 			data_salt[sn]['data'][key] = data_contacts_this[sn]['data'][key]
 
+def check_subject_residues():
+	"""
+	Note that the hydrogen bonds calculation does not save the resnames and resids for the protein
+	in the same way as the salt bridges. Until that is fixed, we get those data from the salt bridges.
+	Note that this method assumes they are the same, but the should be!
+	"""
+	if 'data_salt' not in globals(): compute_salt_bridges_from_contacts()
+	for sn in data_salt:
+		for key in ['subject_residues_resnames','subject_residues_resids']:
+			if sn not in data_hbonds: data_hbonds[sn] = dict(data={})
+			data_hbonds[sn]['data'][key] = data_salt[sn]['data'][key]
+
 def color_light(color,percent):
 	"""Make RGB colors lighter."""
 	color = np.array(mpl.colors.to_rgb(color))
@@ -335,7 +363,7 @@ def compute_summary(self,explicit=False):
 		# loop over lipid types
 		for lipid in lipid_types_ref:
 			lipid_this = [lipid]
-			# filter peptide-lipid bonds
+			# filter peptide-lipid bonds. not that we could have used bond_strict_order also
 			inds = np.where(np.any((
 				np.all((np.in1d(bonds_this[:,rowspec_this.index('subject_resname')],lipid_this),
 					np.in1d(bonds_this[:,rowspec_this.index('target_resname')],
@@ -367,12 +395,15 @@ def compute_chargings(self,explicit=False):
 			bonds_this,obs_this = compute_reduced_bonds(bonds,obs)
 			rowspec_this = ['subject_resname','subject_resid','target_resname','target_resid']
 		else: bonds_this,obs_this,rowspec_this = bonds,obs,rowspec
-		residues = np.unique(bonds_this[:,rowspec.index('subject_resid')])
-		residue_listings[sn] = residues
-		lipid_resnames = np.unique(bonds_this[:,rowspec_this.index('target_resname')])
+		#! note that we hard-code the resnames here because some bond tables alternate lipids/proteins
+		lipid_resnames = lipid_types_ref
 		chargings_this = {}
-		for resnum in residues:
+		# if merged this ends up on the postdata
+		resids = np.array(data_bonds[sn]['data']['subject_residues_resids']).astype(str)
+		for resnum in resids:
 			for target in lipid_resnames:
+				# note that the following logic handles both subject/target and vis versa
+				# ... however we could have also used bond_strict_order
 				partners = np.unique(bonds_this[np.where(np.all((
 					bonds_this[:,rowspec_this.index('subject_resid')]==resnum,
 					bonds_this[:,rowspec_this.index('target_resname')]==target),
@@ -388,7 +419,7 @@ def compute_chargings(self,explicit=False):
 				chargings_this[(resnum,target)] = bond_this
 		chargings[sn] = chargings_this
 	# package
-	self.data = dict(chargings=chargings,residues=residues)
+	self.data = dict(chargings=chargings,residues=resids)
 	return
 
 def subdivide_trajectory(segnum,n_segments,nframes=None):
@@ -542,7 +573,7 @@ def plot_charging_histograms_by_lipid(sup):
 		backup=False,version=True,meta=meta,extras=[legend,suptitle])
 
 def get_cutoff(sup):
-	if sup.dataspec['data_bonds'] in ['data_salt','data_salt_hbonds','data_hbonds']: 
+	if sup.dataspec['data_bonds'] in ['data_salt','data_salt_hbonds']: 
 		cutoff_this = cutoff_salt_bridge
 	elif sup.dataspec['data_bonds']=='data_contacts': cutoff_this = sup.dataspec['contacts_cutoff']
 	#! get this from the specs for the hydrogen bonds calculation instead
@@ -558,10 +589,8 @@ def plot_charging_histograms_stacked(sup,show_zero=False,total=False,
 	total_label = 'total'
 	sup_name = sup.plot.get('sup_name')
 	cutoff_this = get_cutoff(sup)
-	try: resnames = [sup.data_bonds[sn]['data']['subject_residues_resnames'] for sn in sns]
-	except: resnames = [data_salt[sn]['data']['subject_residues_resnames'] for sn in sns]
-	try: resids = [sup.data_bonds[sn]['data']['subject_residues_resids'] for sn in sns]
-	except: resids = [data_salt[sn]['data']['subject_residues_resids'] for sn in sns]
+	resnames = [sup.data_bonds[sn]['data']['subject_residues_resnames'] for sn in sns]
+	resids = [sup.data_bonds[sn]['data']['subject_residues_resids'] for sn in sns]
 	if (any([np.all(resnames[0]!=i) for i in resnames[1:]]) or 
 		any([np.all(resids[0]!=i) for i in resids[1:]])):
 		raise Exception('inconsistent residues between simulations')
@@ -621,7 +650,8 @@ def plot_charging_histograms_stacked(sup,show_zero=False,total=False,
 				if rnum>0: ax.set_yticklabels([])
 				else: 
 					ax.set_yticks(bond_values+0.5)
-					ax.set_yticklabels(bond_values.astype(int))
+					ax.set_yticklabels(bond_values.astype(int),
+						fontsize=sup.ps.get('fs_yticks',8 if max(bond_values)>5 else 10))
 					ax.set_ylabel('bonds')
 				ax.set_ylim((0 if show_zero else 1,peak+1))
 				ax.get_xaxis().set_major_locator(mpl.ticker.MaxNLocator(nbins=1,prune='lower'))
@@ -661,7 +691,11 @@ def plot_charging_histograms_stacked(sup,show_zero=False,total=False,
 			# sometimes the legend is empty if nothing was plotted for a particular bar and panel
 			# ... so we make a custom legend here according to the lipid names
 			legendspec = []
-			for lipid in lipid_types_ref:
+			# filter the lipids by those that are actually present
+			lipid_types_here = [i for i in lipid_types_ref if i in list(set([k[1] 
+				for k,v in sup.data['chargings'][sn].items() for l in lipid_types_ref 
+				if max(v)>0 and k[1]==l]))]
+			for lipid in lipid_types_here:
 				legendspec.append(dict(name=work.vars['names']['short'][lipid],
 					patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=colors[lipid])))
 			patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
@@ -712,6 +746,7 @@ def plot_summary(sup,**kwargs):
 		hspace=sup.ps.get('hspace',0.5),wspace=sup.ps.get('wspace',0.5))
 	ax = axes[0]
 	mark = 0.0
+	observed_lipids = []
 	for snum,sn in enumerate(sup.sns):
 		nframes = list(set([counts[sn][lipid].shape[0] for lipid in lipid_types_ref]))
 		if len(nframes)!=1: raise Exception('inconsistent number of frames')
@@ -749,6 +784,9 @@ def plot_summary(sup,**kwargs):
 			else: raise Exception(mode)
 		mark += n_segments+2.
 		if snum<len(sup.sns)-1 and show_vlines: ax.axvline(mark,c='k',lw=1)
+		# for each simulation we see which lipids are relevant
+		observed_lipids.extend([l for ll,l in enumerate(lipid_types_ref) 
+			if not np.all(traj[ll+1]-traj[ll]==0)])
 	ax.set_xlim((0,(2+n_segments)*len(sup.sns)))
 	ax.set_ylim((0,ax.get_ylim()[1]))
 	ax.set_xticks([(n_segments+2)*(snum+0.5) for snum in range(len(sup.sns))])
@@ -760,7 +798,7 @@ def plot_summary(sup,**kwargs):
 	ax.set_ylabel(sup.plot['label'],fontsize=16)
 	# custom legend
 	legendspec = []
-	for lipid in lipid_types_ref:
+	for lipid in [l for l in lipid_types_ref if l in list(set(observed_lipids))]:
 		legendspec.append(dict(name=work.vars['names']['short'][lipid],
 			patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=colors[lipid])))
 	patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
@@ -791,6 +829,11 @@ def plot_colorstreak_contact_map(sup,bar_style=False,**kwargs):
 	cmap = kwargs.get('cmap','Greys')
 	# same residue comparisons
 	lipid_resnames = lipid_types_ref[::-1]+['all lipids']
+	# max scores to see which lipids to include
+	score_max = dict([(resname,np.array([sup.data[sn]['compacted'][resname].max() 
+		for sn in sns]).max()) for resname in lipid_resnames])
+	# ignoring cases where the max is 1 because CHL1 is showing up mostly blank and it is annoying
+	lipid_resnames = [l for l in lipid_resnames if score_max[l]>1]
 	ceiling = float(max([max([i.max() for i in sup.data[sn]['compacted'].values()]) for sn in sns]))
 	ceiling_bar = 0.0
 	extras = []
@@ -803,8 +846,9 @@ def plot_colorstreak_contact_map(sup,bar_style=False,**kwargs):
 			ax = axes[rr][ss]
 			# override the protein selections
 			resnums = special_protein_parts.get(sn,np.arange(sup.data[sn]['compacted'][resname].shape[0]))
-			try: resnames = np.array(sup.data[sn]['subject_residues_resnames'])
-			except: resnames = np.array(data_salt[sn]['subject_residues_resnames'])
+			#try: 
+			resnames = np.array(sup.data[sn]['subject_residues_resnames'])
+			#except: resnames = np.array(data_salt[sn]['subject_residues_resnames'])
 			if rr==0:
 				ax.set_ylabel(sn_title(sn,which='label_compact'),fontsize=plotspec['fs_ylabel'])
 				if True: #! hack work.plots[plotname].get('settings',{}).get('show_residue_names',True):
@@ -894,175 +938,8 @@ def plot_colorstreak_contact_map(sup,bar_style=False,**kwargs):
 
 if __name__=='__main__':
 
-	if False:
-		# deprecated plots
-		orders_deprecated = {
-			'charging_simple PIP2 cut_5.0':{
-				'plot':{'function':'plot_charging_histograms_by_lipid',
-				'target_resname':'PI2P','sup_name':'contacts'},
-				'plotspec':{'lw':2,'figsize':(8,8),'legend_edge_color':'w','hspace':0.8},
-				'namer':{'base':'charging','mods':['cut_5.0']},
-				'sns':sns_mdia2_ordering,'data':{'function':'compute_chargings',
-				'data_bonds':'data_contacts','contacts_cutoff':5.0},},
-			'charging_simple PIP2 salt':{
-				'plot':{'function':'plot_charging_histograms_by_lipid',
-				'target_resname':'PI2P','sup_name':'salt bridges'},
-				'plotspec':{'lw':3,'figsize':(8,8),'legend_edge_color':'w'},
-				'namer':{'base':'charging','mods':['salt','overlay']},
-				'sns':sns_mdia2_ordering,'data':{'function':'compute_chargings',
-				'data_bonds':'data_salt'},},
-			'charging_simple PIP2 salt merged':{
-				'plot':{'function':'plot_charging_histograms_by_lipid',
-				'target_resname':'PI2P','sup_name':'salt bridges'},
-				'plotspec':{'lw':3,'figsize':(8,8),'legend_edge_color':'w'},
-				'namer':{'base':'charging','mods':['salt','reps_combo','overlay']},
-				'sns':sns_mdia2_ordering,'data':{'function':'compute_chargings',
-				'data_bonds':'data_salt','combine_replicates':True},},}
-
-		orders_explicit = {
-			# panels of sns by residue with stacked bar histograms
-			'charging salt merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','salt','merged']},
-				'tags':{'analysis':'charging histograms','merged':True,'bonds':'salt bridges'},
-				'plot':{'function':'plot_charging_histograms_stacked','sup_name':'salt bridges',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				'data':{'function':'compute_chargings','data_bonds':'data_salt','combine_replicates':True},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			'charging cut_2.2 merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','cut_2.2','merged']},
-				'tags':{'analysis':'charging histograms','merged':True,'bonds':'contacts 2.2A'},
-				'plot':{'function':'plot_charging_histograms_stacked','sup_name':'contacts',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				'data':{'function':'compute_chargings','data_bonds':'data_contacts',
-					'contacts_cutoff':2.2,'combine_replicates':True},
-				'plotspec':{'figsize':(12,8),'legend_edge_color':'w',
-					'wspace':0.2,'hspace':0.2,'frame_color':'#A9A9A9'}},
-			'charging cut_5.0 merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','cut_5.0','merged']},
-				'tags':{'analysis':'charging histograms','merged':True,'bonds':'contacts 5.0A'},
-				'plot':{'function':'plot_charging_histograms_stacked','sup_name':'contacts',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				# somewhat slow because of high cutoff hence larger bond list
-				'data':{'function':'compute_chargings','data_bonds':'data_contacts',
-					'contacts_cutoff':5.0,'combine_replicates':True},
-				'plotspec':{'figsize':(16,8),'legend_edge_color':'w',
-					'wspace':0.2,'hspace':0.2,'frame_color':'#A9A9A9'}},
-			# panels of sns by residue with stacked bar histograms, not merged
-			'charging salt':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','salt']},
-				'tags':{'analysis':'charging histograms','merged':False,'bonds':'salt bridges'},
-				'plot':{'function':'plot_charging_histograms_stacked','sup_name':'salt bridges',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				'data':{'function':'compute_chargings','data_bonds':'data_salt'},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9','legend_bbox':(0.0,-1.25,1.,1.)}},
-			'charging cut_2.2':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','cut_2.2']},
-				'tags':{'analysis':'charging histograms','merged':False,'bonds':'contacts 2.2A'},
-				'plot':{'function':'plot_charging_histograms_stacked','sup_name':'contacts',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				'data':{'function':'compute_chargings','data_bonds':'data_contacts',
-					'contacts_cutoff':2.2},
-				'plotspec':{'figsize':(12,8),'legend_edge_color':'w',
-					'wspace':0.2,'hspace':0.2,'frame_color':'#A9A9A9','legend_bbox':(0.0,-1.5,1.,1.)}},
-			'charging cut_5.0':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','cut_5.0']},
-				'tags':{'analysis':'charging histograms','merged':False,'bonds':'contacts 5.0A'},
-				'plot':{'function':'plot_charging_histograms_stacked','sup_name':'contacts',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				# somewhat slow because of high cutoff hence larger bond list
-				'data':{'function':'compute_chargings','data_bonds':'data_contacts',
-					'contacts_cutoff':5.0},
-				'plotspec':{'figsize':(16,8),'legend_edge_color':'w',
-					'wspace':0.2,'hspace':0.2,'frame_color':'#A9A9A9','legend_bbox':(0.0,-1.5,1.,1.)}},
-			'charging salt_hbonds':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','salt_hbonds']},
-				'tags':{'analysis':'charging histograms','merged':False,'bonds':'salt bridges + hydrogen bonds'},
-				'plot':{'function':'plot_charging_histograms_stacked',
-					'sup_name':'hydrogen bonds + salt bridges','sup_name_y':'bonds',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				'data':{'function':'compute_chargings','data_bonds':'data_salt_hbonds'},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9','legend_bbox':(0.0,-1.25,1.,1.)}},
-			'charging salt_hbonds merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'charging','mods':['stacked','salt_hbonds','merged']},
-				'tags':{'analysis':'charging histograms','merged':True,'bonds':'salt bridges + hydrogen bonds'},
-				'plot':{'function':'plot_charging_histograms_stacked',
-					'sup_name':'hydrogen bonds + salt bridges','sup_name_y':'bonds',
-					'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
-				'data':{'function':'compute_chargings','data_bonds':'data_salt_hbonds','combine_replicates':True},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9','legend_bbox':(0.0,-0.75,1.,1.)}},
-			# peptide-lipid bond totals
-			'summary salt':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'summary','mods':['nbins_%d'%20,'salt']},
-				'tags':{'analysis':'bonds summary','merged':False,'bonds':'salt bridges'},
-				'plot':{'function':'plot_summary',
-					'kwargs':{'n_segments':20},'label':'salt bridges'},
-				'data':{'function':'compute_summary','data_bonds':'data_salt'},
-				'plotspec':{'figsize':(12,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			'summary hbonds':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'summary','mods':['nbins_%d'%20,'hbonds']},
-				'tags':{'analysis':'bonds summary','merged':False,'bonds':'hydrogen bonds'},
-				'plot':{'function':'plot_summary',
-					'kwargs':{'n_segments':20},'label':'hydrogen bonds'},
-				'data':{'function':'compute_summary','data_bonds':'data_hbonds'},
-				'plotspec':{'figsize':(12,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			'summary salt_hbonds':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'summary','mods':['nbins_%d'%20,'salt_hbonds']},
-				'tags':{'analysis':'bonds summary','merged':False,'bonds':'salt bridges + hydrogen bonds'},
-				'plot':{'function':'plot_summary',
-					'kwargs':{'n_segments':20},'label':'salt bridges + hydrogen bonds'},
-				'data':{'function':'compute_summary','data_bonds':'data_salt_hbonds'},
-				'plotspec':{'figsize':(12,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			'summary salt merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'summary','mods':['nbins_%d'%20,'salt','merged']},
-				'tags':{'analysis':'bonds summary','merged':True,'bonds':'salt bridges'},
-				'plot':{'function':'plot_summary','sup_name':'salt bridges',
-					'kwargs':{'n_segments':20,'show_error_bars':True},'label':'salt bridges'},
-				'data':{'function':'compute_summary','data_bonds':'data_salt',
-					'combine_replicates':{'n_segments':20}},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			'summary hbonds merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'summary','mods':['nbins_%d'%20,'hbonds','merged']},
-				'tags':{'analysis':'bonds summary','merged':True,'bonds':'hydrogen bonds'},
-				'plot':{'function':'plot_summary',
-					'kwargs':{'n_segments':20,'show_error_bars':True},'label':'hydrogen bonds'},
-				'data':{'function':'compute_summary','data_bonds':'data_hbonds',
-					'combine_replicates':{'n_segments':20}},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			'summary salt_hbonds merged':{
-				'sns':sns_mdia2_ordering,
-				'namer':{'base':'summary','mods':['nbins_%d'%20,'salt_hbonds','merged']},
-				'tags':{'analysis':'bonds summary','merged':True,'bonds':'salt bridges + hydrogen bonds'},
-				'plot':{'function':'plot_summary',
-					'kwargs':{'n_segments':20,'show_error_bars':True},'label':'salt bridges + hydrogen bonds'},
-				'data':{'function':'compute_summary','data_bonds':'data_salt_hbonds',
-					'combine_replicates':{'n_segments':20}},
-				'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
-					'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},
-			} # end of the plot requests list. moving to a loop scheme below
-
-	routine = ['contact_maps','charging'][-1:]
+	# overall plot styles to make
+	routine = ['contact_maps','charging'][:]
 	orders = collections.OrderedDict()
 
 	# master types
@@ -1086,16 +963,20 @@ if __name__=='__main__':
 				'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
 			'data':{'function':'compute_chargings','kwargs':{'explicit':True},
 				'data_bonds':'data_salt','combine_replicates':True},
-			'plotspec':{'figsize':(8,8),'legend_edge_color':'w',
+			'plotspec':{'figsize':(10,8),'legend_edge_color':'w',
 				'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}}
-		for plot_style in ['charging timeseries','charging histograms'][1:]:
-			#! 5.0 is too slow with reduced I think?
-			for bond_type in ['salt','salt_hbonds','hbonds','cut_2.2','cut_5.0'][:-1]:
+		for plot_style in ['charging timeseries','charging histograms']:
+			for bond_type in ['salt','salt_hbonds','hbonds','cut_2.2','cut_5.0']:
 			 	for merged in [False,True]:
 			 		for explicit in [False,True]:
-						key = 'charging %s'%bond_type+\
+						key = '%s %s'%(plot_style,bond_type)+\
 							(' explicit' if explicit else '')+(' merged' if merged else '')
 						orders[key] = copy.deepcopy(charging_base)
+				 		if (plot_style=='charging histograms' and bond_type=='cut_5.0' 
+				 			and not explicit and merged):
+				 			orders[key]['plotspec']['figsize'] = (18,10)
+				 		#! 5.0A cutoff might be slow
+				 		elif plot_style=='charging histograms' and bond_type=='cut_5.0': continue
 						orders[key]['namer']['mods'] = [bond_type]+\
 							(['merged'] if merged else [])+(['explicit'] if explicit else [])
 						orders[key]['plot']['sup_name'] = labelmaker[bond_type]+\
@@ -1105,7 +986,10 @@ if __name__=='__main__':
 							orders[key]['data']['contacts_cutoff'] = float(
 								re.match('^cut_(.+)$',bond_type).group(1))
 						else: orders[key]['data']['data_bonds'] = 'data_%s'%bond_type
+						orders[key]['data']['combine_replicates'] = merged
 						orders[key]['data']['kwargs']['explicit'] = explicit
+						if not merged and plot_style=='charging timeseries':
+							orders[key]['plotspec']['figsize'] = (16,10)
 						orders[key]['tags']['merged'] = merged
 						orders[key]['tags']['explicit'] = explicit
 						orders[key]['tags']['bonds'] = labelmaker_text[bond_type]
@@ -1118,7 +1002,13 @@ if __name__=='__main__':
 							orders[key]['data']['function'] = 'compute_summary'
 						elif plot_style=='charging histograms':
 							orders[key]['namer']['base'] = 'charging_histograms'
+							# layout exceptions
+							if not merged: 
+								orders[key]['plotspec']['figsize'] = (14,8)
+								orders[key]['plotspec']['legend_bbox'] = (0.0,-1.5,1.,1.)
 						else: raise Exception
+						if (bond_type=='salt' and plot_style=='charging histograms' 
+							and not merged and explicit): orders[key]['plotspec']['fs_yticks'] = 6
 
 	if 'contact_maps' in routine:
 		# contact_maps and interacting_residues
@@ -1160,13 +1050,10 @@ if __name__=='__main__':
 						orders[key]['tags']['explicit'] = explicit
 
 	#! to develop a single plot, skip the render function and trim the orders list
-	#! i = 'contact_map salt' ; orders = {i:orders[i]}
+	#! i = 'charging histograms salt explicit' ; orders = {i:orders[i]}
 	# loop over requested plots
 	for name,spec in orders.items(): 
 		orders[name]['plotter'] = ActinlinkPlotter(name,spec)
+		status('key: %s'%name,tag='render')
 		orders[name]['plotter'].render()
-
-"""
-tasks:
-	check flipping on the histograms?
-"""
+		sup = orders[name]['plotter']
