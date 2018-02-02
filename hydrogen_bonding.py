@@ -87,7 +87,10 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 		if os.path.isfile(itp_fn): itp_fn_abs = itp_fn
 		#---if path is relative then we consult the spots
 		else:
-			rootdir = work.raw.spots[(work.raw.spotname_lookup(sn),'structure')]['rootdir']
+			#! previously work.config['spots'][work.namer.get_spotname(sn)]
+			rootdir = os.path.join(*[work.config['spots'][work.namer.get_spotname(sn)][k] 
+				for k in ['route_to_data','spot_directory']])
+			#! rootdir = work.raw.spots[(work.raw.spotname_lookup(sn),'structure')]['rootdir']
 			sn_dir = os.path.join(rootdir,sn)
 			#---user supplies step folder and path to the reference structure
 			itp_fn_abs = os.path.join(sn_dir,itp_fn)
@@ -195,12 +198,13 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 		
 	#---debug
 	if debug:
-		hbonds.donors_side = donors_side
-		hbonds.donors_inds = donors_inds
-		hbonds.donors_inds = donors_inds
-		hbonds.acceptors_side = acceptors_side
+		#hbonds.donors_side = donors_side
+		#hbonds.donors_inds = donors_inds
+		#hbonds.donors_inds = donors_inds
+		#hbonds.acceptors_side = acceptors_side
 		fr = 686 #---careful debugging at this frame
 		incoming = hbonds.hbonder_framewise(fr,distance_cutoff=distance_cutoff,angle_cutoff=angle_cutoff)
+		import ipdb;ipdb.set_trace()
 		sys.quit()
 
 	start = time.time()

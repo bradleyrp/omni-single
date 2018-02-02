@@ -1,0 +1,514 @@
+variables:
+  selectors:
+    resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2 or resname POPC or resname POP2 or resname DOPE)
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+  slices_intermediate:
+    steady16: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+  slices:
+    steady16:
+      - steady12
+      - steady23
+      - steady34
+      - steady45
+      - steady56
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+slices:
+  membrane-v653-free:
+    groups: 
+      lipids: +selectors/lipid_selection
+    slices:
+      # renamed steady16 to current to fold in the alternative simulations
+      current: {'pbc':'mol','groups':['lipids'],'start':100000,'end':600000,'skip':160}
+  membrane-v652-enthx1:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: +slices/steady16collectcombo
+  membrane-v650-enthx4-dev:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: +slices/steady16collectcombo
+  membrane-v651-enthx8:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: +slices/steady16collectcombo
+  # Exo70 and alternatives simulations
+  membrane-v1005:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':2000000,'skip':2000}
+  membrane-v750-exo70-para-dilute:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':80000,'end':580000,'skip':1000}
+  membrane-v830:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':100000,'end':600000,'skip':1000}
+  # LATEST SIMULATIONS
+  membrane-v841:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current_v0: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':1000}
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':900}
+  membrane-v842:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current_v0: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':1000}
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':900}
+slices_missing:
+  membrane-v702:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':80000,'end':580000,'skip':1000}
+  membrane-v701-exo70-anti-dilute:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':90000,'end':590000,'skip':1000}
+collections:
+  one:
+    - membrane-v651-enthx8
+  control:
+    - membrane-v653-free
+  enth:
+    - membrane-v653-free
+    - membrane-v652-enthx1
+    - membrane-v650-enthx4-dev
+    - membrane-v651-enthx8
+  alternatives:
+    - membrane-v1005
+  alternatives2:
+    - membrane-v750-exo70-para-dilute
+    - membrane-v830
+  latest:
+    - membrane-v841
+    - membrane-v842
+  protein_laden:
+    #- membrane-v841
+    #- membrane-v842
+    #- membrane-v1005
+    - membrane-v651-enthx8
+  focus:
+    - membrane-v651-enthx8
+    # - membrane-v1005
+    # - membrane-v650-enthx4-dev
+  all:
+    - membrane-v653-free
+    - membrane-v652-enthx1
+    - membrane-v650-enthx4-dev
+    - membrane-v651-enthx8
+    - membrane-v750-exo70-para-dilute
+  curvature_undulation_coupling_drilldown:
+    - membrane-v651-enthx8
+meta:
+  short_namer: "lambda name,spot : 'v'+re.findall('membrane-v([0-9]+)',name)[0]"
+  membrane-v653-free:
+    label:               free bilayer
+    nprots:              0
+  membrane-v651-enthx8:
+    label:               '$\mathrm{{ENTH}{\times}8}$'
+    nprots:              8
+  membrane-v652-enthx1:
+    label:               '$\mathrm{{ENTH}{\times}1}$'
+    nprots:              1
+  membrane-v650-enthx4-dev:
+    label:               '$\mathrm{{ENTH}{\times}4}$'
+    nprots:              4
+  membrane-v1005:
+    label:               'helix0x23'
+    nprots:              23
+  meso-test:
+    mesoscale:           True
+    label:               some description
+    path:                ~/omicron/dataset-project-meso/blen-1.27
+calculations:
+  lipid_abstractor:
+    slice_name: current
+    group: lipids
+    collections: 
+      - focus
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        cluster: True
+        lipid_tip: "name PO4"
+  undulations:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections:
+      - focus
+    specs:
+      grid_spacing: 0.5
+      upstream: lipid_abstractor
+  protein_abstractor:
+    slice_name: current
+    group: proteins
+    collections: 
+      - focus
+  curvature_undulation_coupling:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: 
+      - focus
+    specs:
+      loader_membrane:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_membrane
+      loader_protein:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_protein
+      upstream:
+        protein_abstractor: {}
+        undulations:
+          grid_spacing: 0.5
+      fitting: 
+        initial_kappa: 20
+      # notes: >
+      #  validated optimize_method options: SLSQP, Nelder-Mead
+      #  use "optimize_method: wait" to skip optimization for later
+      #  set frequency or nframes in curvature_positions if wait to ensure quick
+      design:
+        loop:
+          v1_fixed_extent_1:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+          v2_fixed_extent_2:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 2.0
+          v3_fixed_extent_0.5:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 0.5
+          v4_fixed_extent_4:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+          v5_fixed_extent_3:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 3.0
+          v6_fixed_extent_5:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 5.0
+          v7_fixed_extent_6:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 6.0
+          v8_fixed_extent_8:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 8.0
+          v9_fixed_extent_10:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+          v10_fixed_extent_0.25:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 0.25
+          ##############
+          v1_fixed_extent_all_frames_1:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+          v2_fixed_extent_all_frames_2:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+            extents:
+              method: fixed_isotropic
+              extent: 2.0
+          v3_fixed_extent_all_frames_0.5:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+            extents:
+              method: fixed_isotropic
+              extent: 0.5
+          v4_fixed_extent_all_frames_4:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+            extents:
+              method: fixed_isotropic
+              extent: 4.0
+          v5_fixed_extent_all_frames_3:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+            extents:
+              method: fixed_isotropic
+              extent: 3.0
+
+# full frame field sets cause the drilldown to go slowly
+aside:
+  # upcoming tests on all frames
+  v5_fixed_extent_all_frames_1:
+    style: wilderness
+    optimize_method: wait
+    store_instantaneous_fields: False
+    store_instantaneous_fields_explicit: True
+    curvature_sum: mean
+    curvature_positions: 
+      method: protein_dynamic_single_catchall
+    extents:
+      method: fixed_isotropic
+      extent: 1.0
+  v6_fixed_extent_all_frames_2:
+    style: wilderness
+    optimize_method: wait
+    store_instantaneous_fields: False
+    store_instantaneous_fields_explicit: True
+    curvature_sum: mean
+    curvature_positions: 
+      method: protein_dynamic_single_catchall
+    extents:
+      method: fixed_isotropic
+      extent: 2.0
+upcoming:        
+  v13:
+    optimize_method: wait
+    optimize_method: Nelder-Mead 
+    binner: explicit
+    weighting_scheme: blurry_explicit
+    store_instantaneous_fields: False
+    store_instantaneous_fields_explicit: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single_uniform
+      frequency: 20
+    extents:
+      method: fixed_isotropic
+      extent: 1.0
+    curvature_sum: mean
+  v14:
+    optimize_method: Nelder-Mead 
+    binner: explicit
+    weighting_scheme: blurry_explicit
+    store_instantaneous_fields: False
+    store_instantaneous_fields_explicit: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single
+      frequency: 20
+    extents:
+      method: fixed_isotropic
+      extent: 1.0
+    curvature_sum: mean
+  v13:
+    optimize_method: Nelder-Mead 
+    binner: explicit
+    weighting_scheme: blurry_explicit
+    store_instantaneous_fields: False
+    store_instantaneous_fields_explicit: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single_uniform
+      frequency: 20
+    extents:
+      method: fixed_isotropic
+      extent: 1.0
+    curvature_sum: mean
+  v12:
+    store_instantaneous_fields: True
+    style: wilderness
+    curvature_positions: 
+      method: protein_dynamic_single_uniform
+    extents:
+      method: fixed_isotropic
+      extent: 2.0
+    curvature_sum: mean
+  v20:
+    style: wilderness
+    curvature_positions: 
+      method: neighborhood
+      distance_cutoff: 5.0
+      spacer: 8.0
+    extents:
+      method: fixed_isotropic
+      extent: 4.0
+    curvature_sum: mean
+incoming:
+  lipid_mesh:
+    uptype: post
+    slice_name: current
+    collections:
+      - latest
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector: lipid_com
+plots:
+  undulations:
+    autoplot: True
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections:
+      - latest
+      - alternatives
+  curvature_undulation_coupling:
+    autoplot: True
+    collections: 
+      - protein_laden
+    calculation: 
+      - protein_abstractor
+      - undulations
+  curvature_undulation_coupling_drilldown:
+    autoplot: True
+    collections: focus
+    calculation: 
+      - curvature_undulation_coupling
+  curvature_undulation_coupling_redev:
+    autoplot: True
+    collections: focus
+    calculation: 
+      - curvature_undulation_coupling
+  undulations_videos:
+    collections: focus

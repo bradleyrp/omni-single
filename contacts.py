@@ -31,6 +31,7 @@ def contacts_framewise(fr,**kwargs):
 	Compute close contacts using global subject and target coordinates. Called by the contacts function.
 	"""
 
+	debug = kwargs.get('debug',False)
 	global vecs,coords_targ,coords_subj
 	distance_cutoff = kwargs['distance_cutoff']
 	lenscale = kwargs.get('lenscale',10.0)
@@ -47,9 +48,14 @@ def contacts_framewise(fr,**kwargs):
 	pts_fore = boxstuff(pts_fore_unstuffed,vec)
 
 	#---! why does vec need to be twice as long? (tested that the limits work though)
-	try: tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=np.concatenate((vec,vec)))
+	#---! after like three years of waiting they finally fixed the broadcast problem so 
+	#---! ... so no need to send two copies of the vec along (very nice, but annoying still)
+	try: tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=vec)
 	#---KDTree failures are blanked
-	except: return {'subjects':np.array([]),'targets':np.array([])}
+	except: 
+		if debug:
+			import ipdb;ipdb.set_trace()
+		else: return {'subjects':np.array([]),'targets':np.array([])}
 	close,nns = tree.query(pts_fore,k=10,distance_upper_bound=distance_cutoff/lenscale)
 
 	#---index pairs within the cutoff distance
@@ -57,6 +63,8 @@ def contacts_framewise(fr,**kwargs):
 	#---list of close donors
 	close_targets = nns[aind(close_pairs)]
 	close_subjects = close_pairs[:,0]
+	if debug:
+		import ipdb;ipdb.set_trace()
 	return {'subjects':close_subjects,'targets':close_targets}
 
 def count_reduced_contact(resid,resname_set,mode='full'):
@@ -191,7 +199,7 @@ def contacts(grofile,trajfile,**kwargs):
 	compute_function = contacts_framewise
 	if debug:
 		fr = 50
-		incoming = compute_function(fr,distance_cutoff=distance_cutoff)
+		incoming = compute_function(fr,distance_cutoff=distance_cutoff,debug=True)
 		import ipdb;ipdb.set_trace()
 		sys.quit()
 

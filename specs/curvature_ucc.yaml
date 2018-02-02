@@ -1,0 +1,138 @@
+variables:
+  selectors:
+    resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2 or resname POPC or resname POP2 or resname DOPE)
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+  slices_intermediate:
+    steady16: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+  slices:
+    steady16:
+      - steady12
+      - steady23
+      - steady34
+      - steady45
+      - steady56
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+meta:
+  short_namer: "lambda name,spot : 'v'+re.findall('(?:membrane|mesomembrane)-v([0-9]+)',name)[0]"
+  membrane-v653-free:
+    label:               free bilayer
+    nprots:              0
+  membrane-v651-enthx8:
+    label:               '$\mathrm{{ENTH}{\times}8}$'
+    nprots:              8
+  membrane-v652-enthx1:
+    label:               '$\mathrm{{ENTH}{\times}1}$'
+    nprots:              1
+  membrane-v650-enthx4-dev:
+    label:               '$\mathrm{{ENTH}{\times}4}$'
+    nprots:              4
+  membrane-v1005:
+    label:               'helix0x23'
+    nprots:              23
+  meso-test:
+    mesoscale:           True
+    label:               some description
+    path:                ~/omicron/dataset-project-meso/blen-1.27
+  membrane-v841:
+    label:               Exo70 dimer (anti-parallel) WT
+    nprots:              2
+  membrane-v842:
+    label:               Exo70 dimer (anti-parallel) ULK mutant
+    nprots:              2
+collections:
+  all: 
+    - membrane-v650-enthx4-dev
+    - membrane-v842
+  ucc:
+    - membrane-v650-enthx4-dev
+    #- membrane-v842
+slices:
+  membrane-v650-enthx4-dev:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: +slices/steady16collectcombo
+  membrane-v841:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current_v0: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':1000}
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':900}
+  membrane-v842:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current_v0: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':1000}
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':900}
+calculations:
+  lipid_abstractor:
+    slice_name: current
+    group: lipids
+    collections: all
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        cluster: True
+        lipid_tip: "name PO4"
+  undulations:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: all
+    specs:
+      grid_spacing: 0.5
+      upstream: lipid_abstractor
+  protein_abstractor:
+    slice_name: current
+    group: proteins
+    collections: all
+plots:
+  undulations:
+    autoplot: True
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections: all
+  undulations_videos:
+    collections: focus
+  ucc:
+    autoplot: True
+    collections: ucc
+    calculation:
+      undulations: {}
+      protein_abstractor: {}
+  # ???????
+  ucc_meso:
+    autoplot: True
+    collections: ucc-meso
+    specs: 
+      # alternate names to match the calculation inputs above
+      calcname: curvature_undulation_coupling_dex
+      protein_abstractor_name: import_readymade_meso_v1_nanogel
+      undulations_name: import_readymade_meso_v1_membrane
+      # alternate loaders for interpreting the nanogel positions
+      loader: 
+        module: codes.curvature_coupling_loader_dex
+        function: prepare_mesoscale_postdat

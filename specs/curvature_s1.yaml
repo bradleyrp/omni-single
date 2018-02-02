@@ -1,7 +1,7 @@
 variables:
   selectors:
-    resnames_lipid: ['DOPC','DOPS','PIP2']
-    lipid_selection: (resname DOPC or resname DOPS or resname PIP2)
+    resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2 or resname POPC or resname POP2 or resname DOPE)
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
   slices_intermediate:
     steady16: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
@@ -26,122 +26,108 @@ variables:
       steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
       steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
       steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
-# DEV multiplex slices for memory. feature is under redevelopment
-slices_multiplex:
-  membrane-v653-free:
-    groups: 
-      all: all
-      lipids: +selectors/lipid_selection
-    slices: 
-      steady12: {'pbc':'mol','groups':['lipids'],'start':100000,'end':200000,'skip':160}
-      steady23: {'pbc':'mol','groups':['lipids'],'start':200000,'end':300000,'skip':160}
-      steady34: {'pbc':'mol','groups':['lipids'],'start':300000,'end':400000,'skip':160}
-      steady45: {'pbc':'mol','groups':['lipids'],'start':400000,'end':500000,'skip':160}
-      steady56: {'pbc':'mol','groups':['lipids'],'start':500000,'end':600000,'skip':160}
-  membrane-v652-enthx1:
-    groups: 
-      all: all
-      lipids: +selectors/lipid_selection
-      proteins: +selectors/protein_selection
-    slices: +slices/steady16collect
-  membrane-v650-enthx4-dev:
-    groups: 
-      all: all
-      lipids: +selectors/lipid_selection
-      proteins: +selectors/protein_selection
-    slices: +slices/steady16collect
-  membrane-v651-enthx8:
-    groups: 
-      all: all
-      lipids: +selectors/lipid_selection
-      proteins: +selectors/protein_selection
-    slices: +slices/steady16collect   
-# single slices
 slices:
   membrane-v653-free:
     groups: 
       lipids: +selectors/lipid_selection
     slices:
-      steady16: {'pbc':'mol','groups':['lipids'],'start':100000,'end':600000,'skip':160}
+      # renamed steady16 to current to fold in the alternative simulations
+      current: {'pbc':'mol','groups':['lipids'],'start':100000,'end':600000,'skip':160}
   membrane-v652-enthx1:
     groups: 
       lipids: +selectors/lipid_selection
       proteins: +selectors/protein_selection
     slices:
-      steady16: +slices/steady16collectcombo
+      current: +slices/steady16collectcombo
   membrane-v650-enthx4-dev:
     groups: 
       lipids: +selectors/lipid_selection
       proteins: +selectors/protein_selection
     slices:
-      steady16: +slices/steady16collectcombo
+      current: +slices/steady16collectcombo
   membrane-v651-enthx8:
     groups: 
       lipids: +selectors/lipid_selection
       proteins: +selectors/protein_selection
     slices:
-      steady16: +slices/steady16collectcombo
+      current: +slices/steady16collectcombo
+  # Exo70 and alternatives simulations
+  membrane-v1005:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':2000000,'skip':2000}
+  membrane-v750-exo70-para-dilute:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':80000,'end':580000,'skip':1000}
+  membrane-v830:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':100000,'end':600000,'skip':1000}
+  # LATEST SIMULATIONS
+  membrane-v841:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current_v0: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':1000}
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':900}
+  membrane-v842:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current_v0: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':1000}
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':900}
+slices_missing:
+  membrane-v702:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':80000,'end':580000,'skip':1000}
+  membrane-v701-exo70-anti-dilute:
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids'],'start':90000,'end':590000,'skip':1000}
 collections:
-  one:
+  focus:
     - membrane-v651-enthx8
-  control:
-    - membrane-v653-free
-  all:
-    - membrane-v653-free
-    - membrane-v652-enthx1
-    - membrane-v650-enthx4-dev
-    - membrane-v651-enthx8
-  protein_laden:
-    - membrane-v650-enthx4-dev
-    - membrane-v651-enthx8
-    - membrane-v652-enthx1
 meta:
   short_namer: "lambda name,spot : 'v'+re.findall('membrane-v([0-9]+)',name)[0]"
   membrane-v653-free:
     label:               free bilayer
     nprots:              0
   membrane-v651-enthx8:
-    label:               '$\mathrm{{ENTH}\ensuremath{\times}8}$'
+    label:              '$\mathrm{{ENTH}\ensuremath{\times}8}$'
     nprots:              8
   membrane-v652-enthx1:
-    label:               '$\mathrm{{ENTH}\ensuremath{\times}1}$'
+    label:              '$\mathrm{{ENTH}\ensuremath{\times}1}$'
     nprots:              1
   membrane-v650-enthx4-dev:
-    label:               '$\mathrm{{ENTH}\ensuremath{\times}4}$'
+    label:              '$\mathrm{{ENTH}\ensuremath{\times}4}$'
     nprots:              4
+  membrane-v1005:
+    label:              'helix0x23'
+    nprots:              23
   meso-test:
     mesoscale:           True
     label:               some description
     path:                ~/omicron/dataset-project-meso/blen-1.27
-# DEV multiplexed version
-calculations_multi:
-  lipid_abstractor:
-    slice_name:
-      loop: +slices/steady16
-    group: lipids
-    collections: all
-    specs:
-      selector:
-        loop:
-          lipid_com:
-            resnames: +selectors/resnames_lipid
-            type: com
-      separator: 
-        lipid_tip: "name PO4"
-        # smaller cutoffs are more effective
-        monolayer_cutoff: 1.0
-        topologize_tolerance: 0.05
-  protein_abstractor:
-    slice_name:
-      loop: +slices/steady16
-    group: proteins
-    collections: protein_laden
-# combined version
 calculations:
   lipid_abstractor:
-    slice_name: steady16
+    slice_name: current
     group: lipids
-    collections: all
+    collections: 
+      - focus
     specs:
       selector:
         loop:
@@ -149,29 +135,28 @@ calculations:
             resnames: +selectors/resnames_lipid
             type: com
       separator: 
+        cluster: True
         lipid_tip: "name PO4"
-        # smaller cutoffs are more effective
-        monolayer_cutoff: 1.0
-        topologize_tolerance: 0.05
-  protein_abstractor:
-    slice_name: steady16
-    group: proteins
-    collections: protein_laden
   undulations:
     uptype: post
     group: lipids
-    slice_name: steady16
-    collections: all
+    slice_name: current
+    collections:
+      - focus
     specs:
       grid_spacing: 0.5
-      upstream: 
-        lipid_abstractor:
-          selector: lipid_com
+      upstream: lipid_abstractor
+  protein_abstractor:
+    slice_name: current
+    group: proteins
+    collections: 
+      - focus
   curvature_undulation_coupling:
     uptype: post
     group: lipids
-    slice_name: steady16
-    collections: protein_laden
+    slice_name: current
+    collections: 
+      - focus
     specs:
       loader_membrane:
         module: codes.curvature_coupling_loader
@@ -185,66 +170,29 @@ calculations:
           grid_spacing: 0.5
       design:
         loop:
-          v3:
+          v13:
             store_instantaneous_fields: True
             style: wilderness
             curvature_positions: 
-              method: protein_dynamic_single
+              method: protein_dynamic_single_uniform
             extents:
               method: fixed_isotropic
               extent: 1.0
             curvature_sum: mean
-          v4:
-            store_instantaneous_fields: True
-            style: wilderness
-            curvature_positions: 
-              method: protein_dynamic_single
-            extents:
-              method: fixed_isotropic
-              extent: 2.0
-            curvature_sum: mean
-          v5:
-            store_instantaneous_fields: True
-            style: wilderness
-            curvature_positions: 
-              method: protein_dynamic_single
-            extents:
-              method: fixed_isotropic
-              extent: 4.0
-            curvature_sum: mean
-          v6:
-            store_instantaneous_fields: True
-            style: wilderness
-            curvature_positions: 
-              method: protein_dynamic_single
-            extents:
-              method: fixed_isotropic
-              extent: 8.0
-            curvature_sum: mean
-incoming:
-  curvature_undulation_coupling_pixel:
-    uptype: post
-    group: all
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        undulations: {}
-      design:
-        loop:
-          v16:
-            style: wilderness
-            curvature_positions: 
-              method: pixel
-              spacer: 10.0
-            extents:
-              method: fixed_isotropic
-              extent: 5.0
-            curvature_sum: mean
 plots:
+  undulations:
+    autoplot: True
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections:
+      - latest
+      - alternatives
   curvature_undulation_coupling:
     autoplot: True
-    collections: protein_laden
+    collections: 
+      - protein_laden
     calculation: 
       - protein_abstractor
       - undulations

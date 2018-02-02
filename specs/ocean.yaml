@@ -4,6 +4,8 @@ collections:
     - sv004
     - sv005
     - sv007
+  atomistic:
+    - mk005
 slices:
   mk001:
     readymade_namd:
@@ -40,24 +42,6 @@ slices:
     slices:
       current_v1: {'pbc':'mol','groups':['all'],'start':20000,'end':520000,'skip':2000}
       current: {'pbc':'mol','groups':['all'],'start':20000,'end':1020000,'skip':2000}
-calculation_aside:
-  #! for now you have to manipulate the names to handle cgmd/aamd
-  lipid_abstractor_aamd:
-    uptype: simulation
-    slice_name: current
-    group: all
-    collections: all
-    specs:
-      selector:
-        loop:
-          lipid_com:
-            resnames: +selectors/resnames_lipid
-            type: com
-      separator: 
-        lipid_tip: "name P"
-        monolayer_cutoff: 1.4
-        monolayer_cutoff_retry: True
-        topologize_tolerance: 0.1
 calculations:
   protein_abstractor:
     uptype: simulation
@@ -75,10 +59,16 @@ calculations:
           lipid_com:
             resnames: +selectors/resnames_lipid
             type: com
+          lipid_phosphate:
+            resnames: +selectors/resnames_lipid
+            selection: "name P or name PO4"
+            type: select
       separator: 
-        lipid_tip: "name PO4"
-        monolayer_cutoff: 1.8
-        topologize_tolerance: 0.10
+        # dual, mutually exclusive aamd/cgmd selection
+        lipid_tip: "name PO4 or name P"
+        # previously 1.8
+        monolayer_cutoff: 1.0
+        topologize_tolerance: 0.05
       nojumps: "z"
   undulations:
     uptype: post
@@ -88,7 +78,9 @@ calculations:
     specs:
       # note that downstream looping over 0.5,0.25 is broken
       grid_spacing: 0.5
-      upstream: lipid_abstractor
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_com
   lipid_mesh:
     uptype: post
     slice_name: current
@@ -97,19 +89,10 @@ calculations:
     specs:
       upstream:
         lipid_abstractor:
-          selector: lipid_com
-  lipid_areas2d:
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        lipid_mesh:
-          upstream:
-            lipid_abstractor:
-              selector:
-                loop:
-                  - lipid_com
+          selector: 
+            loop: 
+              - lipid_phosphate
+              - lipid_com
   lipid_areas3d:
     uptype: simulation
     slice_name: current
@@ -121,8 +104,8 @@ calculations:
             lipid_abstractor:
               selector:
                 loop:
+                  - lipid_phosphate
                   - lipid_com
-  # under development/testing
   curvature_undulation_coupling:
     uptype: post
     group: all
@@ -210,7 +193,7 @@ calculations:
               method: fixed_isotropic
               extent: 8.0
             curvature_sum: mean
-deprecated_curvature_design:
+calculation_curvature_undulation_coupling_on_deck:
   v3:
     store_instantaneous_fields: True
     style: wilderness
@@ -346,7 +329,7 @@ variables:
   # unprotected
   selectors:
     protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
-    resnames_lipid: ['DOPC','DOPS','PIP2','POPC']
+    resnames_lipid: ['DOPC','DOPS','PIP2','POPC','POP2']
   slices:
     mk001:
         psf: "1protein_again_autopsf.psf"
@@ -371,10 +354,11 @@ meta:
   mk004: 
     label: "example"
     nprots: 1
-	index_top_monolayer: 1
+    index_top_monolayer: 1
   mk005: 
     label: "example mk5"
     nprots: 1
+    repeated_resids: True
   sv004: 
     label: "4 helix-0, small bilayer"
     nprots: 4
@@ -419,19 +403,18 @@ plots:
           upstream:
             lipid_abstractor:
               selector: lipid_com
-  ocean_lipid_areas:
-    calculation: lipid_areas3d
-  # under development
+  leaflet_areas:
+    calculation: 
+      lipid_areas3d:
+        upstream:
+          lipid_mesh:
+            upstream:
+              lipid_abstractor:
+                # choose the selection method here
+                selector: lipid_com
   curvature_undulation_coupling:
+    autoplot: True
+    collections: atomistic
     calculation: 
       - protein_abstractor
       - undulations
-    collections: all
-    specs: 
-      routine:
-        - individual_reviews
-    notes:
-      curvature_undulation_coupling_notes: |
-        Note that we have to check the following features of this calculation:
-          1. are curvature fields wrapping over PBCs?
-          2. is the average field a faithful depiction of the field i.e. what do instantaneous fields look like when the protein is on either side? and why is the top part of the box completely zeroed out even though the bottom part has some intensity at the edge? it is likely that the reference grid is not wrapping.

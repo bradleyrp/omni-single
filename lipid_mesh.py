@@ -9,8 +9,6 @@ from codes.mesh import *
 from base.timer import checktime
 from base.tools import status,framelooper
 
-debug = False
-
 def lipid_mesh(**kwargs):
 
 	"""
@@ -25,18 +23,21 @@ def lipid_mesh(**kwargs):
 	resnames = dat['resnames']
 	monolayer_indices = dat['monolayer_indices']
 	nframes = dat['nframes']
+	debug = kwargs.pop('debug',False)
+	kwargs_out = dict(curvilinear=calc.get('specs',{}).get('curvilinear',False))
 
 	#---parallel
 	mesh = [[],[]]
 	if debug: 
 		mn,fr = 0,10
-		makemesh(dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr],debug=True)
+		makemesh(dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr],
+			debug=True,**kwargs_out)
 		sys.exit(1)
 	for mn in range(2):
 		start = time.time()
 		mesh[mn] = Parallel(n_jobs=work.nprocs,verbose=0)(
 			delayed(makemesh)(
-				dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr])
+				dat['points'][fr][where(monolayer_indices==mn)],dat['vecs'][fr],**kwargs_out)
 			for fr in framelooper(nframes,start=start,text='monolayer %d, frame'%mn))
 	checktime()
 

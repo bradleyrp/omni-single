@@ -19,7 +19,7 @@ def fftwrap(dat):
 	"""
 	return np.fft.fft2(np.array(dat))
 
-def perfect_collapser(xs,ys,trim=False):
+def perfect_collapser(xs,ys,trim=False,return_indices=False):
 	"""
 	Return two arrays for a "perfect" collapse.
 	"""
@@ -29,20 +29,65 @@ def perfect_collapser(xs,ys,trim=False):
 	#---! future warning below
 	if type(ys)==type(None): col = None
 	else: col = np.array([np.mean(ys[np.where(inds==i)]) for i in range(len(xsort))])
-	return xsort,col,inds
+	if return_indices: return xsort,col,inds
+	else: return xsort,col
 
-def blurry_binner(xs,ys,bin_width=0.05,trim=True):
+def blurry_binner_deprecated(xs,ys,bin_width=0.05,trim=True,return_mapping=False):
 	"""
 	Group wavevectors by bins.
+	Retired this because it was confusing!
 	"""
 	blurred = (xs/bin_width).astype(int)
-	xsort = array(sort(list(set(blurred))))
+	xsort = np.array(np.sort(list(set(blurred))))
 	if trim: xsort = xsort[1:]
-	inds = argmax(array([(xs/bin_width).astype(int)==xsort[i] for i in range(len(xsort))]),axis=0)
-	if type(ys)!=ndarray: coly = None
-	else: coly = array([mean(ys[where(inds==i)]) for i in range(len(xsort))])
-	colx = array([mean(xs[where(inds==i)]) for i in range(len(xsort))])
-	return colx,coly,inds
+	inds = np.argmax(np.array([blurred==xsort[i] for i in range(len(xsort))]),axis=0)
+	if type(ys)!=np.ndarray: coly = None
+	else: coly = np.array([np.mean(ys[np.where(inds==i)]) for i in range(len(xsort))])
+	colx = np.array([np.mean(xs[np.where(inds==i)]) for i in range(len(xsort))])
+	if not return_mapping: return colx,coly,inds
+	else:
+		#---! this takes a moment
+		mapping = [np.where(blurred==i)[0] for i in np.sort(blurred)]
+		return colx,coly,inds,mapping
+
+def blurry_binner(xs,ys,bin_width=0.05,trim=True,return_mapping=False,mode='snapped'):
+	"""
+	Improved over original with sensible binning and interpolation.
+	Removed the index return strategy in favor of handling things internally.
+	"""
+	#---get the range of the independent variable
+	x0,x1 = xs.min(),xs.max()
+	#---snap to the bin width
+	x0b,x1b = bin_width*np.floor(x0/bin_width),bin_width*np.ceil(x1/bin_width)
+	#---develop canonical bin markers
+	bins = np.arange(x0b,x1b+bin_width,bin_width)
+	#---bins are represented in the middle
+	xmid = (bins[1:]+bins[:-1])/2.
+	#---get the bin positions
+	xbin = np.floor(xs/bin_width).astype(int) - np.floor(xs.min()/bin_width).astype(int)
+	#---check that everything is in the right bin
+	try: 
+		if not (np.all(xs<=bins[1:][xbin]) and np.all(xs>=bins[:-1][xbin])):
+			import ipdb;ipdb.set_trace()
+			raise Exception('binning failure!')
+	except:
+		import ipdb;ipdb.set_trace()
+	#---reindex each position into bins
+	indices = np.unique(xbin)
+	reindex = [np.where(xbin==i)[0] for i in indices]
+	#---snapped mode just uses the middle of each bin and takes the average of the constituents
+	if mode=='snapped':
+		y_out = np.array([ys[r].mean() for r in reindex])
+		x_out = xmid[indices]
+	#---! recommend developing an interpolation method here to shift laterally if off-center constituents
+	else: raise 
+	#---for each point, return the indices of other points in the same bin
+	#---...note that this is essential for developing weights in the blurry_explicit
+	#---...where the weights end up: weights = 1./np.array([len(i) for i in q_mapping])[band]
+	if return_mapping: 
+		mapping = [np.where(xbin==i)[0] for i in np.sort(xbin)]
+		return x_out,y_out,mapping
+	else: return x_out,y_out
 
 def undulation_fitter(q_raw,hqs,area,initial_conditions=(20.0,0.0),residual_form='linear'):
 	"""Like bath fitter, but for undulations."""
@@ -123,7 +168,7 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 	packed = {}
 	#---choose a binning method, range method, and fitting method
 	if fit_style in ['band,perfect,simple','band,perfect,basic',
-		'band,perfect,fit','band,perfect,curvefit','band,perfect,curvefit-crossover']:
+		'band,perfect,fit','band,perfect,curvefit','band,blurry,curvefit','band,perfect,curvefit-crossover']:
 
 		if lims==None: raise Exception('fit_style %s requires lims'%fit_style)
 		#---collapse, perfectly
@@ -132,6 +177,12 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 		#---sample in the band and drop the zero mode
 		#---! where is the zero mode dropped?
 		x3,y3 = x2[goodslice],y2[goodslice]
+
+		#---apply binning method
+		if fit_style=='band,blurry,curvefit':
+			x3,y3 = blurry_binner(x3,y3)
+
+
 		#---perform the fit
 		if fit_style=='band,perfect,simple': 
 			#---the simple method is a crude way to do the fit, by fixing the exponent and then using the fact
@@ -149,7 +200,7 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 			kappa,gamma = 1./(10**c1*area)*2.0,0.0
 			#---save for debugging
 			packed['linear_fit_in_log'] = dict(c0=c0,c1=c1)
-		elif fit_style=='band,perfect,curvefit':
+		elif fit_style in ['band,perfect,curvefit','band,blurry,curvefit']:
 			#---in this method we use the scipy curve_fit function
 			exponent = 4.0
 			kwargs = {}

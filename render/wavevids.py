@@ -12,7 +12,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from plotter import *
 
 #---update for new omnicalc
-from plotter.panels import panelplot
+from plotter.panels import panelplot,square_tiles
 
 import numpy as np
 
@@ -22,10 +22,12 @@ def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
 	"""
 	Outer loop for rendering protein videos.
 	"""
+	square_layout = kwargs.pop('square',False)
 	if not all([len(np.shape(s))==2 for s in surfs]):
 		raise Exception('incoming data must be simulation by x by y')
 	npanels = len(surfs)
-	axes,fig = panelplot(**panelspecs)
+	if not square_layout: axes,fig = panelplot(**panelspecs)
+	else: axes,fig = square_tiles(ntiles=npanels,**panelspecs)
 	#---loop over panels
 	for ni in range(npanels):
 		m,n = griddims = np.shape(surfs[ni])

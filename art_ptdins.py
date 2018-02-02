@@ -21,7 +21,7 @@ import brewer2mpl
 
 palette_colors = dict([(val,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[key]) for key,val in enumerate('red blue green purple orange yellow brown pink grey'.split())])
 	
-def colorize(metadat,comparison='',resname='',named=False):
+def colorize(metadat,comparison='',resname='',named=False,overrides=None):
 	"""
 	Master listing of colors for different PtdIns comparisons.
 	"""
@@ -40,6 +40,7 @@ def colorize(metadat,comparison='',resname='',named=False):
 			'SAPI':'purple',
 			'PtdIns':'purple',
 			'CHL1':'grey'}
+		if overrides: colordict.update(**overrides)
 		if named: return colordict[resname]
 		else: return palette_colors[colordict[resname]]
 	else:

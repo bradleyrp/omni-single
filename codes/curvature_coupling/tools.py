@@ -49,7 +49,7 @@ def blurry_binner(xs,ys,bin_width=0.05,trim=False):
 	Group wavevectors by bins.
 	"""
 	blurred = (xs/bin_width).astype(int)
-	xsort = np.array(sort(list(set(blurred))))
+	xsort = np.array(np.sort(list(set(blurred))))
 	if trim: xsort = xsort[1:]
 	inds = np.argmax(np.array([(xs/bin_width).astype(int)==xsort[i] for i in range(len(xsort))]),axis=0)
 	if type(ys)==type(None): coly = None

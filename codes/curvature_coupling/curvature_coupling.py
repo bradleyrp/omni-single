@@ -11,6 +11,7 @@ from base.compute_loop import basic_compute_loop
 import codes.curvature_coupling.tools as cctools
 import scipy
 import scipy.optimize
+from codes.undulate import perfect_collapser,blurry_binner
 
 machine_eps = eps = np.finfo(float).eps
 
@@ -52,6 +53,327 @@ def rotation_matrix(axis,theta):
 	return np.array([[aa+bb-cc-dd,2*(bc+ad),2*(bd-ac)],[2*(bc-ad),aa+cc-bb-dd,2*(cd+ab)],
 		[2*(bd+ac),2*(cd-ab),aa+dd-bb-cc]])
 
+###---OBJECTIVE FUNCTION and associated paraphanalia
+
+def gopher(spec,module_name,variable_name,work=None):
+	"""Load an external module. Useful for changing the workflow without changing the code."""
+	#---note that this function was folded into the omnicalc codebase in omni/base/tools.py
+	mod = importlib.import_module(spec[module_name])
+	target = mod.__dict__.get(spec[variable_name],None)
+	#---the database design might need work so we always export it
+	mod.work = work
+	if not target: raise Exception('add %s and %s to the specs'%(module_name,variable_name))
+	return target
+
+def formulate_wavevectors(dims,vecs=None,lx=None,ly=None,lenscale=1.0):
+	"""
+	Generate wavevectors from box dimensions and the number of grid points.
+	"""
+	if type(vecs)!=type(None):
+		Lx,Ly = np.mean(vecs,axis=0)[:2]
+	elif type(lx)==type(None) or type(ly)==type(None):
+		raise Exception('send box dimensions (lx and ly) or framewise box vectors (vecs)')
+	else: Lx,Ly = lx,ly
+	if len(dims)!=2: raise Exception('dims must be the number of grid points in each of two directions')
+	#---formulate the wavevectors
+	lenscale = 1.0
+	m,n = mn = dims
+	q2d = lenscale*np.array([[np.sqrt(
+		((i-m*(i>m/2))/((Lx)/1.)*2*np.pi)**2+
+		((j-n*(j>n/2))/((Ly)/1.)*2*np.pi)**2)
+		for j in range(0,n)] for i in range(0,m)])
+	q_raw = np.reshape(q2d,-1)[1:]
+	area = (Lx*Ly/lenscale**2)
+	return dict(wavevectors=q_raw,area=area)
+
+def curvature_sum_function(cfs,curvatures,**kwargs):
+	"""
+	Curvature fields are maxed not summed.
+	!? What's with the weird transpose below. Document this!!!
+	!? Should this be turned into a decorator?
+	"""
+	method = kwargs.get('method')
+	if method=='mean':
+		combo = np.array([np.transpose(cfs,(1,0,2,3))[cc]*c 
+			for cc,c in enumerate(curvatures)]).mean(axis=0)
+	else: raise Exception('invalid method %s'%method)
+	return combo
+
+def prepare_residual_DEPRECATED(residual_form='log',weighting_scheme=None):
+	"""
+	DEPRECATED!
+	Decorate a residual function.
+	"""
+	#---residual mode for the return format from the objective
+	if residual_form == 'log':
+		if weighting_scheme=='blurry_explicit':
+			def residual(values):
+				return np.sum(weights*np.log10(values.clip(min=machine_eps))**2)/float(len(values))
+		else: 
+			def residual(values):
+				return np.sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
+	#---deprecated residual method
+	elif residual_form == 'linear':
+		raise Exception('linear is not the right residual option') 
+		def residual(values): 
+			return np.sum((values-1.0)**2)/float(len(values))
+	else: raise Exception('unclear residual form %s'%residual_form)
+	return residual
+
+def log_reverse(raw):
+	return 10.**(-1.0*np.log10(raw))
+
+def prepare_oscillator_function(reverse=False,positive_vibe=True):
+	"""Reversible for .... !!! mysterious reasons."""
+	# TESTING TESTING thursday
+	def oscillator_function(vibe,qs):
+		"""Standard harmonic oscillator function."""
+		#---vibration must be nonnegative
+		if positive_vibe: vibe = np.abs(vibe)
+		#raw = ((vibe*qs+machine_eps)/((np.exp(vibe*qs)-1)+machine_eps))
+		raw = (vibe*qs)*(0.+1./(np.exp(vibe*qs)-1))
+		if not reverse: return raw
+		else: return log_reverse(raw)
+	#def oscillator_function(vibe,q_raw):
+	#	#return (energy_raw(kappa,gamma)+0.)/(vibe*q_raw)/(0.+1./(np.exp(vibe*q_raw)-1))
+	#	return (vibe*q_raw)*(0.+1./(np.exp(vibe*q_raw)-1))
+	return oscillator_function
+
+def prepare_residual(mode='standard'):
+	"""Decorate the residual function."""
+	#---! document the ambiguity in function forms here
+	#---! looks the same to me really: ... x = 1./10;(10.*x);10/(10.**(-1.*np.log10(x)))
+	#def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
+	# TESTING TESTING thursday
+	#def residual(hel,hosc): 
+	#	energies = hel/hosc
+	#	return sum(np.log10(energies.clip(min=machine_eps))**2)/float(len(energies))
+	if mode in ['standard','comp','subtractor']:
+		def residual(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
+	elif mode=='alt':
+		def residual(hel,hosc): 
+			#return np.mean(np.log10((hel/hosc).clip(min=machine_eps))**2)
+			energies = hel/hosc
+			return sum(np.log10(energies.clip(min=machine_eps))**2)/float(len(energies))
+	else: raise Exception('unclear residual mode')
+	return residual
+
+def prepare_objective(
+	hqs,curvature_fields,wavevectors,area,
+	curvature_sum_function,fft_function,band,
+	**kwargs):
+	"""
+	Package the objective function for optimization.
+	"""
+	#---the ndrops_uniform switch tells us how to multiplex a single field to multiple proteins
+	ndrops_uniform = kwargs.pop('ndrops_uniform',0)
+	#---default curvature sum method is the mean
+	curvature_sum_method = kwargs.pop('curvature_sum_method','mean')
+	#---binning methods are blurry (i.e. nonzero bins), perfect (i.e. one bin per unique magnitude)
+	#---...or explicit, which does no binning whatsoever
+	binner_method = kwargs.pop('binner_method','blurry')
+	perfect_collapser = kwargs.pop('perfect_collapser',None)
+	blurry_binner = kwargs.pop('blurry_binner',None)
+	signterm = kwargs.pop('inner_sign',1.0)
+	imaginary_mode = kwargs.pop('imaginary_mode','complex')
+	fix_curvature = kwargs.pop('fix_curvature',None)
+	oscillator_function_local = kwargs.pop('oscillator_function',None)
+	subtractor = kwargs.pop('subtractor',None)
+	#---handle master modes
+	master_mode = kwargs.pop('master_mode','standard')
+	signterm = {'standard':1.0,'alt':-1.0,'comp':True}.get(master_mode,1.0)
+	positive_vibe = {'standard':True,'alt':False,'comp':True}.get(master_mode,True)
+	#---! adding this back in
+	positive_vibe = kwargs.pop('positive_vibe',False)
+	reverse_oscillator = {'standard':True,'alt':False,'comp':False,'subtractor':False}[master_mode]
+	#---get the oscillator if not explicit
+	if oscillator_function_local==None:
+		oscillator_function_local = prepare_oscillator_function(reverse=reverse_oscillator,
+			positive_vibe=positive_vibe)
+	residual = kwargs.pop('residual_function',
+		prepare_residual(mode={'comp':'standard'}.get(master_mode,master_mode)))
+	weighting_scheme = kwargs.pop('weighting_scheme',None)
+	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
+	#---consistency checks
+	if binner_method=='blurry' and type(blurry_binner)==type(None): 
+		raise Exception('send blurry_binner')
+	elif binner_method=='perfect' and type(perfect_collapser)==type(None): 
+		raise Exception('send perfect_collapser')
+	#---rename for the function
+	cfs,q_raw = curvature_fields,wavevectors
+	#---compute weights for specific weighting schemes	
+	if weighting_scheme=='blurry_explicit':
+		q_raw_binned_temp,_,q_mapping = blurry_binner(q_raw,q_raw,return_mapping=True)
+		weights = 1./np.array([len(i) for i in q_mapping])[band]
+	else: weights = None
+
+	def multipliers(x,y): 
+		"""Multiplying complex matrices in the list of terms that contribute to the energy."""
+		return x*np.conjugate(y)
+
+	#---fitting kappa, gamma, and the vibration with a fixed curvature
+	#---note that this use-case is meant for matching to the legacy code
+	if type(fix_curvature)!=type(None):
+		if ndrops_uniform==0:
+			raise Exception('you can only fix curvature for the uniform case right now')
+		curvatures = [fix_curvature for i in range(ndrops_uniform)]
+		#---generate a composite field from 
+		composite = curvature_sum_function(cfs,curvatures,method=curvature_sum_method)
+		#---Fourier transform		
+		cqs = fft_function(composite)
+		###!!! special debugging for redev use
+		if len(hqs)!=len(cqs) and fix_curvature==0:
+			termlist = [multipliers(hqs,hqs)]+[multipliers(np.zeros(hqs.shape),np.zeros(hqs.shape)) 
+				for jj in range(3)]
+		else:
+			#---construct the terms in eqn 23
+			termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
+		#---reshape the terms into one-dimensional lists, dropping the zeroth mode
+		termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
+		#---! explain logic behind real/imaginary here
+		if imaginary_mode=='real': termlist = [np.real(k) for k in termlist]
+		elif imaginary_mode=='complex': termlist = [np.abs(k) for k in termlist]
+		else: raise Exception('invalid imaginary_mode %s'%imaginary_mode)
+		def objective(args,mode='residual',return_spectrum=False,debug=False):
+			"""
+			Fit parameters are defined in sequence for the optimizer.
+			They are: kappa,gamma,vibe,*curvatures-per-dimple.
+			"""
+			if master_mode in ['standard','alt']:
+				if len(args)>3: raise Exception('only send three arguments')
+				#---the first three arguments are always bending rigitidy, surface tension, vibration
+				kappa,gamma,vibe = args[:3]
+				#---CONSTRAINTS are enforced here
+				if positive_vibe: vibe = np.abs(vibe)
+			###
+			### PROTRUSION IS UNDER DEVELOPMENT HERE SEE debug_resurvey in the drilldown
+			###
+			elif master_mode=='comp':
+				kappa,gamma,gamma_p,vibe = args[:4]
+				gamma_p = np.abs(gamma_p)
+				#---! assume no macro tension for now
+				gamma = 0.0
+				if positive_vibe: vibe = np.abs(vibe)
+			elif master_mode=='subtractor':
+				kappa,gamma = args[:2]
+				kappa,gamma = np.abs(kappa),np.abs(gamma)
+			else: raise Exception('invalid master_mode %s'%master_mode)
+
+			#---constructing the elastic Hamiltonian based on the wavevectors
+			if master_mode in ['standard','alt']: 
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma*area*(termlist[0]*q_raw**2))
+			elif master_mode=='comp':
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma_p*area*(termlist[0]*q_raw**2))
+			elif master_mode=='subtractor':
+				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+					+signterm*termlist[2]*q_raw**2+termlist[3])
+					+gamma*area*(termlist[0]*q_raw**2))
+			else: raise Exception('invalid master_mode %s'%master_mode)			
+			if master_mode=='subtractor': hosc = subtractor + 1.0
+			else: hosc = oscillator_function_local(vibe,q_raw)
+			#---note that the band is prepared in advance above
+			if binner_method=='explicit': ratio = hel
+			elif binner_method=='perfect':
+				q_binned,ratio,q_binned_inds = perfect_collapser(q_raw,hel)
+			elif binner_method=='blurry':
+				q_binned,ratio = blurry_binner(q_raw,hel)
+			else: raise Exception('invalid binner_method %s'%binner_method)
+			#----compute residuals with relevant wavevectors (in the band) and return
+			if mode=='residual': 
+				if type(weights)!=type(None): value = residual(weights*hel[band],weights*hosc[band])
+				else: value = residual(hel[band],hosc[band])
+			elif mode=='elastic': value = hel
+			else: raise Exception('invalid residual mode %s'%mode)
+			if debug:
+				print('!!!!!!!!!')
+				import ipdb;ipdb.set_trace()
+			return value
+		return objective
+
+	def objective(args,mode='residual',return_spectrum=False,debug=False):
+		"""
+		Fit parameters are defined in sequence for the optimizer.
+		They are: kappa,gamma,vibe,*curvatures-per-dimple.
+		"""
+		if master_mode in ['standard','alt']:
+			if len(args)>3: raise Exception('only send three arguments')
+			#---the first three arguments are always bending rigitidy, surface tension, vibration
+			kappa,gamma,vibe = args[:3]
+			#---CONSTRAINTS are enforced here
+			if positive_vibe: vibe = np.abs(vibe)
+			#---uniform curvatures are multiplexed here
+			if ndrops_uniform!=0: curvatures = [args[3] for i in range(ndrops_uniform)]
+			#---one curvature per field
+			else: curvatures = args[3:]
+
+		###
+		### PROTRUSION IS UNDER DEVELOPMENT HERE SEE debug_resurvey in the drilldown
+		###
+		elif master_mode=='comp':
+			kappa,gamma,gamma_p,vibe = args[:4]
+			gamma_p = np.abs(gamma_p)
+			#---! assume no macro tension for now
+			gamma = 0.0
+			if positive_vibe: vibe = np.abs(vibe)
+			#---uniform curvatures are multiplexed here
+			if ndrops_uniform!=0: curvatures = [args[4] for i in range(ndrops_uniform)]
+			#---one curvature per field
+			else: curvatures = args[4:]
+		else: raise Exception('invalid master_mode %s'%master_mode)
+		#---generate a composite field from the individual fields
+		composite = curvature_sum_function(cfs,curvatures,method=curvature_sum_method)
+		#---Fourier transform		
+		cqs = fft_function(composite)
+		#---construct the terms in eqn 23
+		termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
+		#---reshape the terms into one-dimensional lists, dropping the zeroth mode
+		termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
+		#---! explain logic behind real/imaginary here
+		if imaginary_mode=='real': termlist = [np.real(k) for k in termlist]
+		elif imaginary_mode=='complex': termlist = [np.abs(k) for k in termlist]
+		else: raise Exception('invalid imaginary_mode %s'%imaginary_mode)
+		#---constructing the elastic Hamiltonian based on the wavevectors
+		if master_mode in ['standard','alt']: 
+			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+		elif master_mode=='comp':
+			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+		elif master_mode=='subtractor':
+			hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
+				+signterm*termlist[2]*q_raw**2+termlist[3])
+				+gamma*area*(termlist[0]*q_raw**2))
+		else: raise Exception('invalid master_mode %s'%master_mode)
+		#---apply the vibration correction
+		if master_mode=='subtractor': hosc = subtractor+1.0
+		else: hosc = oscillator_function_local(vibe,q_raw)
+		#---note that the band is prepared in advance above
+		if binner_method=='explicit': ratio = hel
+		elif binner_method=='perfect':
+			q_binned,ratio,q_binned_inds = perfect_collapser(q_raw,hel)
+		elif binner_method=='blurry':
+			q_binned,ratio = blurry_binner(q_raw,hel)
+		else: raise Exception('invalid binner_method %s'%binner_method)
+		#----compute residuals with relevant wavevectors (in the band) and return
+		if mode=='residual':
+			if type(weights)!=type(None): value = residual(weights*ratio[band],weights*hosc[band])
+			else: value = residual(hel[band],hosc[band])
+		elif mode=='elastic': value = ratio
+		else: raise Exception('invalid residual mode %s'%mode)
+		if debug:
+			print('!!!!!!!!!')
+			import ipdb;ipdb.set_trace()
+		return value
+
+	#---return the decorated function
+	return objective
+
 ###---CONTROLLER
 
 class InvestigateCurvature:
@@ -78,6 +400,8 @@ class InvestigateCurvature:
 		if not self.style: raise Exception('invalid style %s'%self.style)
 		self.data_prot_incoming = kwargs.pop('protein_abstractor',None)
 		if not self.data_prot_incoming: raise Exception('send upstream protein_abstractor data')
+		#---allow the user to send through previous data from the memory to avoid repeating previous steps
+		remember = kwargs.pop('remember',{})
 		if kwargs: raise Exception('unprocessed arguments %s'%kwargs)
 		#---reformat some data if only one simulation. legacy versions of this code analyzed multiple 
 		#---...simulations at once and we retain some of this design for later
@@ -102,18 +426,14 @@ class InvestigateCurvature:
 		#---midplane method is "flat" by default
 		midplane_method = self.design.get('midplane_method','flat')
 		self.memory = self.loader_func(data=dict(undulations=self.data),midplane_method=midplane_method)
+		#---load remembered data into memory. the curvature function may notice this and avoid repetition
+		self.memory.update(**remember)
 		#---the style should be a function in this class
 		if self.do_calculation: self.finding = getattr(self,self.style)()
 
 	def gopher(self,spec,module_name,variable_name):
 		"""Load an external module. Useful for changing the workflow without changing the code."""
-		#---note that this function was folded into the omnicalc codebase in omni/base/tools.py
-		mod = importlib.import_module(spec[module_name])
-		target = mod.__dict__.get(spec[variable_name],None)
-		#---the database design might need work so we always export it
-		mod.work = self.work
-		if not target: raise Exception('add %s and %s to the specs'%(module_name,variable_name))
-		return target
+		return gopher(spec,module_name,variable_name,work=self.work)
 
 	###---OPTIMIZED SOLUTIONS
 
@@ -199,11 +519,9 @@ class InvestigateCurvature:
 			def arange_symmetric(a,b,c):
 				return np.unique(np.concatenate((np.arange(a,b,c),-1*np.arange(a,b,c))))
 			for sn in self.sns:
-
 				###---!!! beware this code might have an indexing problem !!!
-
-				#---nope .. now that you fixed the index error each protein gets its own neighborhood presumably with an indeterminate position
-
+				#---! nope now that you fixed the index error each protein gets its own neighborhood 
+				#---! ...presumably with an indeterminate position
 				#---for each frame we compute the centroid and orientation
 				points_all = self.data_prot[sn]['data']['points_all']
 				cogs = points_all.mean(axis=2).mean(axis=1)[:,:2]
@@ -218,8 +536,10 @@ class InvestigateCurvature:
 				span_x,span_y = np.abs(rot).max(axis=0) + extra_distance
 				ref_grid = np.concatenate(np.transpose(np.meshgrid(
 					arange_symmetric(0,span_x,spacer),arange_symmetric(0,span_y,spacer))))
-				#import matplotlib as mpl;import matplotlib.pyplot as plt;ax = plt.subplot(111);ax.scatter(*average_pts.T);plt.show()
-				#import ipdb;ipdb.set_trace()
+				if False:
+					import matplotlib as mpl;import matplotlib.pyplot as plt;ax = plt.subplot(111);
+					ax.scatter(*average_pts.T);plt.show()
+					import ipdb;ipdb.set_trace()
 				vecs = self.memory[(sn,'vecs')]
 				vecs_mean = np.mean(vecs,axis=0)
 				#---for each frame, map the ref_grid onto the principal axis
@@ -265,10 +585,19 @@ class InvestigateCurvature:
 				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
 				self.memory[(sn,'fields_unity')] = fields_unity
 				if False:
-					import matplotlib as mpl;import matplotlib.pyplot as plt;plt.imshow(fields_unity[0][0].T);plt.show()
+					import matplotlib as mpl;import matplotlib.pyplot as plt;
+					plt.imshow(fields_unity[0][0].T);plt.show()
 					import ipdb;ipdb.set_trace()
 		#---one field per protein, for all proteins
-		elif method=='protein_dynamic_single':
+		elif method in ['protein_dynamic_single','protein_dynamic_single_uniform',
+			#---the catchall represents curvatures saved for both methods for drilldown later
+			'protein_dynamic_single_catchall']:
+			#---precomputed values or subsequent reanalysis precludes the construction of the fields
+			if (set([(self.sns[0],k) for k in ['sampling','fields_unity','drop_gaussians_points']])
+				<=set(self.memory.keys())): 
+				self.nframes = len(self.memory[(self.sns[0],'fields_unity')])
+				self.sampling = self.memory[(self.sns[0],'sampling')]
+				return
 			#---! the following code is very repetitive with the protein subselection method
 			for sn in self.sns:
 				#---points_all is nframes by proteins by beads/atoms by XYZ
@@ -278,34 +607,36 @@ class InvestigateCurvature:
 				ndrops = len(points)
 				#---get data from the memory
 				hqs = self.memory[(sn,'hqs')]
-				self.nframes = len(hqs)
+				if 'nframes' not in pos_spec:
+					sampling = np.arange(0,len(hqs),pos_spec.get('frequency',1))
+				#---nframes gets exactly the right number of frames
+				else: sampling = np.linspace(0,len(hqs)-1,pos_spec['nframes']).astype(int)
 				mn = hqs.shape[1:]
 				vecs = self.memory[(sn,'vecs')]
 				vecs_mean = np.mean(vecs,axis=0)
 				#---formulate the curvature request
 				curvature_request = dict(curvature=1.0,mn=mn,sigma_a=extent,sigma_b=extent,theta=0.0)
 				#---construct unity fields
-				fields_unity = np.zeros((self.nframes,ndrops,mn[0],mn[1]))
+				fields_unity = np.zeros((len(sampling),ndrops,mn[0],mn[1]))
 				reindex,looper = zip(*[((fr,ndrop),
 					dict(vecs=vecs[fr],centers=[points[ndrop][fr]/vecs[fr][:2]],**curvature_request)) 
-					for fr in range(self.nframes) for ndrop in range(ndrops)])
+					for fr in sampling for ndrop in range(ndrops)])
 				status('computing curvature fields for %s'%sn,tag='compute')
 				incoming = basic_compute_loop(make_fields,looper=looper)
 				#---! inelegant
-				for ii,(fr,ndrop) in enumerate(reindex): fields_unity[fr][ndrop] = incoming[ii]
+				sampling_reindex = dict([(key,ii) for ii,key in enumerate(sampling)])
+				for ii,(fr,ndrop) in enumerate(reindex): 
+					fields_unity[sampling_reindex[fr]][ndrop] = incoming[ii]
+				self.memory[(sn,'sampling')] = self.sampling = sampling
 				self.memory[(sn,'fields_unity')] = fields_unity
+				self.nframes = len(sampling)
 		else: raise Exception('invalid selection method')
 
 	def curvature_sum(self,cfs,curvatures,**kwargs):
 		"""
 		Curvature fields are maxed not summed.
 		"""
-		method = kwargs.get('method')
-		if method=='mean':
-			combo = np.array([np.transpose(cfs,(1,0,2,3))[cc]*c 
-				for cc,c in enumerate(curvatures)]).mean(axis=0)
-		else: raise Exception('invalid method %s'%method)
-		return combo
+		return curvature_sum_function(cfs,curvatures,**kwargs)
 
 	def wilderness(self,**kwargs):
 		"""
@@ -321,214 +652,130 @@ class InvestigateCurvature:
 		#---! should this check of the curvature position method is pixel?
 		if extents.get('extent',False)==None and spec['curvature_positions']['method']:
 			extents['extent'] = spec['curvature_positions']['spacer']/2.
+		#---flag for uniform or variable curvatures
+		do_uniform_curvature = spec['curvature_positions']['method']=='protein_dynamic_single_uniform'
 		#---prepare curvature fields
 		if extents_method=='fixed_isotropic': self.drop_gaussians(**spec)
 		elif extents_method=='protein_dynamic': pass
 		else: raise Exception('invalid extents_method %s'%extents_method)
 		#---in the previous version we manually saved the data (and checked if it was already computed here)
 		#---...however this class has been ported directly into omnicalc now
-		#---optimize over simulations
+		#---optimize over simulations, however only one simulation will ever be present in the current code
 		for snum,sn in enumerate(self.sns):
 			status('starting optimization for %s %d/%d'%(sn,snum+1,len(self.sns)),tag='optimize')
+			#---! we could apply a second filter here for the fit, after the filter for the frames
+			#---! ... frameslice = np.arange(0,self.nframes,spec.get(
+			#---! ...     'curvature_positions',{}).get('frequency_fit',1))
+			frameslice = self.sampling
 
 			#---load the source data
-			hqs = self.memory[(sn,'hqs')][:self.nframes]
-			cfs = self.memory[(sn,'fields_unity')][:self.nframes]
-			vecs = self.memory[(sn,'vecs')][:self.nframes]
+			hqs = self.memory[(sn,'hqs')][frameslice]
+			#---previously saved a composite curvature field but this condition was removed in favor of
+			#---...saving the separate curvature fields, even for re-optimization
+			needs_curvature_sum = True
+			if (sn,'fields_unity') in self.memory: 
+				cfs = self.memory[(sn,'fields_unity')]
+			vecs = self.memory[(sn,'vecs')][frameslice]
 			ndrops = cfs.shape[1]
-
+			ndrops_uniform = 0 
+			if do_uniform_curvature: 
+				ndrops_uniform = int(ndrops)
+				ndrops = 1
 			#---formulate the wavevectors
-			lenscale = 1.0
-			m,n = mn = np.shape(hqs)[1:]
 			Lx,Ly = np.mean(vecs,axis=0)[:2]
-			q2d = lenscale*np.array([[np.sqrt(
-				((i-m*(i>m/2))/((Lx)/1.)*2*np.pi)**2+
-				((j-n*(j>n/2))/((Ly)/1.)*2*np.pi)**2)
-				for j in range(0,n)] for i in range(0,m)])
-			q_raw = np.reshape(q2d,-1)[1:]
-			area = (Lx*Ly/lenscale**2)
-
+			q_raw = formulate_wavevectors(lx=Lx,ly=Ly,dims=np.shape(hqs)[1:])['wavevectors']
+			area = Lx * Ly
 			tweak = self.fitting_parameters
-			signterm = tweak.get('inner_sign',-1.0)
+			#---definition of inner sign is hard-coded here. used in one other place (below) which should
+			#---...have the same value. this term is the same sign as height. the optimizer will find the 
+			#---...right sign, so this parameter really only matters for the purposes of interpreting 
+			#---...the curvature
+			signterm = tweak.get('inner_sign',1.0)
 			initial_kappa = tweak.get('initial_kappa',25.0)
 			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
-			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
+			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',2.0))
 			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
-			if residual_form == 'log':
-				def residual(values): 
-					return np.sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
-			elif residual_form == 'linear': 
-				def residual(values): 
-					return np.sum((values-1.0)**2)/float(len(values))
-			else: raise Exception('unclear residual form %s'%residual_form)
+			master_mode = kwargs.get('master_mode','standard')
+			if residual_form!='log': raise Exception('deprecated parameter')
+			binner_method = spec.get('binner','explicit')
+			##### weighting_scheme = spec.get('weighting_scheme','standard')
+			if binner_method=='explicit': q_raw_binned = q_raw
+			elif binner_method=='perfect':
+				q_raw_binned,_,_ = perfect_collapser(q_raw,q_raw)
+			elif binner_method=='blurry':
+				q_raw_binned,_ = blurry_binner(q_raw,q_raw)
+			else: raise Exception('invalid binner_method %s'%binner_method)
+			band = cctools.filter_wavevectors(q_raw_binned,low=lowcut,high=tweak.get('high_cutoff',2.0))
+			residual_function = prepare_residual(mode=master_mode)
+			oscillator_function = prepare_oscillator_function(
+				reverse={'standard':True,'alt':False}[master_mode])
 
-			def multipliers(x,y): 
-				"""Multiplying complex matrices in the list of terms that contribute to the energy."""
-				return x*np.conjugate(y)
+			objective = prepare_objective(
+				master_mode=master_mode,
+				hqs=hqs,curvature_fields=cfs,
+				wavevectors=q_raw,area=area,
+				oscillator_function=oscillator_function,
+				curvature_sum_function=curvature_sum_function,fft_function=cctools.fft_field,
+				band=band,residual_function=residual_function,blurry_binner=blurry_binner,
+				binner_method='explicit',ndrops_uniform=ndrops_uniform)
 
 			def callback(args):
 				"""Watch the optimization."""
 				global Nfeval
 				name_groups = ['kappa','gamma','vibe']+['curve(%d)'%i for i in range(ndrops)]
 				text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
-					for name,val in zip(name_groups,args)+[('error',objective(args))]])
+					for name,val in zip(name_groups,args) ])#[('error',objective(args))]])
 				status('searching! '+text,tag='optimize')
 				Nfeval += 1
 
-			def objective(args,mode='residual'):
-				"""
-				Fit parameters are defined in sequence for the optimizer.
-				They are: kappa,gamma,vibe,*curvatures-per-dimple.
-				"""
-				kappa,gamma,vibe = args[:3]
-				curvatures = args[3:]
-				composite = self.curvature_sum(cfs,curvatures,method=curvature_sum_method)
-				cqs = cctools.fft_field(composite)
-				termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
-				termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
-				#---skipping assertion and dropping imaginary
-				termlist = [np.real(k) for k in termlist]
-				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
-					+signterm*termlist[2]*q_raw**2+termlist[3])
-					+gamma*area*(termlist[0]*q_raw**2))
-				ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
-				if mode=='residual': return residual(ratio[band])
-				elif mode=='ratio': return ratio
-				else: raise Exception('invalid mode %s'%mode)
-
 			Nfeval = 0
-			initial_conditions = [initial_kappa,0.0,0.01]+[0.0 for i in range(ndrops)]
-			test_ans = objective(initial_conditions)
-			if not isinstance(test_ans,np.floating): 
-				raise Exception('objective_residual function must return a scalar')
-			fit = scipy.optimize.minimize(objective,
-				x0=tuple(initial_conditions),method='SLSQP',callback=callback)
-			#---package the result
-			bundle[sn] = dict(fit,success=str(fit.success))
-			solutions['x'] = bundle[sn].pop('x')
-			solutions['jac'] = bundle[sn].pop('jac')
-			solutions['cf'] = np.array(self.curvature_sum(cfs,fit.x[3:],
-				method=curvature_sum_method).mean(axis=0))
-			solutions['cf_first'] = np.array(self.curvature_sum(cfs,fit.x[3:],
-				method=curvature_sum_method)[0])
-			#---save explicit fields
-			if spec.get('store_instantaneous_fields',False):
-				solutions['cfs'] = np.array(self.curvature_sum(cfs,fit.x[3:],method=curvature_sum_method))
+			optimize_method = self.design.get('optimize_method','Nelder-Mead')
+			if optimize_method!='wait':
+				#---either one distinct curvature per field or one curvature for all fields
+				initial_conditions = [initial_kappa,0.0,0.001]+[0.0 for i in range(ndrops)]
+				test_ans = objective(initial_conditions)
+				if not isinstance(test_ans,np.floating): 
+					raise Exception('objective_residual function must return a scalar')
+				fit = scipy.optimize.minimize(objective,
+					x0=tuple(initial_conditions),method=optimize_method,
+					callback=callback)
+				#---package the result
+				bundle[sn] = dict(fit,success=str(fit.success))
+				solutions['x'] = bundle[sn].pop('x')
+				#---duplicate curvatures for uniform fields
+				if ndrops_uniform!=0:
+					solutions['x'] = np.concatenate((solutions['x'][:3],[solutions['x'][3] 
+						for i in range(ndrops_uniform)]))
+				#---cannot save final_simplex to attributes if it is available
+				try: 
+					final_simplex = bundle[sn].pop('final_simplex')
+					solutions['final_simplex_0'] = final_simplex[0]
+					solutions['final_simplex_1'] = final_simplex[1]
+				except: pass
+				#---not all integrators have the jacobean
+				try: solutions['jac'] = bundle[sn].pop('jac')
+				except: pass
+			if needs_curvature_sum and optimize_method!='wait':
+				solutions['cf'] = np.array(self.curvature_sum(cfs,fit.x[3:],
+					method=curvature_sum_method).mean(axis=0))
+				solutions['cf_first'] = np.array(self.curvature_sum(cfs,fit.x[3:],
+					method=curvature_sum_method)[0])
+				#---save explicit fields
+				if spec.get('store_instantaneous_fields',False):
+					solutions['cfs'] = np.array(self.curvature_sum(
+						cfs,fit.x[3:],method=curvature_sum_method))
+			if needs_curvature_sum:
+				if spec.get('store_instantaneous_fields_explicit',False):
+					solutions['fields_unity'] = self.memory[(sn,'fields_unity')]
 			#---we also save the dropped gaussian points here
 			if extents_method=='fixed_isotropic': 
 				solutions['drop_gaussians_points'] = self.memory[(sn,'drop_gaussians_points')]
 			else: raise Exception('invalid extents_method %s'%extents_method)
-			solutions['ratios'] = objective(fit.x,mode='ratio')
+			if optimize_method!='wait': 
+				solutions['ratios'] = objective(fit.x,mode='elastic')
 			solutions['qs'] = q_raw
+			solutions['qs_binned'] = q_raw_binned
+			solutions['sampling'] = self.sampling
 		#---we return contributions to result,attrs for the calculation
-		return dict(result=solutions,attrs=dict(bundle=bundle,spec=spec))
-
-	def protein_dynamic_standard(self,**kwargs):
-		"""
-		Spinoff of the wilderness method which computes extents on the fly and reproduces the protein_dynamic method.
-		"""
-		raise Exception('currently abandoned!!!')
-		bundle,solutions = {},{}
-		global Nfeval
-		spec = self.design
-		extents = spec.get('extents',{})
-		extents_method = extents.get('method')
-		curvature_sum_method = self.design['curvature_sum']
-		#---optimize over simulations
-		for snum,sn in enumerate(self.sns):
-			status('starting optimization for %s %d/%d'%(sn,snum+1,len(self.sns)),tag='optimize')
-
-			#---load the source data
-
-			hqs = self.memory[(sn,'hqs')]
-			self.nframes = len(hqs)
-			### cfs = self.memory[(sn,'fields_unity')][:self.nframes]
-			vecs = self.memory[(sn,'vecs')][:self.nframes]
-			#ndrops = 
-
-			#---formulate the wavevectors
-			lenscale = 1.0
-			m,n = mn = np.shape(hqs)[1:]
-			Lx,Ly = np.mean(vecs,axis=0)[:2]
-			q2d = lenscale*np.array([[np.sqrt(
-				((i-m*(i>m/2))/((Lx)/1.)*2*np.pi)**2+
-				((j-n*(j>n/2))/((Ly)/1.)*2*np.pi)**2)
-				for j in range(0,n)] for i in range(0,m)])
-			q_raw = np.reshape(q2d,-1)[1:]
-			area = (Lx*Ly/lenscale**2)
-
-			tweak = self.fitting_parameters
-			signterm = tweak.get('inner_sign',-1.0)
-			initial_kappa = tweak.get('initial_kappa',25.0)
-			lowcut = kwargs.get('lowcut',tweak.get('low_cutoff',0.0))
-			band = cctools.filter_wavevectors(q_raw,low=lowcut,high=tweak.get('high_cutoff',1.0))
-			residual_form = kwargs.get('residual_form',tweak.get('residual_form','log'))
-			if residual_form == 'log':
-				def residual(values): 
-					return np.sum(np.log10(values.clip(min=machine_eps))**2)/float(len(values))
-			elif residual_form == 'linear': 
-				def residual(values): 
-					return np.sum((values-1.0)**2)/float(len(values))
-			else: raise Exception('unclear residual form %s'%residual_form)
-
-			def multipliers(x,y): 
-				"""Multiplying complex matrices in the list of terms that contribute to the energy."""
-				return x*np.conjugate(y)
-
-			def callback(args):
-				"""Watch the optimization."""
-				global Nfeval
-				name_groups = ['kappa','gamma','vibe']+['curve(%d)'%i for i in range(ndrops)]
-				text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
-					for name,val in zip(name_groups,args)+[('error',objective(args))]])
-				status('searching! '+text,tag='optimize')
-				Nfeval += 1
-
-			def objective(args,mode='residual'):
-				"""
-				Fit parameters are defined in sequence for the optimizer.
-				They are: kappa,gamma,vibe,*curvatures-per-dimple.
-				"""
-				kappa,gamma,vibe = args[:3]
-				curvatures = args[3:]
-				composite = self.curvature_sum(cfs,curvatures,method=curvature_sum_method)
-				cqs = cctools.fft_field(composite)
-				termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
-				termlist = [np.reshape(np.mean(k,axis=0),-1)[1:] for k in termlist]
-				#---skipping assertion and dropping imaginary
-				termlist = [np.real(k) for k in termlist]
-				hel = (kappa/2.0*area*(termlist[0]*q_raw**4+signterm*termlist[1]*q_raw**2
-					+signterm*termlist[2]*q_raw**2+termlist[3])
-					+gamma*area*(termlist[0]*q_raw**2))
-				ratio = hel/((vibe*q_raw+machine_eps)/(np.exp(vibe*q_raw)-1)+machine_eps)
-				if mode=='residual': return residual(ratio[band])
-				elif mode=='ratio': return ratio
-				else: raise Exception('invalid mode %s'%mode)
-
-			Nfeval = 0
-			#---initial extent is one, and extents follow curvatures
-			initial_conditions = [initial_kappa,0.0,0.01]+[]+[0.0 for i in range(ndrops)]
-			test_ans = objective(initial_conditions)
-			if not isinstance(test_ans,np.floating): 
-				raise Exception('objective_residual function must return a scalar')
-			fit = scipy.optimize.minimize(objective,
-				x0=tuple(initial_conditions),method='SLSQP',callback=callback)
-			#---package the result
-			bundle[sn] = dict(fit,success=str(fit.success))
-			solutions['x'] = bundle[sn].pop('x')
-			solutions['jac'] = bundle[sn].pop('jac')
-			solutions['cf'] = np.array(self.curvature_sum(cfs,fit.x[3:],
-				method=curvature_sum_method).mean(axis=0))
-			solutions['cf_first'] = np.array(self.curvature_sum(cfs,fit.x[3:],
-				method=curvature_sum_method)[0])
-			#---save explicit fields
-			if spec.get('store_instantaneous_fields',False):
-				solutions['cfs'] = np.array(self.curvature_sum(cfs,fit.x[3:],method=curvature_sum_method))
-			#---we also save the dropped gaussian points here
-			if extents_method=='fixed_isotropic': 
-				solutions['drop_gaussians_points'] = self.memory[(sn,'drop_gaussians_points')]
-			else: raise Exception('invalid extents_method %s'%extents_method)
-			solutions['ratios'] = objective(fit.x,mode='ratio')
-			solutions['qs'] = q_raw
-		#---we return contributions to result,attrs for the calculation
+		#---! bundle is indexed by sn but solutions is not. this is an awkward mixture of bookkeeping
 		return dict(result=solutions,attrs=dict(bundle=bundle,spec=spec))

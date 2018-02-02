@@ -2,6 +2,7 @@
 
 """
 CURVATURE-UNDULATION COUPLING (version 3)
+!!! Currently abandoned for version 3b!!!
 """
 
 import copy,importlib,time,os,re

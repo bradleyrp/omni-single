@@ -111,6 +111,7 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 				favor_rows=horizontal,**square_tiles_args)
 			#---several plots use the same data
 			vecs = postdat[sn]['vecs']
+			if len(vecs.shape)==2: vecs = vecs.mean(axis=0)
 			griddims = datas[tag][sn]['cf'].shape
 			#---shared variables for several plots
 			cmax = np.abs(datas[tag][sn]['cf']).max()
@@ -143,14 +144,21 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 				surf -= surf.mean()
 				hmax = np.abs(surf).max()
 				ax = axes[viewnames.index('average_height')]
-				im = ax.imshow(surf.T,origin='lower',
+				try: im = ax.imshow(surf.T,origin='lower',
 					interpolation='nearest',cmap=mpl.cm.__dict__['RdBu_r'],
 					extent=[0,vecs[0],0,vecs[1]],vmax=hmax,vmin=-1*hmax)
-				try: mean_prot_pts = postdat[sn]['points_protein_mean'][:,:2]
-				except: mean_prot_pts = data[protein_abstractor_name][sn][
-					'data']['points'].mean(axis=0)[:,:2]
-				plothull(ax,[mean_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
-				# data[protein_abstractor_name][sn]['data']['points_all'].mean(axis=0)[...,:2]
+				except:
+					import ipdb;ipdb.set_trace()
+				try: 
+					mean_prot_pts = [postdat[sn]['points_protein_mean'][:,:2]]
+				except:
+					try:
+						mean_prot_pts = data[protein_abstractor_name][
+							sn]['data']['points_all'].mean(axis=0)[...,:2]
+					except: 
+						mean_prot_pts = [data[protein_abstractor_name][sn][
+							'data']['points'].mean(axis=0)[:,:2]]
+				plothull(ax,mean_prot_pts,griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
 				ax.set_title('height profile')
 				ax.set_xlabel('x (nm)')
 				ax.set_ylabel('y (nm)')
@@ -170,6 +178,22 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 				mean_trial = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)[example_frame]
 				ax.scatter(*mean_trial.T,s=1,c='k')
 				ax.set_title('curvature field',fontsize=10)
+			#---PLOT example curvature without the dots for the trial functions, including the protein hull
+			if 'example_field_no_neighborhood' in viewnames:
+				ax = axes[viewnames.index('example_field_no_neighborhood')]
+				example_frame = 0
+				cf_first = datas[tag][sn]['cf_first']
+				im = ax.imshow(cf_first.T,origin='lower',interpolation='nearest',
+					vmax=cmax,vmin=-1*cmax,cmap=mpl.cm.__dict__[cmap_name],extent=[0,vecs[0],0,vecs[1]])
+				add_colorbar(ax,im,title=r'$\mathrm{C_0\,({nm}^{-1})}$')
+				ax.set_xlim((0,vecs[0]))
+				ax.set_ylim((0,vecs[1]))
+				ax.set_xlabel('x (nm)')
+				ax.set_ylabel('y (nm)')
+				mean_trial = datas[tag][sn]['drop_gaussians_points'].transpose(1,0,2)[example_frame]
+				ax.set_title('curvature field',fontsize=10)
+				ex_prot_pts = data[protein_abstractor_name][sn]['data']['points'][example_frame][:,:2]
+				plothull(ax,[ex_prot_pts],griddims=datas[tag][sn]['cf'].shape,vecs=vecs,c='k',lw=0)
 			#---PLOT periodic view of the example field
 			if 'example_field_pbc' in viewnames:
 				ax = axes[viewnames.index('example_field_pbc')]
@@ -199,12 +223,14 @@ def individual_reviews_plotter(viewnames,out_fn,seep=None,figsize=(10,10),
 			#---PLOT spectrum
 			if 'spectrum' in viewnames:
 				ax = axes[viewnames.index('spectrum')]
-				ax.scatter(datas[tag][sn]['qs'],datas[tag][sn]['ratios'],s=4,c='k',alpha=0.25)
+				if len(datas[tag][sn]['qs_binned'])==len(datas[tag][sn]['ratios']): 
+					qs = datas[tag][sn]['qs_binned']
+				else: datas[tag][sn]['qs']
+				ax.scatter(qs,datas[tag][sn]['ratios'],s=4,c='k',alpha=0.25)
 				#---! high cutoff is hard-coded here but needs to be removed to the yaml
 				#---! ...we need to get the default
-				qs = datas[tag][sn]['qs']
 				band = qs<=hicut
-				ax.scatter(datas[tag][sn]['qs'][band],datas[tag][sn]['ratios'][band],s=10,c='k',alpha=1.0)
+				ax.scatter(qs[band],datas[tag][sn]['ratios'][band],s=10,c='k',alpha=1.0)
 				ax.axhline(1.0,c='k')
 				ax.set_xscale('log')
 				ax.set_yscale('log')
