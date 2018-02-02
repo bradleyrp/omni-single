@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-...
+Plot probabilities of adjacent lipids on the mesh.
 """
 
 import scipy
@@ -10,36 +10,16 @@ import scipy.interpolate
 import itertools,time
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import brewer2mpl
-
-#---settings
-#---we must declare variables here. this should match the top of the reload function
-variables = 'sns,collect'.split(',')
-
 from codes.looptools import basic_compute_loop
 
-###---STANDARD
-
-#---declare standard variables
-required_variables = 'printers,routine'.split(',')
-for v in variables+required_variables:
-	if v not in globals(): globals()[v] = None
-
-def register_printer(func):
-	"""Add decorated functions to a list of "printers" which are the default routine."""
-	#---! note that you cannot add the decorator without restarting
-	global printers
-	if printers is None: printers = []
-	printers.append(func.__name__)
-	return func
-
-###---PLOTS
+### STANDARD
 
 def get_upstream_mesh_partners(abstractor_key):
 	"""Filter the upstream sweep for presence/absence of cholesterol."""
 	data = dict()
 	for sn in sns:
 		keys = [k for k in collect['calcs'] if 
-			#---! extremely verbose!
+			#! extremely verbose!
 			collect['calcs'][k][sn]['calcs']['specs']['upstream'][
 				'lipid_mesh']['upstream']['lipid_abstractor']['selector']==abstractor_key]
 		if len(keys)!=1: raise Exception('failed to find a unique mesh for this request')
@@ -91,13 +71,12 @@ def prep_postdat(nn,sns,abstractor='lipid_com'):
 	postdat['combos'] = postdat[sns[0]]['combos']
 	return postdat
 
-@register_printer
+@autoplot(plotrun)
 def plot_partners():
 	"""Create several plots of the partner data."""
-	#---alternate layouts
 	specs = {
 		'summary':{
-			'sns':work.specs['collections']['position'],
+			'sns':work.metadata.collections['position'],
 			'extras':{'special':True,'summary':True,'legend_below':True},
 			'specs':{
 				0:dict(nn=3,abstractor='lipid_com',combos=[['Ptdins','Ptdins','Ptdins']]),
@@ -106,7 +85,7 @@ def plot_partners():
 				layout={'out':{'grid':[1,1]},'ins':[{'grid':[1,2],
 				'wratios':[1,6],'wspace':0.1},]}),},
 		'comprehensive_core':{
-			'sns':work.specs['collections']['position'],
+			'sns':work.metadata.collections['position'],
 			'extras':{'small_labels_ax3':True,'all_y_labels':True,'legend_everywhere':True},
 			'specs':{
 				0:dict(nn=2,abstractor='lipid_com'),
@@ -117,7 +96,7 @@ def plot_partners():
 				layout={'out':{'grid':[1,1]},
 				'ins':[{'grid':[4,1],'wspace':0.1} for i in range(1)]}),},
 		'comprehensive_core_wide':{
-			'sns':work.specs['collections']['position'],
+			'sns':work.metadata.collections['position'],
 			'extras':{'four_plots':True},
 			'specs':{
 				0:dict(nn=2,abstractor='lipid_com'),
@@ -129,7 +108,7 @@ def plot_partners():
 				'ins':[{'grid':[2,1]} for i in range(2)]}),},
 		'comprehensive':{
 			#---! what's wrong with v536 has only POPC-POPC
-			'sns':[i for i in work.specs['collections']['asymmetric_all'] if i!='membrane-v536'],
+			'sns':[i for i in work.metadata.collections['asymmetric_all'] if i!='membrane-v536'],
 			'extras':{'small_labels_ax3':True,'error_bars':False,
 				'all_y_labels':True,'legend_everywhere':True},
 			'specs':{
@@ -159,7 +138,7 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		max_y,min_y = 0,10
 		combo_spacer,half_width = 0.5,0.5
 		for snum,sn in enumerate(sns_reorder):
-			#---already ensured each simulation has the same combinations
+			# already ensured each simulation has the same combinations
 			for cnum,combo in enumerate(combos):
 				xpos = (cnum)*len(sns)+snum+cnum*combo_spacer
 				ypos = postdat[sn]['ratios'][cnum]-baseline
@@ -186,7 +165,7 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		if extras.get('small_labels_ax3',False) and axnum==3: labelsize = 10
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on',labelsize=14)
 		ax.tick_params(axis='x',which='both',top='off',bottom='off',labeltop='on',labelsize=labelsize)
-		#---! ax.set_ylim((min_y*0.9,max_y*1.1))
+		#! ax.set_ylim((min_y*0.9,max_y*1.1))
 		if axnum==len(axes)-1 or extras.get('legend_everywhere',False):
 			bar_formats = make_bar_formats(sns_reorder,work=work)
 			comparison_spec = dict(ptdins_names=list(set([work.meta[sn]['ptdins_resname'] for sn in sns])),
@@ -197,9 +176,9 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 			legend,patches = legend_maker_stylized(ax,work=work,
 				sns_this=sns_reorder,bar_formats=bar_formats,comparison_spec=comparison_spec,
 				**kwargs)
-	#---make the unity line even between subplots (used algrebra in real life here)
-	#---...decided to shift down the right axis y plot since it has a smaller range, to make things even
-	#---! note that this is not perfect but we should just pick our battles
+	# make the unity line even between subplots (used algrebra in real life here)
+	# ... decided to shift down the right axis y plot since it has a smaller range, to make things even
+	#! note that this is not perfect but we should just pick our battles
 	if extras.get('special',False):
 		spread_prop = np.array([[i for i in ax.get_ylim()] for ax in axes[:2]])
 		s0,s1,s2,s3 = spread_prop.reshape(-1)
@@ -210,33 +189,17 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		axes[1].set_ylabel('observations relative to chance',fontsize=16)
 	if extras.get('all_y_labels',False):
 		for ax in axes: ax.set_ylabel('observations relative to chance',fontsize=16)
-	picturesave('fig.lipid_mesh_partners.%s'%figname,work.plotdir,backup=False,version=True,meta={},extras=[legend],
-		form='pdf')
+	picturesave('fig.lipid_mesh_partners.%s'%figname,work.plotdir,
+		backup=False,version=True,meta={},extras=[legend],form='pdf')
 
-def reload():
+@autoload(plotrun)
+def load():
 	"""Load everything for the plot only once."""
-	#---canonical globals list is loaded systematically 
-	#---...but you have to load it into globals manually below
-	global variables
-	for v in variables: exec('global %s'%v)
-	#---custom reload sequence goes here
-	#---instead of plotload we do a sweep
-	globals()['collect'] = work.collect_upstream_calculations_over_loop('lipid_mesh_partners')
-	globals()['sns'] = work.sns()
+	#! previously: collect = work.collect_upstream_calculations_over_loop('lipid_mesh_partners')
+	collect = work.plotload('lipid_mesh_partners')
+	sns = work.sns()
 
-###---STANDARD
+plotrun.routine = []
 
-def printer():
-	"""Load once per plot session."""
-	global variables,routine,printers
-	#---reload if not all of the globals in the variables
-	if any([v not in globals() or globals()[v] is None for v in variables]): reload()
-	#---after loading we run the printers
-	printers = list(set(printers if printers else []))
-	if routine is None: routine = list(printers)	
-	#---routine items are function names
-	for key in routine: 
-		status('running routine %s'%key,tag='printer')
-		globals()[key]()
-
-if __name__=='__main__': printer()
+if __name__=='__main__':
+	pass
