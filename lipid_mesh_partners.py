@@ -10,19 +10,24 @@ from base.tools import status
 from codes.looptools import basic_compute_loop
 
 """
+Analyze the triples and pairs on the lipid mesh.
 """
 
 i2s = lambda mn,fr,key : '%d.%d.%s'%(mn,fr,key)
 
-def counter(mn,fr,nn,random=False):
+def counter(mn,fr,nn,simplices=None,random=False):
 	"""..."""
 	global dat,results,rxmlook
 	reslist = results['reslist']
-	simplices = dat[i2s(mn,fr,'simplices')]
-	gids = dat[i2s(mn,fr,'ghost_ids')]
+	if type(simplices)==type(None): 
+		simplices = dat[i2s(mn,fr,'simplices')]
+		gids = dat[i2s(mn,fr,'ghost_ids')]
+		simplices_gids = gid[simplices]
+	# allow the calling function to supply the ghost-indexed simplices directly
+	else: simplices_gids = simplices
 	if nn==2:
 		links = np.array(list(set([tuple(np.sort(j)) for j in 
-			np.concatenate([np.transpose((gids[simplices][:,i],gids[simplices][:,(i+1)%3])) 
+			np.concatenate([np.transpose((simplices_gids[:,i],simplices_gids[:,(i+1)%3])) 
 			for i in range(3)])])))
 		#---uniquely identify each link type
 		if not random:
@@ -42,7 +47,7 @@ def counter(mn,fr,nn,random=False):
 		counts = dict(scipy.stats.itemfreq(links_type_str))
 	elif nn==3:
 		#---identify each triple type
-		triples = gids[simplices]
+		triples = simplices_gids
 		triple_type = np.transpose([np.sum(rxmlook[mn][triples]==i,axis=1) for i in range(len(reslist))])
 		if not random:
 			triple_type_str = [''.join(['%s'%s for s in i]) for i in triple_type]
@@ -81,7 +86,6 @@ def lipid_mesh_partners(**kwargs):
 	lipids = np.array(list(resnames[np.sort(np.unique(resnames,return_index=True)[1])]))
 	reslist = list(np.array(resnames)[np.sort(np.unique(resnames,return_index=True)[1])])
 	results['reslist'] = reslist
-
 	#---collect statistics for pairs and triples
 	for nn in [2,3]:
 		combos = np.array([''.join(j) for j in 
@@ -127,7 +131,6 @@ def lipid_mesh_partners(**kwargs):
 				counts_trials[nn].append(
 					np.concatenate(incoming).reshape((2,nframes,len(results['combonames_%d'%nn]))))
 	if do_randomize: counts_random = dict([(nn,np.concatenate([counts_trials[nn]])) for nn in [2,3]])
-
 	#---pack
 	for nn in [2,3]:
 		if do_randomize: results['counts_random_%d'%nn] = np.array(counts_random[nn])
