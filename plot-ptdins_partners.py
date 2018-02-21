@@ -115,6 +115,7 @@ def plot_partners_ptdins():
 				'ins':[{'grid':[2,1]} for i in range(2)]}),},
 		'comprehensive':{
 			#---! what's wrong with v536 has only POPC-POPC
+			#! just a guess since I noticed this: wrong monolayer index! almost certainly!
 			'sns':[i for i in work.metadata.collections['asymmetric_all'] if i!='membrane-v536'],
 			'extras':{'small_labels_ax3':True,'error_bars':False,
 				'all_y_labels':True,'legend_everywhere':True},
@@ -126,6 +127,17 @@ def plot_partners_ptdins():
 			'panelspec':dict(figsize=(18,30),
 				layout={'out':{'grid':[1,1]},
 				'ins':[{'grid':[4,1],'wspace':0.1} for i in range(1)]}),},}
+	if False: specs = {
+		'comprehensive_symmetric':{
+			'sns':work.metadata.collections['symmetric_all'],
+			'extras':{'small_labels_ax3':True,'error_bars':False,
+				'all_y_labels':True,'legend_everywhere':True},
+			'specs':{
+				0:dict(nn=2,abstractor='lipid_com'),
+				1:dict(nn=3,abstractor='lipid_com'),},
+			'panelspec':dict(figsize=(18,16),
+				layout={'out':{'grid':[1,1]},
+				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},}
 	for figname,spec in specs.items(): 
 		plot_partners_basic(figname=figname,**spec)
 
@@ -259,11 +271,11 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on',labelsize=14)
 		ax.tick_params(axis='x',which='both',top='off',bottom='off',labeltop='on',labelsize=labelsize)
 		#! ax.set_ylim((min_y*0.9,max_y*1.1))
-		if (axnum==len(axes)-1 or extras.get('legend_everywhere',False) 
+		if ((axnum==len(axes)-1 or extras.get('legend_everywhere',False)) 
 			and extras.get('legend_scheme',False) in ['actinlink_nochol','actinlink']):
 			#! custom actinlink legends
 			legendspec = []
-			if extras['legend_scheme']=='actinlink_nochol': 
+			if extras.get('legend_scheme','')=='actinlink_nochol': 
 				match_list = [replicate_mapping[i] for i in [0,2,3]]
 			else: match_list = replicate_mapping
 			for sn,matches in match_list:

@@ -22,7 +22,7 @@ def counter(mn,fr,nn,simplices=None,random=False):
 	if type(simplices)==type(None): 
 		simplices = dat[i2s(mn,fr,'simplices')]
 		gids = dat[i2s(mn,fr,'ghost_ids')]
-		simplices_gids = gid[simplices]
+		simplices_gids = gids[simplices]
 	# allow the calling function to supply the ghost-indexed simplices directly
 	else: simplices_gids = simplices
 	if nn==2:
