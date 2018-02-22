@@ -14,7 +14,9 @@ _art_words = ['colorize','barmaker']
 _art_words += ['uniquify','catalog','delve','delveset','delveset_list',
 	'BarGrouper','barspecs_stylized','colorscale',
 	'make_bar_formats','legend_maker_stylized','sidestack_images','get_blank_border',
-	'ptdins_manuscript_settings']
+	'ptdins_manuscript_settings','residue_codes']
+#! extras for actinlink
+_art_words += ['actinlink_monolayer_indexer']
 
 #---canonical colors for this project from brewer2mpl
 import brewer2mpl
@@ -580,3 +582,19 @@ def ptdins_manuscript_settings():
 	colors_ions = {'NA':'green','Na,Cal':'bluegreen','MG':'pink','Cal':'blue','K':'grey',}
 	hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':''}
 	return dict(colors_ions=colors_ions,colors=colors,hatches_lipids=hatches_lipids)
+
+residue_codes = {'ARG':'R','HIS':'H','LYS':'K','ASP':'D','GLU':'E',
+	'SER':'S','THR':'T','ASN':'N','GLN':'Q','CYS':'C','SEL':'U','GLY':'G','PRO':'P',
+	'ALA':'A','ILE':'I','LEU':'L','MET':'M','PHE':'F','TRP':'W','TYR':'Y','VAL':'V'}
+
+#! actinlink settings
+
+def actinlink_monolayer_indexer(sn,abstractor):
+	if abstractor=='lipid_chol_com':
+		if sn in ['mdia2bilayer10_2','mdia2bilayer30_2']: return 1
+		else: return 0
+	elif abstractor=='lipid_com':
+		if sn in ['mdia2bilayerphys2','mdia2bilayer30_2']: return 1
+		else: return 0
+	else: raise Exception
+

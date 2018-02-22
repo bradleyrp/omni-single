@@ -16,8 +16,6 @@ def protein_rmsd(grofile,trajfile,**kwargs):
 	work = kwargs['workspace']
 	
 	#---prepare universe	
-	slice_name = kwargs['slice_name']
-	group = kwargs['group']
 	uni = MDAnalysis.Universe(grofile,trajfile)
 	nframes = len(uni.trajectory)
 	protein = uni.select_atoms('protein and name CA')

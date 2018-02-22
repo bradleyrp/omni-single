@@ -4,7 +4,15 @@
 Successor to plot-actinlink_bonds.py.
 """
 
-import time,copy,collections
+# choose routines
+plotrun.routine = [
+	'master_bond_distribution_plotter',
+	'snapshots',
+	'bound_lipids_summary',
+	'mesh_lamplight',
+	][-1:]
+
+import time,copy,collections,glob
 from joblib import Parallel,delayed
 from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper,dictsum
@@ -12,76 +20,86 @@ from base.compute_loop import basic_compute_loop
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import brewer2mpl
 
-# SETTINGS
-#! note cannot put these in main because functions called by the loader might need them
-residue_types = {'ARG':'basic','HIS':'basic','LYS':'basic',
-	'ASP':'acidic','GLU':'acidic','SER':'polar','THR':'polar','ASN':'polar','GLN':'polar',
-	'ALA':'hydrophobic','VAL':'hydrophobic','ILE':'hydrophobic','LEU':'hydrophobic',
-		'MET':'hydrophobic','PHE':'hydrophobic','TYR':'hydrophobic','TRP':'hydrophobic',
-	'CYS':'special','SEC':'special','GLY':'special','PRO':'special'}
-residue_codes = {'ARG':'R','HIS':'H','LYS':'K','ASP':'D','GLU':'E',
-	'SER':'S','THR':'T','ASN':'N','GLN':'Q','CYS':'C','SEL':'U','GLY':'G','PRO':'P',
-	'ALA':'A','ILE':'I','LEU':'L','MET':'M','PHE':'F','TRP':'W','TYR':'Y','VAL':'V'}
-residue_codes_reverse = dict([(j,i) for i,j in residue_codes.items()])
-residue_type_colors = {'basic':'Blues','acidic':'Reds','hydrophobic':'Greens',
-	'polar':'Purples','special':'Oranges'}
-residue_colors = dict([(name,residue_type_colors[residue_types[name]]) for name in residue_types])
-ticks_font = mpl.font_manager.FontProperties(family='Latin Modern Mono',style='normal',
-	size=14,weight='normal',stretch='normal')
-#! hardcoded replicate mapping for reducing simulations into one
-replicate_mapping = [('pip2_20_no_chol',['mdia2bilayer_nochl2','mdia2bilayer_nochl3']),
-	('pip2_10',['mdia2bilayer10','mdia2bilayer10_2']),
-	('pip2_20',['mdia2bilayerphys','mdia2bilayerphys2']),
-	('pip2_30',['mdia2bilayer30','mdia2bilayer30_2'])]
-# augment the metadata with better labels
-extra_labels = {
-	'pip2_20_no_chol':r'mDia2, 20% $PIP_2$, no CHOL ($\times2$)',
-	'pip2_20':r'mDia2, 20% $PIP_2$ ($\times2$)',
-	'pip2_30':r'mDia2, 30% $PIP_2$ ($\times2$)',
-	'pip2_10':r'mDia2, 10% $PIP_2$ ($\times2$)',}
-extra_labels_short = {
-	'pip2_20_no_chol':r'mDia2, 20% $PIP_2$'+'\n'+r'no CHOL ($\times2$)',
-	'pip2_20':r'mDia2'+'\n'+r'20% $PIP_2$ ($\times2$)',
-	'pip2_30':r'mDia2'+'\n'+r'30% $PIP_2$ ($\times2$)',
-	'pip2_10':r'mDia2'+'\n'+r'10% $PIP_2$ ($\times2$)',}
-for key,val in extra_labels.items(): 
-	work.metadata.meta[key] = dict(label=val)
-for key,val in extra_labels_short.items(): 
-	work.metadata.meta[key]['label_compact'] = val
-def color_by_simulation(sn):
-	# tetradic colors via https://www.sessions.edu/color-calculator/
-	colors = ['#ff6c28','#28c6ff','#a928ff','#ffd828']
-	# tetradic colors via http://paletton.com/#uid=7030Z0kqbujggFvlnx6qcY+wDkl
-	colors = ['#f2b52c','#22b93c','#2e47a4','#f23a2c']
-	refs = ['^mdia2bilayer_nochl','^mdia2bilayer(?!(_nochl|[0-9]))','^mdia2bilayer10','^mdia2bilayer30']
-	ref_to_color = dict(zip(refs,colors))
-	matches = [color for ref,color in ref_to_color.items() if re.match(ref,sn)]
-	if len(matches)>1: raise Exception
-	elif len(matches)==0:
-		#! handling combos here with a minor hack see global replicate_mapping
-		return dict(zip(zip(*replicate_mapping)[0],colors))[sn]
-	else: return matches[0]
-# define salt bridges
-valid_salt_bridges = [
-	{'resname':'ARG','atoms':['NH1','NH2']},
-	{'resname':'LYS','atoms':['NZ']},
-	{'resname':'HIS','atoms':['ND1','NE2']},]
-# special subselections
-special_protein_parts = {'nwaspbilayernochl':np.arange(0,22+1).astype(int)}
-rowspec = ['subject_resname','subject_resid','subject_atom',
-	'target_resname','target_resid','target_atom']
-# common colors
-colors = {'DOPC':'blue','DOPS':'red','POP2':'magenta','PI2P':'magenta',
-	'all lipids':'black','DOPE':'blue'}
-colors = {'DOPE':'#808080','DOPS':'#000080','PI2P':'#FF0000','CHL1':'#181818','POPC':'#33cc33'}
-lipid_label = lambda x: dict([(i,r'$\mathrm{{PIP}_{2}}$') 
-	for i in work.vars.get('selectors',{}).get('resnames_PIP2',{})]).get(x,x)
-sn_title = lambda sn,which='label': work.meta.get(sn,{}).get(which,re.sub('_','-',sn))
-#! hardcoding lipid types here
-lipid_types_ref = ['PI2P','DOPS','DOPE','CHL1','POPC']
-
 @autoload(plotrun)
 def load():
+
+	### SETTINGS
+	residue_types = {'ARG':'basic','HIS':'basic','LYS':'basic',
+		'ASP':'acidic','GLU':'acidic','SER':'polar','THR':'polar','ASN':'polar','GLN':'polar',
+		'ALA':'hydrophobic','VAL':'hydrophobic','ILE':'hydrophobic','LEU':'hydrophobic',
+			'MET':'hydrophobic','PHE':'hydrophobic','TYR':'hydrophobic','TRP':'hydrophobic',
+		'CYS':'special','SEC':'special','GLY':'special','PRO':'special'}
+	residue_codes = {'ARG':'R','HIS':'H','LYS':'K','ASP':'D','GLU':'E',
+		'SER':'S','THR':'T','ASN':'N','GLN':'Q','CYS':'C','SEL':'U','GLY':'G','PRO':'P',
+		'ALA':'A','ILE':'I','LEU':'L','MET':'M','PHE':'F','TRP':'W','TYR':'Y','VAL':'V'}
+	residue_codes_reverse = dict([(j,i) for i,j in residue_codes.items()])
+	residue_type_colors = {'basic':'Blues','acidic':'Reds','hydrophobic':'Greens',
+		'polar':'Purples','special':'Oranges'}
+	residue_colors = dict([(name,residue_type_colors[residue_types[name]]) for name in residue_types])
+	ticks_font = mpl.font_manager.FontProperties(family='Latin Modern Mono',style='normal',
+		size=14,weight='normal',stretch='normal')
+	#! hardcoded replicate mapping for reducing simulations into one
+	replicate_mapping = [('pip2_20_no_chol',['mdia2bilayer_nochl2','mdia2bilayer_nochl3']),
+		('pip2_10',['mdia2bilayer10','mdia2bilayer10_2']),
+		('pip2_20',['mdia2bilayerphys','mdia2bilayerphys2']),
+		('pip2_30',['mdia2bilayer30','mdia2bilayer30_2'])]
+	# augment the metadata with better labels
+	extra_labels = {
+		'pip2_20_no_chol':r'mDia2, 20% $PIP_2$, no CHOL ($\times2$)',
+		'pip2_20':r'mDia2, 20% $PIP_2$ ($\times2$)',
+		'pip2_30':r'mDia2, 30% $PIP_2$ ($\times2$)',
+		'pip2_10':r'mDia2, 10% $PIP_2$ ($\times2$)',}
+	extra_labels_short = {
+		'pip2_20_no_chol':r'mDia2, 20% $PIP_2$'+'\n'+r'no CHOL ($\times2$)',
+		'pip2_20':r'mDia2'+'\n'+r'20% $PIP_2$ ($\times2$)',
+		'pip2_30':r'mDia2'+'\n'+r'30% $PIP_2$ ($\times2$)',
+		'pip2_10':r'mDia2'+'\n'+r'10% $PIP_2$ ($\times2$)',}
+	for key,val in extra_labels.items(): 
+		work.metadata.meta[key] = dict(label=val)
+	for key,val in extra_labels_short.items(): 
+		work.metadata.meta[key]['label_compact'] = val
+	def color_by_simulation(sn):
+		#! move to art? this is used elsewhere, in plot-ptdins_partners.py
+		# tetradic colors via https://www.sessions.edu/color-calculator/
+		colors = ['#ff6c28','#28c6ff','#a928ff','#ffd828']
+		# tetradic colors via http://paletton.com/#uid=7030Z0kqbujggFvlnx6qcY+wDkl
+		colors = ['#f2b52c','#22b93c','#2e47a4','#f23a2c']
+		refs = ['^mdia2bilayer_nochl','^mdia2bilayer(?!(_nochl|[0-9]))','^mdia2bilayer10','^mdia2bilayer30']
+		ref_to_color = dict(zip(refs,colors))
+		matches = [color for ref,color in ref_to_color.items() if re.match(ref,sn)]
+		if len(matches)>1: raise Exception
+		elif len(matches)==0:
+			#! handling combos here with a minor hack see global replicate_mapping
+			return dict(zip(zip(*replicate_mapping)[0],colors))[sn]
+		else: return matches[0]
+	# define salt bridges
+	valid_salt_bridges = [
+		{'resname':'ARG','atoms':['NH1','NH2']},
+		{'resname':'LYS','atoms':['NZ']},
+		{'resname':'HIS','atoms':['ND1','NE2']},]
+	# special subselections
+	special_protein_parts = {'nwaspbilayernochl':np.arange(0,22+1).astype(int)}
+	rowspec = ['subject_resname','subject_resid','subject_atom',
+		'target_resname','target_resid','target_atom']
+	# common colors
+	colors = {'DOPC':'blue','DOPS':'red','POP2':'magenta','PI2P':'magenta',
+		'all lipids':'black','DOPE':'blue'}
+	colors = {'DOPE':'#808080','DOPS':'#000080','PI2P':'#FF0000','CHL1':'#181818','POPC':'#33cc33'}
+	colors = {'DOPE':'#808080','DOPS':'#000080','PI2P':'#FF0000','CHL1':'#181818','POPC':'#33cc33'}
+	#! redefining colors between v2 and v3 because too much red from DOPS, so changed to green3
+	lipid_colors = {'ptdins':'purple','PI2P':'purple','SAPI':'purple',
+		'P35P':'purple','CHL1':'gray','DOPS':'green3','DOPE':'blue2'}
+	# redefined colors for v4 to make the cholesterol pop out more
+	lipid_colors = {'ptdins':'purple','PI2P':'purple','SAPI':'purple',
+		'P35P':'purple','CHL1':'orange','DOPS':'green3','DOPE':'blue2'}
+	lipid_label = lambda x: dict([(i,r'$\mathrm{{PIP}_{2}}$') 
+		for i in work.vars.get('selectors',{}).get('resnames_PIP2',{})]).get(x,x)
+	sn_title = lambda sn,which='label': work.meta.get(sn,{}).get(which,re.sub('_','-',sn))
+	#! hardcoding lipid types here
+	lipid_types_ref = ['PI2P','DOPS','DOPE','CHL1','POPC']
+	licorice_thick = ['licorice','Licorice 0.7 12.0 12.0'][-1]
+
+	### LOAD THE DATA
 	sns_contacts,(data_contacts,calc_contacts) = work.sns(),plotload('contacts',work)
 	sns_hbonds,(data_hbonds,calc_hbonds) = work.sns(),plotload('hydrogen_bonding',work)
 	sns_mdia2_ordering = ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayer10','mdia2bilayer10_2',
@@ -91,6 +109,11 @@ def load():
 	else: sns = sns_mdia2_ordering
 	colors.update(**dict([(sn,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[sns.index(sn)]) 
 		for sn in sns]))
+	if 'mesh_lamplight' in plotrun.routine:
+		# load mesh 
+		#! note you will eventually get an error if they have different collections
+		data_mesh,calc_mesh = plotload('lipid_mesh',work)
+		data_protein,calc_protein = work.sns(),plotload('protein_abstractor',work)
 
 class ActinlinkPlotter:
 	"""Supervise the mapping from data to plot."""
@@ -936,12 +959,12 @@ def plot_colorstreak_contact_map(sup,bar_style=False,**kwargs):
 	picturesave(sup.make_output_name(),work.plotdir,
 		backup=False,version=True,meta=meta,extras=extras)
 
-if __name__=='__main__':
-
-	# overall plot styles to make
-	routine = ['contact_maps','charging'][:]
+def prepare_all_orders(*routine):
+	"""
+	Collect all possible plot combinations.
+	"""
+	# collect all possible plots in one place
 	orders = collections.OrderedDict()
-
 	# master types
 	bond_types = ['salt','salt_hbonds','hbonds','cut_2.2','cut_5.0']
 	bond_types_labels = ['salt bridges','salt bridges + hydrogen bonds',
@@ -953,7 +976,6 @@ if __name__=='__main__':
 	labelmaker_newlines = dict(zip(bond_types,bond_types_labels_newlines))
 	labelmaker_text = dict(zip(bond_types,bond_types_labels_text))
 	labelmaker = dict(zip(bond_types,bond_types_labels))
-
 	if 'charging' in routine:
 		charging_base = {
 			'sns':sns_mdia2_ordering,
@@ -1009,9 +1031,8 @@ if __name__=='__main__':
 						else: raise Exception
 						if (bond_type=='salt' and plot_style=='charging histograms' 
 							and not merged and explicit): orders[key]['plotspec']['fs_yticks'] = 6
-
+	# contact_maps and interacting_residues
 	if 'contact_maps' in routine:
-		# contact_maps and interacting_residues
 		contact_base = {
 			'sns':sns_mdia2_ordering,
 			'namer':{'base':'contact_maps','mods':[]},
@@ -1048,7 +1069,17 @@ if __name__=='__main__':
 						orders[key]['tags']['merged'] = merged
 						orders[key]['tags']['bonds'] = labelmaker_text[bond_type]
 						orders[key]['tags']['explicit'] = explicit
+	return orders
 
+@autoplot(plotrun)
+def master_bond_distribution_plotter():
+	"""
+	Plot the bond distributions in four different styles.
+	This is one of two plot routines: the other is meant to make snapshots.
+	"""
+	# overall plot styles to make
+	routine = ['contact_maps','charging'][:]
+	orders = prepare_all_orders(*routine)
 	#! to develop a single plot, skip the render function and trim the orders list
 	#! i = 'charging histograms salt explicit' ; orders = {i:orders[i]}
 	# loop over requested plots
@@ -1057,3 +1088,509 @@ if __name__=='__main__':
 		status('key: %s'%name,tag='render')
 		orders[name]['plotter'].render()
 		sup = orders[name]['plotter']
+
+def clone_vmdmake():
+	"""Clone a copy of VMDMAKE."""
+	from config import bash
+	vmdmake_dn = 'calcs/codes/vmdmake'
+	vmdmake_source = 'https://github.com/bradleyrp/amx-vmd'
+	try: from codes import vmdmake
+	except: 
+		if os.path.isdir(vmdmake_dn): 
+			raise Exception('cannot import vmdmake from codes but %s exists'%vmdmake_dn)
+		bash('git clone %s %s'%(vmdmake_source,vmdmake_dn))
+		from codes import vmdmake
+	globals()['vmdmake'] = vmdmake
+
+def get_snapshots_folder(supername,overwrite_snaps=False,**kwargs):
+	"""Generate a snapshot folder from a method name."""
+	# store the snapshots in the post_plot_spot according to the tag
+	tempdir = os.path.join(work.paths['post_plot_spot'],supername)
+	# only make figures if the folder is empty
+	if (os.path.isdir(tempdir) and not overwrite_snaps): 
+		status('found %s and refusing to overwrite'%tempdir,tag='warning')
+		return None
+	try: os.mkdir(tempdir)
+	except: status('directory exists so we are overwriting',tag='warning')
+	status('snapshots dropping to %s'%tempdir,tag='note')
+	return tempdir
+
+def make_snapshots(group_name,do_color_lipids=True,
+	do_protein_cartoon=True,do_protein_explicit=False,nsnaps=4,special=False,**kwargs):
+	"""Make a batch of snapshots."""	
+	# multiple selection methods (specific is too specific, cannot find frames)
+	selection_method = ['specific','general'][-1]
+	target_lipid = 'PI2P'
+	# settings for method "specific"
+	target_nbonds = 3
+	target_resnums = [25,34,35]
+	target_score = 1
+	# settings for general method
+	target_general_score = 2
+	# choose an order name
+	order_key = 'charging histograms salt'
+	bond_name = 'salt'
+	# drop settings
+	snaps_drop_dn = 'actinlink_bonds_snapshots'
+	do_shuffle = True
+
+	clone_vmdmake()
+	# get all orders for charging curves
+	orders = prepare_all_orders('charging')
+	# choose criteria for finding a frame and a lipid
+	request = ActinlinkPlotter(order_key,orders[order_key])
+	def snapshot_namer(bond_name,group,sn,frame): 
+		return 'snap.bond_%s.group_%s.%s.frame_%d'%(bond_name,group,sn,frame)
+	tempdir = get_snapshots_folder(snaps_drop_dn,overwrite_snaps=True)
+	# loop over simulation names
+	for sn_this in request.sns:
+		#! control flow note. we check for nsnaps and only make snapshots if needed
+		fns = [i for i in glob.glob(os.path.join(work.plotdir,
+			'actinlink_bonds_snapshots','snap.bond_%s.group_%s.%s.*'%(bond_name,group_name,sn_this)))]
+		if len(fns)>nsnaps: raise Exception('too many figures (%d) for %s'%(len(fns),sn_this))
+		elif len(fns)==nsnaps: 
+			status('found snapshots for %s'%sn_this)
+			continue
+		else: pass
+		if special and sn_this in special.get('exclude_sns',[]): continue
+		do_goodsell = True
+		hbond_cylinder_radius = 0.15
+		draw_color = 'black'
+		lipid_extra = lambda resname: ' and '+'(%s)'%' or '.join(['name %s'%i 
+			for i in work.vars['selectors']['head_atoms'][resname].split()])
+		if special and special.get('full_lipids',False): lipid_extra = lambda resname: ''
+		# try to find a frame with bonds to the residues we care about
+		#! deprecated because the following method only works on specific lipids
+		if selection_method=='specfic': 
+			candidate_frames = np.where(np.sum([
+				request.data['chargings'][sn_this][(str(i),target_lipid)]==target_nbonds 
+				for i in target_resnums],axis=0)>=target_score)[0] 
+		elif selection_method=='general':
+			request_this = request.data['chargings'][sn_this]
+			resids = np.unique(zip(*request_this.keys())[0])
+			# residues by frames, total number of bonds to all lipids. this is the y-axis on histograms
+			bonds_by_resid = np.array([[request_this[k] for k in request_this.keys() 
+				if k[0]==r] for r in resids]).sum(axis=1)
+			# number of residues that match the score
+			score_by_resid = (bonds_by_resid==target_general_score).sum(axis=0)
+			candidate_frames = np.where(score_by_resid==max(score_by_resid))[0]
+		else: raise Exception
+		if len(candidate_frames)<nsnaps: 
+			raise Exception('not enough candidates')
+		if do_shuffle: np.random.shuffle(candidate_frames)
+		# loop over difference instances
+		for frame in candidate_frames[-1*nsnaps:]:
+			# trawling the bonds list
+			bonds,obs = [request.data_bonds[sn_this]['data'][k] for k in ['bonds','observations']]
+			slice_path = calc_contacts['extras'][sn_this]['slice_path']
+			if not hasattr(work,'source'): work.parse_sources()
+			gro,xtc = [os.path.join(work.postdir,'%s.%s'%(slice_path,i)) for i in ['gro','xtc']]
+			tpr = work.source.get_last(sn_this,subtype='tpr')
+			kwargs_vmdmake = {'CGBONDSPATH':'/home/share/libs/cg_bonds.tcl',
+				'GMXDUMP':'/usr/local/gromacs/bin/gmx'}
+			view = vmdmake.VMDWrap(site=tempdir,gro=gro,xtc=xtc,tpr=tpr,
+				frames='',res=(2000,2000),**kwargs_vmdmake)
+			view.do('load_dynamic','standard','bonder')
+			view['snapshot_filename'] = snapshot_namer(sn=sn_this,frame=frame,
+				group=group_name,bond_name=bond_name)
+			if do_protein_cartoon: 
+				view.select(**{'protein':'noh and protein','style':'cartoon','structure_color':True,
+					'goodsell':do_goodsell,'smooth':False})
+			if do_protein_explicit:
+				view.select(**{'protein':'noh and protein','style':licorice_thick,
+					'goodsell':do_goodsell,'smooth':False})
+			if False: view.select(**{
+				'near_lipids':'noh and (same residue as resname PI2P and within 5 of protein)',
+				'goodsell':True,'style':licorice_thick,'smooth':False})
+			#! we assume subject=protein and target=lipid because the bond counter enforces this
+			# systematically show protein residues participating in a bond since otherwise ribbon
+			if not do_protein_explicit:
+				for resid in np.unique(bonds[np.where(obs[frame])][:,rowspec.index('subject_resid')]):
+					view.select(**{'residue_protein_%s'%resid:'noh and protein and resid %s'%resid,
+						'goodsell':do_goodsell,'smooth':False,'style':licorice_thick})
+			# systematically show bound lipids
+			for resid in np.unique(bonds[np.where(obs[frame])][:,rowspec.index('subject_resid')]):
+				view.select(**{'residue_protein_%s'%resid:'noh and protein and resid %s'%resid,
+					'goodsell':do_goodsell,'smooth':False,'style':licorice_thick})
+			inds = np.unique(bonds[np.where(obs[frame])][:,
+				rowspec.index('target_resid')],return_index=True)[1]
+			lipids = zip(*[bonds[np.where(obs[frame])][inds,rowspec.index(i)] 
+				for i in ['target_resid','target_resname']])
+			# plot bound lipids
+			for resid,resname in lipids:
+				if do_color_lipids: view.set_color_cursor(lipid_colors[resname])
+				view.select(**{'residue_lipid_%s'%resid:'noh and resname %s and resid %s%s'%(
+					resname,resid,lipid_extra(resname)),
+					'goodsell':do_goodsell,'smooth':False,'style':licorice_thick,
+					'color_specific':do_color_lipids})
+			view.command("animate goto %d"%frame)
+			# plot all bonds
+			view.command('draw color %s'%draw_color)
+			for hnum,(subject_resname,subject_resid,subject_atom,target_resname,target_resid,target_atom) \
+				in enumerate(bonds[np.where(obs[frame])]):
+				sel = 'resname %s and resid %s and name %s'%(subject_resname,subject_resid,subject_atom)
+				view.command('set partner_1_hbond_%d_ref [atomselect top "%s"]'%(hnum,sel))
+				view.command('puts "selecting %s"'%sel)
+				view.command('puts $partner_1_hbond_%d_ref'%hnum)
+				view.command('puts [expr $partner_1_hbond_%d_ref get {x y z}]'%hnum)
+				sel = 'resname %s and resid %s and name %s'%(target_resname,target_resid,target_atom)
+				view.command('set partner_2_hbond_%d_ref [atomselect top "%s"]'%(hnum,sel))
+				view.command('puts "selecting %s"'%sel)
+				view.command('puts $partner_2_hbond_%d_ref'%hnum)
+				#! the following fails a lot for some reason
+				view.command('puts [expr $partner_2_hbond_%d_ref get {x y z}]'%hnum)
+				view.command('puts "drawing..."')
+				view.command(("draw cylinder [expr [$partner_1_hbond_%d_ref get {x y z}]] "+
+					"[expr [$partner_2_hbond_%d_ref get {x y z}]] radius %.3f")%(
+					hnum,hnum,hbond_cylinder_radius))
+			# special selections
+			if special: 
+				if 'color_specific' in special:
+					view.set_color_cursor(special['color_specific'])
+				view.select(**special['selection'])
+			view.do('reset','xview')
+			view.command('scale by 1.5')
+			view.do('snapshot')
+			view.command("mol delrep 1 top")
+			view.command("mol delrep 0 top")
+			view.show(quit=True)
+
+def summary_panels(sns,group,bond,nsnaps,figsize=(10,10),tag=''):
+	"""Combine snapshots."""
+	import scipy
+	import scipy.ndimage
+	lookups = {}
+	for sn in sns:
+		fns = [i for i in glob.glob(os.path.join(work.plotdir,
+			'actinlink_bonds_snapshots','snap.bond_%s.group_%s.%s.*'%(bond,group,sn)))]
+		if len(fns)!=nsnaps: raise Exception('too many figures (%d) for %s: %s'%(len(fns),sn,fns))
+		lookups[sn] = dict(fns=fns)
+	axes,fig = panelplot(
+		layout={'out':{'hspace':0.0,'wspace':0.0,'grid':[1,len(sns)]},
+		'ins':[{'hspace':0.0,'wspace':0.0,'grid':[nsnaps,1]} 
+		for i in range(len(sns))]},figsize=figsize)
+	for snum,sn in enumerate(sns):
+		for pnum,fn in enumerate(lookups[sn]['fns']):
+			ax = axes[snum][pnum]
+			if pnum==0: ax.set_title(work.meta[sn]['label'])
+			image = scipy.ndimage.imread(fn)
+			ax.imshow(image)
+			ax.axis('off')
+	picturesave('fig.snapshot_summary.bond_%s.group_%s%s'%(bond,group,'' if not tag else '.'+tag),
+		directory=work.plotdir,meta={})
+
+@autoplot(plotrun)
+def snapshots():
+	"""Make many snapshots."""
+	nsnaps = 4
+	# completed
+	snapshot_batches = {
+		'v1':{'nsnaps':nsnaps},
+		'v2':{'do_protein_cartoon':False,
+			'do_color_lipids':False,'do_protein_explicit':True,'nsnaps':nsnaps},
+		'v3':{
+			'nsnaps':nsnaps,
+			'special':{
+				'color_specific':'gray','full_lipids':True,'exclude_sns':[],
+				'selection':{
+					'special':'noh and same residue as (resname CHL1 and within 10.0 of protein)',
+					'goodsell':True,'smooth':False,'style':licorice_thick,'color_specific':True}},
+			'post':[
+				dict(sns=sns,group='v3',bond='salt',nsnaps=4,figsize=(22,14)),
+				dict(sns=['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayerphys','mdia2bilayerphys2'],group='v3',bond='salt',nsnaps=4,figsize=(14,14),tag='compare20'),]},}
+	# ongoing
+	snapshot_batches = {
+		'v4':{
+			'nsnaps':nsnaps,
+			'special':{
+				'color_specific':'orange','full_lipids':True,'exclude_sns':[],
+				'selection':{
+					'special':'noh and same residue as (resname CHL1 and within 10.0 of protein)',
+					'goodsell':True,'smooth':False,'style':licorice_thick,'color_specific':True}},
+			'post':[
+				dict(sns=sns,group='v4',bond='salt',nsnaps=4,figsize=(22,14)),
+				dict(sns=['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayerphys','mdia2bilayerphys2'],group='v4',bond='salt',nsnaps=4,figsize=(14,14),tag='compare20'),]},}
+	# render snapshots and summaries
+	for key,val in snapshot_batches.items(): 
+		make_snapshots(group_name=key,**val)
+		for post in val.get('post',[]): summary_panels(**post)
+
+@autoplot(plotrun)
+def bound_lipids_summary():
+	"""
+	A simple plot of which lipid types are bound to the protein.
+	! This might be basically redundant with the charging timeseries.
+	"""
+	# plot a bond score and a residue score
+	for score in ['scored','residue']:
+		# prepare some salt data to ensure that data_salt is available
+		#! this is a bit overkill, but lazy
+		orders = dict(basic_order={
+			'sns':sns_mdia2_ordering,
+			'namer':{'base':'charging','mods':[]},
+			'tags':{'analysis':'charging histograms','merged':False,'bonds':'salt bridges','explicit':True},
+			'plot':{'function':'plot_charging_histograms_stacked',
+				'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
+			'data':{'function':'compute_chargings','kwargs':{'explicit':True},
+				'data_bonds':'data_salt','combine_replicates':True},
+			'plotspec':{'figsize':(10,8),'legend_edge_color':'w',
+				'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}},)
+		sup = ActinlinkPlotter('basic_order',orders['basic_order'])
+		# make a mapping from bond row to residue ID
+		lipid_to_col = dict(zip(lipid_types_ref,range(len(lipid_types_ref))))
+		bound_lipid_counts = {}
+		for sn in sns:
+			bonds,obs = [data_salt[sn]['data'][k] for k in ['bonds','observations']]
+			idx,_ = uniquify(bonds[:,np.array([rowspec.index(z) for z in ['target_resname','target_resid']])])
+			resid_to_resname = dict([(j,i) for i,j in np.transpose([bonds[idx,y] 
+				for y in np.array([rowspec.index(z) for z in ['target_resname','target_resid']])])])
+			nframes = len(obs)
+			counts = np.zeros((len(lipid_types_ref),nframes))
+			for fr,o in enumerate(obs):
+				if score=='scored':
+					target_bonds = bonds[np.where(o),rowspec.index('target_resname')]
+					lipids_row,counts_row = np.unique(target_bonds,return_counts=True)
+				elif score=='residue':
+					target_bonds = bonds[np.where(o),rowspec.index('target_resid')]
+					obs_this = [resid_to_resname[j] for j in np.unique(target_bonds)]
+					lipids_row,counts_row = np.unique(obs_this,return_counts=True)
+				else: raise Exception
+				for l,c in zip(lipids_row,counts_row): counts[lipid_to_col[l]][fr] = c
+			bound_lipid_counts[sn] = counts
+		# make the plot
+		axes,fig = square_tiles(1,figsize=(8,8))
+		ax = axes[0]
+		lipids_here = [l for l in lipid_types_ref if l in np.unique(bonds[:,rowspec.index('target_resname')])]
+		bottom = np.ones(len(sns_mdia2_ordering))
+		for lnum,resname in enumerate(lipids_here):
+			counts = np.array([bound_lipid_counts[sn][lipid_to_col[resname]].mean() 
+				for sn in sns_mdia2_ordering])
+			ax.bar(range(len(sns_mdia2_ordering)),counts,bottom=bottom,color=colors[resname])
+			bottom += counts
+		ax.set_xticklabels([work.meta[sn]['label'] for sn in sns_mdia2_ordering],rotation=90)
+		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
+		ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
+		ax.set_xticks(range(len(sns_mdia2_ordering)))
+		ax.set_ylabel('protein-lipid bonds per frame')
+		legendspec = []
+		# filter the lipids by those that are actually present
+		for lipid in lipids_here:
+			legendspec.append(dict(name=work.vars['names']['short'][lipid],
+				patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=colors[lipid])))
+		patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
+		legend = ax.legend(patches,labels,loc='upper left',
+			bbox_to_anchor=(1.0,0.0,1.,1.),ncol=1,fontsize=14)
+		frame = legend.get_frame()
+		frame.set_edgecolor(sup.ps.get('legend_edge_color','k'))
+		frame.set_facecolor('white')
+		picturesave('fig.bound_lipids.summary.%s'%score,work.plotdir,
+			backup=False,version=True,meta={},extras=[legend])
+
+def get_lipid_indices_absolute():
+	"""Use the cholesterol-laden meshes to get the right indices.
+	This is necessary for matching to the bonds list, which uses regular indices."""
+	key_mesh, = [key for key,val in calc_mesh.items() if 'calcs' in val and 
+		val['calcs']['specs']['upstream']['lipid_abstractor']['selector']=='lipid_chol_com']
+	dat = data_mesh[key_mesh][sn]['data']	
+
+@autoplot(plotrun)
+def mesh_lamplight():
+	"""
+	Compute the partner data on a small mesh of lipids bound to the protein.
+	Uses lipid_mesh_partners.py calcuation.
+	Includes a near-verbatim copy of the plot function from ptdins_partners.py.
+	"""
+	pass
+	import scipy
+	import MDAnalysis
+	import itertools
+	def monolayer_indexer(sn,abstractor):
+		if abstractor=='lipid_chol_com':
+			if sn in ['mdia2bilayer10_2','mdia2bilayer30_2']: return 1
+			else: return 0
+		elif abstractor=='lipid_com':
+			if sn in ['mdia2bilayer10','mdia2bilayerphys2','mdia2bilayer30_2']: return 1
+			else: return 0
+		else: raise Exception
+	# drop this result to globals because it takes a moment to compute
+	if 'major_results' not in globals():
+		global major_results
+		major_results = {}
+		for abstractor in ['lipid_com','lipid_chol_com']:
+			postdata = {}
+			# analyze each simulation
+			for sn in sns_mdia2_ordering:
+				status('analyzing local meshes for %s'%sn)
+				# get the monolayer index
+				mn_top = monolayer_indexer(sn=sn,abstractor=abstractor)
+				# get the bond data
+				key_contacts, = [key for key,val in calc_contacts.items() 
+					if 'calcs' in val and val['calcs']['specs']['cutoff']==5.0]
+				data_bonded = data_contacts[key_contacts]
+				bonds,obs = [data_bonded[sn]['data'][k] for k in ['bonds','observations']]
+				key_mesh, = [key for key,val in calc_mesh.items() if 'calcs' in val and 
+					val['calcs']['specs']['upstream']['lipid_abstractor']['selector']==abstractor]
+				dat = data_mesh[key_mesh][sn]['data']
+				# we have to turn to the structure files to be sure to get residues right
+				uni = MDAnalysis.Universe(os.path.join(work.postdir,
+					'%s.gro'%calc_contacts['extras'][sn]['slice_path']))
+				lipids_this = [l for l in lipid_types_ref 
+					if l not in ([] if abstractor=='lipid_chol_com' else ['CHL1'])]
+				sel = uni.select_atoms(' or '.join(['resname %s'%r for r in lipids_this]))
+				resids,resnames = sel.residues.resnums,sel.residues.resnames
+				# cross check resids from the universe with those in the bonds list
+				imono = dat['monolayer_indices']
+				cols_target = np.array([rowspec.index(i) for i in ['target_resid','target_resname']])
+				idx,_ = uniquify(bonds[:,cols_target])
+				resid_to_linear = dict(zip(resids,range(len(resids))))
+				flipside = []
+				for resid,resname in bonds[idx][:,cols_target]:
+					if (int(resid),resname) not in zip(resids,resnames): 
+						raise Exception('residue/resname mismatch between the structure and bonds list')
+					if resid_to_linear[int(resid)] not in resids[np.where(imono==mn_top)]:
+						flipside.append(int(resid))
+				# check the total unique resids after ghosting on the simplex
+				fr = 0
+				total = sum([np.unique(dat['%d.%d.ghost_ids'%(mn,fr)][
+					dat['%d.%d.simplices'%(mn,fr)]]).shape[0] for mn in range(2)])
+				# check that the resnames from the mesh data are the same as from the structure
+				if not np.all(dat['resnames']==resnames): 
+					raise Exception('resname mismatch between mesh, structure')
+				# the cross check above ensures that all of the bonds are in the residues list so now we map 
+				# ... them from absolute residue ids on the top monolayer to relative indices on that 
+				# ... monolayer. note that this mapping was somewhat tricky
+				resid_abs_mono_to_mono = dict(zip(resids[np.where(imono==mn_top)],np.where(imono==mn_top)[0]))
+				resid_mono_to_simplex = dict(zip(np.where(imono==mn_top)[0],range(np.sum(imono==mn_top))))
+				def resid_abs_to_simplex(rs): return np.unique([
+					resid_mono_to_simplex[resid_abs_mono_to_mono[r]] for r in rs])
+				# construct subselections of the mesh
+				meshes = []
+				nframes = len(obs)
+				for fr in range(nframes):
+					status('generating mesh subsets',i=fr,looplen=nframes)
+					# get the simplex after accounting for ghost indices
+					simplices = dat['%d.%d.ghost_ids'%(mn_top,fr)][dat['%d.%d.simplices'%(mn_top,fr)]]
+					# get the target residue IDs in absolute indexing
+					resids_this = bonds[np.where(obs[fr])[0],rowspec.index('target_resid')].astype(int)
+					# note that simplices runs from e.g. 0-99, the lipids on one monolayer
+					# ... next we use the reverse mapping from simplex index to resid. the mapping goes from 
+					# ... absolute indexing from obs, to linear indexing from zero
+					resids_simplex = resid_abs_to_simplex(resids_this)
+					# get all simplices associated with our subselection
+					minimesh = simplices[np.where(np.any(np.reshape(
+						np.in1d(simplices,resids_simplex),simplices.shape),axis=1))]
+					meshes.append(minimesh)
+					
+				# unpacking other userful mappings
+				nmols = [np.sum(dat['monolayer_indices']==i) for i in range(2)]
+				resnames = np.array(dat['resnames'])
+				reslist = list(np.array(resnames)[np.sort(np.unique(resnames,return_index=True)[1])])
+				rxm = [[
+					np.array([np.where(np.where(imono==mn)[0]==i)[0][0] 
+					for i in np.where(np.all((imono==mn,resnames==rn),axis=0))[0]])
+					for rn in reslist] for mn in range(2)]
+				rxmlook = [np.zeros(n) for n in nmols]
+				for mn in range(2):
+					for ri,r in enumerate(rxm[mn]):
+						if r != []: rxmlook[mn][r] = ri
+
+				export = {}
+				lipids = np.unique(resnames[np.where(imono==mn_top)])
+				export['reslist'] = reslist
+				for nn in [2,3]:
+					combos = np.array([''.join(j) for j in 
+						itertools.product(''.join([str(i) for i in range(nn+1)]),repeat=len(lipids)) 
+						if sum([int(k) for k in j])==nn])
+					combonames = [tuple(v) for v in [np.concatenate([[lipids[ww]]*int(w) 
+						for ww,w in enumerate(l)]) for l in combos]]
+					export['combos_%d'%nn] = combos
+					export['combonames_%d'%nn] = combonames
+					combolookup = np.sum([np.array(combonames)==r for r in reslist],axis=2).T
+					combolookup_str = [''.join(['%s'%s for s in i]) for i in combolookup]
+					export['combo_lookup_%d'%nn] = combolookup
+					export['combo_lookup_str_%d'%nn] = combolookup_str
+
+				results = export
+				# rare import from another calculation
+				import lipid_mesh_partners
+				lipid_mesh_partners.results = export
+				#! you will not need dat if we send simplices manually lipid_mesh_partners.dat = dat
+				lipid_mesh_partners.rxmlook = rxmlook
+
+				# recapitulating the lipid_mesh_partners routine
+				for nn in [2,3]:
+					combos = np.array([''.join(j) for j in 
+						itertools.product(''.join([str(i) for i in range(nn+1)]),repeat=len(lipids)) 
+						if sum([int(k) for k in j])==nn])
+				counts_observed = {}
+				for nn in [2,3]:
+					status('observations for nn=%d'%(nn),tag='compute')
+					looper = [dict(fr=fr,mn=mn,nn=nn,simplices=meshes[fr]) 
+						for mn in [mn_top] for fr in range(nframes)]
+					incoming = basic_compute_loop(lipid_mesh_partners.counter,looper)
+					# reindex data mn,fr,combo
+					counts_observed[nn] = np.concatenate(incoming).reshape(
+						(nframes,len(export['combonames_%d'%nn])))
+				import scipy
+				for nn in [2,3]: export['counts_observed_%d'%nn] = counts_observed[nn]
+				for mn in range(2): export['monolayer_residues_%d'%mn] = rxmlook[mn]
+				#! lifted the postdat preparation from ptdins_partners. uses the "data" variable
+				data = {sn:export}
+				for nn in [2,3]:
+					top_mono = mn_top
+					combonames = data[sn]['combonames_%d'%nn]
+					combi = scipy.misc.comb
+					combos = data[sn]['combonames_%d'%nn]
+					reslist = data[sn]['reslist']
+					comps = dict([(reslist[int(i)],j) 
+						for i,j in zip(*np.unique(data[sn]['monolayer_residues_%d'%top_mono],
+							return_counts=True))])
+					inds = np.where([np.in1d(c,comps.keys()).all() for c in combos])[0]
+					ratios_random = np.array([np.product([combi(comps[k],v) 
+						for k,v in zip(*np.unique(c,return_counts=True))])/combi(sum(comps.values()),nn) 
+						for c in [combos[i] for i in inds]])
+					#! removed top mono below and above in the loop because the protein is only on one side
+					counts_obs = data[sn]['counts_observed_%d'%nn].mean(axis=0)
+					counts_obs_std = data[sn]['counts_observed_%d'%nn].std(axis=0)
+					#! nmols = data[sn]['monolayer_residues_%d'%top_mono].shape[0]
+					ratios = counts_obs[inds]/(counts_obs[inds].sum())/ratios_random
+					ratios_err = counts_obs_std[inds]/(counts_obs[inds].sum())/ratios_random
+					rename_ptdins = lambda x: 'PtdIns' if x==work.meta[sn]['ptdins_resname'] else x
+					combonames_std = np.array([[rename_ptdins(i) for i in j] 
+						for j in np.array(combonames)[inds]])
+					postdata[(sn,nn)] = dict(ratios=ratios,ratios_err=ratios_err,combos=combonames_std)
+					postdata['combos_%d'%nn] = combos
+			major_results[abstractor] = postdata
+	# get the plot function manually. it has minor modifications to receive the post
+	outgoing = {'autoplot':autoplot,'plotrun':plotrun}
+	exec(open('calcs/plot-ptdins_partners.py'),globals(),outgoing)
+	plot_partners_basic = outgoing['plot_partners_basic']
+	# collect specs and make plots
+	specs = {
+		'local_mesh_without_chol':{
+			'sns':sns_mdia2_ordering,
+			'extras':{'special':True,'summary':True,'legend_below':True,
+				'color_scheme':'actinlink','legend_scheme':'actinlink','hatch':False,
+				'monolayer_indexer':monolayer_indexer,'postdat':major_results['lipid_com']},
+			'specs':{
+				0:dict(nn=3),
+				1:dict(nn=2),},
+			'panelspec':dict(figsize=(20,8),
+				layout={'out':{'grid':[1,1]},'ins':[{'grid':[2,1],
+				'wspace':0.1},]}),},
+		'local_mesh_with_chol':{
+			'sns':sns_mdia2_ordering[2:],
+			'extras':{'special':True,'summary':True,'legend_below':True,
+				'color_scheme':'actinlink','legend_scheme':'actinlink_nochol','hatch':False,
+				'monolayer_indexer':monolayer_indexer,'postdat':major_results['lipid_chol_com']},
+			'specs':{
+				0:dict(nn=3),
+				1:dict(nn=2),},
+			'panelspec':dict(figsize=(20,8),
+				layout={'out':{'grid':[1,1]},'ins':[{'grid':[2,1],
+				'wspace':0.1},]}),},}
+	for figname,spec in specs.items(): 
+		status('plotting %s'%figname,tag='plot')
+		plot_partners_basic(figname=figname,**spec)
+
+if __name__=='__main__': pass

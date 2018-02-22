@@ -15,6 +15,10 @@ variables:
     resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
     resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
     resnames_protein: ["GLH", "ILE", "ALAD", "GLUH", "GLN", "HISH", "ASN1", "HYP", "GLY", "HIP", "ARGN", "MSE", "CYS1", "GLU", "CYS2", "CYS", "HISE", "ASP", "SER", "HSD", "HSE", "PRO", "CYX", "ASPH", "ORN", "HSP", "HID", "HIE", "LYN", "DAB", "ASN", "CYM", "HISD", "VAL", "THR", "HISB", "HIS", "HIS1", "HIS2", "TRP", "HISA", "ACE", "ASH", "CYSH", "PGLU", "LYS", "PHE", "ALA", "QLN", "MET", "LYSH", "NME", "LEU", "ARG", "TYR"]
+    head_atoms: 
+      PI2P: 'N  C12  C13  C14  C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C  C11 H11A H11B  P  O13  O14  O12  O11   C1   HA   HB   C2   HS N   HN1   HN2   HN3   C12  H12A   C13  O13A  O13B   C11  H11A  H11B     P   O13   O14   O12 O11    C1    HA    HB    C2    HS C12   H2   O2  HO2  C13   H3   O3  HO3  C14   H4   O4   P4 OP42 OP43 OP44  C15   H5   O5   P5  OP52 OP53 OP54  H52  C16   H6   O6  HO6  C11   H1    P  O13  O14  O12  O11   C1   HA   HB   C2   HS'
+      DOPE: 'N HN1 HN2 HN3 C12 H12A H12B C11 H11A H11B P O13 O14 O11 O12 C1 '#HA HB C2 HS O21 C21 O22 C22 H2R H2S C3 HX HY O31 C31 O32 C32'
+      DOPS: 'N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B P O13 O14 O12 O11 C1'
   slices:
     steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
     current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
@@ -93,7 +97,7 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 no CHOL (r1)"
+    label:              "mDia2 20% $PIP_2$, no CHOL (r1)"
     label_compact:      "mDia2\nno CHOL (r1)"
   mdia2bilayer_nochl3:
     name:               "mdia2bilayer nochl r1"
@@ -104,7 +108,7 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 no CHOL (r2)"
+    label:              "mDia2 20% $PIP_2$, no CHOL (r1)"
     label_compact:      "mDia2\nno CHOL (r2)"
   mdia2bilayer10:
     name:               "mdia2bilayer10 (r1)"
@@ -128,6 +132,7 @@ meta:
     cation:              NA
     label:              "mDia2, 10% $PIP_2$ (r2)"
     label_compact:      "mDia2 with\n10% $PIP_2$ (r2)"
+    index_top_monolayer: 1
   mdia2bilayer30:
     name:               "mdia2bilayer30 (r1)"
     ptdins_resname:     "PI2P"
@@ -150,7 +155,7 @@ meta:
     cation:              NA
     label:              "mDia2, 30% $PIP_2$ (r2)"
     label_compact:      "mDia2 with\n30% $PIP_2$ (r2)"
-
+    index_top_monolayer: 1
 slices:
   # mdia2bilayerphys -> /home/share/lolabu/simulations/mdia2bilayerphys
   mdia2bilayerphys: 
@@ -194,6 +199,11 @@ slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
 
 calculations:
+  protein_rmsd:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: cursor
   lipid_abstractor:
     uptype: simulation
     slice_name: current
@@ -233,6 +243,34 @@ calculations:
       angle_cutoff: 160.0
       distance_cutoff: 3.4
       protein: true
+  lipid_mesh:
+    uptype: post
+    slice_name: current
+    collections: cursor
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector:
+            loop:
+              - lipid_com
+              - lipid_chol_com
+  lipid_mesh_partners:
+    uptype: simulation
+    slice_name: current
+    collections: cursor
+    specs:
+      upstream:
+        lipid_mesh:
+          upstream:
+            lipid_abstractor:
+              selector:
+                loop:
+                  - lipid_com
+                  - lipid_chol_com
+  protein_abstractor:
+    slice_name: current
+    group: all
+    collections: cursor
 incoming:
   hydrogen_bonding:
     group: all
@@ -304,3 +342,28 @@ plots:
       figsize_all: [20,8]
       sns_explicit_color_names: {}
       nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
+  protein_structure_review:
+    script: protein_structure_review.py
+    calculation: protein_rmsd
+    collections: cursor
+  ptdins_partners:
+    autoplot: True
+    collections: cursor
+    calculation:
+      lipid_mesh_partners: {}
+  lipids_rdfs:
+    autoplot: True
+    script: lipids_rdfs.py
+    collections: cursor
+    calculation: 
+      lipid_abstractor:
+        selector: 
+          loop: [lipid_com, lipid_chol_com]
+  actinlink_snapshots:
+    autoplot: True
+    script: snapshots.py
+    collections: cursor
+    calculation:
+      lipid_abstractor:
+        selector: lipid_chol_com
+
