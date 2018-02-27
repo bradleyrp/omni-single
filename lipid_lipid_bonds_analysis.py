@@ -174,7 +174,6 @@ def plot_bonds(name,kinds,**kwargs):
 			combos_sym = list(set([tuple(sorted(i)) for i in post[sn].keys()]))
 			for combo in combos_sym:
 				post_symmetric[sn][combo] = np.sum([post[sn][c] for c in post[sn] if set(c)==set(combo)],axis=0)
-		import ipdb;ipdb.set_trace()
 		post = post_symmetric
 	# reformulate post into images
 	combos_u = list(set([k for j in [i.keys() for i in post.values()] for k in j]))
@@ -382,11 +381,12 @@ def plots_actinlink():
 	post_debugger = {}
 	kind_map = {'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
 		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
+	symmetrize = True
 	for normed in [True,False]:
 		for merged in [True,False]:
 			for key,kind in kind_map.items():
 				name = key+('.merged' if merged else '')+('.normed' if normed else '')
-				figspec[name] = {'merged':merged,'kinds':kind,'normed':normed}
+				figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
 	#! testing figspec = {'salt.normed':figspec['salt.normed']}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
