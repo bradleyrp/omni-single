@@ -12,6 +12,8 @@ plotrun.routine = [
 	'mesh_lamplight',
 	][-1:]
 
+plotrun.routine = []
+
 import time,copy,collections,glob
 from joblib import Parallel,delayed
 from joblib.pool import has_shareable_memory
@@ -1593,4 +1595,6 @@ def mesh_lamplight():
 		status('plotting %s'%figname,tag='plot')
 		plot_partners_basic(figname=figname,**spec)
 
-if __name__=='__main__': pass
+if __name__=='__main__':
+
+	bonds,obs = [data_contacts[('contacts',0)][sns[0]]['data'][k] for k in ['bonds','observations']]

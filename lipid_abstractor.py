@@ -132,7 +132,8 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		status('loading frame',tag='load',i=fr,looplen=nframes)
 		uni.trajectory[fr]
 		trajectory.append(sel.positions/lenscale)
-		vecs.append(sel.dimensions[:3])
+		#! critical fix: you must cast the dimensions or you get repeated vectors
+		vecs.append(np.array(uni.trajectory[fr].dimensions[:3]))
 	vecs = np.array(vecs)/lenscale
 
 	checktime()

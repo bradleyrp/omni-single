@@ -309,9 +309,11 @@ def salt_bridges_framewise(fr,**kwargs):
 	pts_fore = boxstuff(pts_fore_unstuffed,vec)
 	pts_cations = boxstuff(all_cation_coords[fr],vec)
 
-	try: tree = scipy.spatial.ckdtree.cKDTree(pts_cations,boxsize=np.concatenate((vec,vec)))
+	#try:
+	#tree = scipy.spatial.ckdtree.cKDTree(pts_cations,boxsize=np.concatenate((vec,vec)))
+	tree = scipy.spatial.ckdtree.cKDTree(pts_cations,boxsize=vec)
 	#---sometimes the tree fails?
-	except: return []
+	#except: return []
 
 	#---query both the accceptors and donors against the cations tree (fore/back is just historical name)
 	close_d,nns_d = tree.query(pts_back,k=10,distance_upper_bound=distance_cutoff/lenscale)

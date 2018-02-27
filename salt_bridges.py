@@ -283,3 +283,4 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	result['nmols'] = rescounts
 	status('compute job lasted %.1fmin'%((time.time()-start_job_time)/60.),tag='time')
 	return result,attrs
+

@@ -108,7 +108,7 @@ meta:
     protein_itp:         s02-adhere/protein.itp
     cations:            ['NA']
     cation:              NA
-    label:              "mDia2 20% $PIP_2$, no CHOL (r1)"
+    label:              "mDia2 20% $PIP_2$, no CHOL (r2)"
     label_compact:      "mDia2\nno CHOL (r2)"
   mdia2bilayer10:
     name:               "mdia2bilayer10 (r1)"
@@ -242,7 +242,8 @@ calculations:
     specs:
       angle_cutoff: 160.0
       distance_cutoff: 3.4
-      protein: true
+      protein: 
+        loop: [true, false]
   lipid_mesh:
     uptype: post
     slice_name: current
@@ -271,16 +272,23 @@ calculations:
     slice_name: current
     group: all
     collections: cursor
-incoming:
-  hydrogen_bonding:
+  lipid_rdfs:
+    slice_name: current
+    collections: cursor
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+      cutoff: 20.0
+      binsize: 0.05
+  salt_bridges:
     group: all
     uptype: simulation
     slice_name: current
     collections: cursor
     specs:
-      angle_cutoff: 160.0
-      distance_cutoff: 3.4
-      protein: true
+      distance_cutoff: 
+        loop: [2.2,3.4,4.6]
 plots:
   video_maker:
     script: video_maker.py
@@ -315,7 +323,32 @@ plots:
     specs:
       cutoff_salt_bridge: 3.4
       cutoff_hydrogen_bonds: 3.4
-  hydrogen_bonding:
+  lipid_lipid_bonds_analysis:
+    autoplot: True
+    script: lipid_lipid_bonds_analysis.py
+    collections: cursor
+    calculation:
+      hydrogen_bonding:
+        protein: false
+      salt_bridges:
+        distance_cutoff: 3.4
+  protein_structure_review:
+    script: protein_structure_review.py
+    calculation: protein_rmsd
+    collections: cursor
+  ptdins_partners:
+    autoplot: True
+    collections: cursor
+    calculation:
+      lipid_mesh_partners: {}
+  lipid_rdfs:
+    autoplot: True
+    collections: cursor
+    calculation: lipid_rdfs
+
+deprecated:
+  #! this was interfering with actinlink_lipid_lipid_bonds above !!!
+  hydrogen_bonding: #! note that these images named "bonding_subset" may be from an earlier round of analysis?
     calculation: hydrogen_bonding
     collections: cursor
     specs:
@@ -342,28 +375,16 @@ plots:
       figsize_all: [20,8]
       sns_explicit_color_names: {}
       nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
-  protein_structure_review:
-    script: protein_structure_review.py
-    calculation: protein_rmsd
-    collections: cursor
-  ptdins_partners:
-    autoplot: True
-    collections: cursor
-    calculation:
-      lipid_mesh_partners: {}
-  lipids_rdfs:
-    autoplot: True
-    script: lipids_rdfs.py
-    collections: cursor
-    calculation: 
-      lipid_abstractor:
-        selector: 
-          loop: [lipid_com, lipid_chol_com]
   actinlink_snapshots:
     autoplot: True
-    script: snapshots.py
+    script: actinlink_snapshots.py
     collections: cursor
     calculation:
       lipid_abstractor:
         selector: lipid_chol_com
-
+  lipid_rdfs_dev:
+    autoplot: True
+    collections: cursor
+    calculation:
+      lipid_abstractor:
+        selector: lipid_chol_com

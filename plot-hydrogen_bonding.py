@@ -29,7 +29,7 @@ _old_school = True
 if 'data' not in globals(): 
 	#---! bad to declare here
 	global figsize_all,press_routine,interesting,bar_formats_style
-	sns,(data,calc) = work.sns(),plotload(plotname,work)
+	sns,(data,calc) = work.sns(),plotload('hydrogen_bonding',work)
 	data_salt,calc_salt = plotload('salt_bridges',work)
 	#---set the plot targets in the YAML for multiuse scripts
 	plotspecs = work.plots[plotname]['specs']
