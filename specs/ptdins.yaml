@@ -126,6 +126,17 @@ variables:
     Cal: 2.6
     K: 3.0
   names:
+    # short is only used in lipid_lipid_bonds_analysis
+    short:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PI(4,5)P$_2$"
+      P35P: "PI(3,5)P$_2$"
+      PIPP: "PI(4,5)P$_2^{-3}$"
+      PIPU: "PI(4,5)P$_2^{-5}$"
     proper_residue_names_long:
       CHL1: Cholesterol
       DOPC: DOPC
@@ -578,7 +589,9 @@ plots:
       ion_binding_combinator:
         zonecut: 2.2
       # ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
-  hydrogen_bonding:
+  hydrogen_bonding_real:
+    #! rename was necessary for lipid_lipid_bonds_analysis, which was otherwise redirecting here!
+    script: plot-hydrogen_bonding.py
     calculation: hydrogen_bonding
     collections: all
     specs:
@@ -803,3 +816,12 @@ plots:
     calculation: 
       lipid_abstractor:
         selector: lipid_com
+  lipid_lipid_bonds_analysis:
+    autoplot: True
+    script: lipid_lipid_bonds_analysis.py
+    collections: asymmetric_all
+    calculation:
+      hydrogen_bonding: {}
+      salt_bridges:
+        distance_cutoff: 2.2
+
