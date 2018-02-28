@@ -7,6 +7,7 @@ LIPID-LIPID hydrogen bond and salt-bridge analysis
 import itertools
 
 def load_actinlink(data):
+	"""Plot settings for the "actinlink" project. Called by load() and sent to globals."""
 	sns = actinlink_sns_mdia2
 	color_by_simulation = actinlink_color_by_simulation
 	replicate_mapping = actinlink_replicate_mapping
@@ -21,13 +22,15 @@ def load_actinlink(data):
 	return outgoing
 
 def load_ptdins(data):
-	collection = 'asymmetric_all'
+	"""Plot settings for the "ptdins" project. Called by load() and sent to globals."""
+	collection = 'asymmetric_all_no_mixed'
 	sns = work.metadata.collections[collection]
 	if set(sns)!=set(work.sns()): raise Exception('plot is set up for %s'%collection)
 	def color_by_simulation(sn):
 		return colorize(work.meta[sn],comparison='asymmetric_all')
 	replicate_mapping = dict([(sn,[sn]) for sn in sns])
-	extra_labels = dict([(sn,'%s, %s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label'])) 
+	extra_labels = dict([(sn,'%s, %s'%(work.meta.get(sn,{}).get('ptdins_label','ptdins'),
+		work.meta.get(sn,{}).get('ion_label','ion'))) 
 		for sn in sns])
 	nmol_counts = dict([(sn,dict(zip(*[data['hydrogen_bonding'][sn]['data'][k] 
 		for k in ['resnames','nmols']]))) for sn in sns])
@@ -41,14 +44,17 @@ def load_ptdins(data):
 
 @autoload(plotrun)
 def load():
+	"""Load once and export to globals. Uses project-specific load-functions."""
 	data,calc = work.plotload('lipid_lipid_bonds_analysis')
-	# load switch by project name
-	project_name = os.path.basename(os.getcwd())
-	# load to locals then automatically to globals
-	locals().update(**globals()['load_%s'%project_name](data=data))
 	# format of the bonds data
 	rowspec = ['subject_resname','subject_resid','subject_atom',
 		'target_resname','target_resid','target_atom']
+	# load switch by project name
+	project_name = os.path.basename(os.getcwd())
+	#! this does not work with plot_supervised. do not do this!
+	# load to locals then automatically to globals
+	_locals = globals()['load_%s'%project_name](data=data)
+	#locals().update(**_locals)
 
 def make_legend(ax,replicate_mapping_this,ncol=1,keys=None):
 	"""Make a legend."""
@@ -169,6 +175,13 @@ def plot_bonds(name,kinds,**kwargs):
 					post[sn_group][combo] = [[i if len(i)>0 else [np.zeros(max([len(k[0]) 
 						for k in post[sn_group][combo]]))] for i in j] for j in post[sn_group][combo]]					
 				post[sn_group][combo] = np.concatenate(np.array(post[sn_group][combo]).sum(axis=0))
+	# diagnostic
+	try:
+		status('mean counts v532, PtdIns-PtdIns: %s'%
+			post['membrane-v532'][('PtdIns','PtdIns')].mean(),tag='diagnostic')
+		status('mean counts v532, DOPE-DOPE: %s'%
+			post['membrane-v532'][('DOPS','DOPE')].mean(),tag='diagnostic')
+	except: pass
 	if symmetrize:
 		post_symmetric = {}
 		for sn in post:
@@ -206,13 +219,19 @@ def plot_bonds(name,kinds,**kwargs):
 				counts = post[sn][combo]
 				norm_factor = get_norm_factor(sn,combo)
 				counts_normed = counts/norm_factor
+				# diagnostic
+				if normed and sn=='membrane-v532' and combo==('PtdIns','PtdIns'):
+					status('normed mean counts v532, PtdIns-PtdIns: %s'%
+						counts_normed.mean(),tag='diagnostic')
+				if normed and sn=='membrane-v532' and combo==('DOPE','DOPE'):
+					status('normed mean counts v532, DOPE-DOPE: %s'%
+						counts_normed.mean(),tag='diagnostic')
 				#! alternate count 
 				vals_u,idx,counts_u = np.unique(counts_normed,return_counts=True,return_index=True)
 				obs_by_snum.append(counts_normed)
 				post_norm_interp[combo][sn] = dict(counts_normed=counts_normed,
 					vals_u=vals_u,counts_u=counts_u,idx=idx,norm_factor=norm_factor,counts=counts)
 			post_norm[combo] = obs_by_snum
-			#!np.concatenate(obs_by_snum).max()
 		#! simple image method which may be deprecated by the superior interpolation method
 		#! THIS SECTION IS DEPRECATED. Use the "fancy" method even when not doing normalization
 		if not do_fancy_interp:
@@ -260,7 +279,7 @@ def plot_bonds(name,kinds,**kwargs):
 		# loop over normed data and interpolate. note that iterpolation is *essential* to rendering
 		# ... this data correctly because we have integer counts normalized by floats (see note above)
 		else:
-			images = {}
+			images,images_extra = {},{}
 			for combo in combos_u:
 				sns_this = [sn for sn in sns_by_mapping if sn in post and combo in post[sn]]
 				# the number of bins is the maximum of the discrete count of bins. we could modify this later to 
@@ -297,6 +316,7 @@ def plot_bonds(name,kinds,**kwargs):
 				# second pass to make the image is necessary to get the width sums
 				total_width = sum([post_norm_interp[combo][s]['width_bins'] for s in post_norm_interp[combo]])
 				xpos = 0
+				images_extra[combo] = dict(xticks=[])
 				for sn in sns_this:
 					vals_u,counts_u,idx,norm_factor,counts_normed,counts = [post_norm_interp[combo][sn][k] 
 						for k in ['vals_u','counts_u','idx','norm_factor','counts_normed','counts']]
@@ -319,6 +339,7 @@ def plot_bonds(name,kinds,**kwargs):
 						# ... and there is nothing behind it so no overlays. this looks better.
 						image[inds[0]:inds[1],inds[2]:inds[3]] = np.array(mpl.colors.to_rgba(
 							color_by_simulation(sn)))*np.array([1.,1.,1.,intensity])
+					images_extra[combo]['xticks'].append((inds[1]-0.5)/total_width)
 					xpos += width_bins
 				# transpose so the image looks correct on imshow using the 3-dimensional color values
 				images[combo] = np.transpose(image,(1,0,2))/image.max()
@@ -327,6 +348,7 @@ def plot_bonds(name,kinds,**kwargs):
 	axes,fig = square_tiles(len(combos_u),figsize=16,wspace=wspace,hspace=hspace)
 	for cnum,combo in enumerate(combos_u):
 		ax = axes[cnum]
+		#! bars style is superceded by the imshow style
 		if style=='bars':
 			counter = 0
 			for sn in sns_this:
@@ -355,16 +377,22 @@ def plot_bonds(name,kinds,**kwargs):
 			kwargs_to_imshow = {}
 			if normed: kwargs_to_imshow['extent'] = [0.,1.,0.,1.]
 			ax.imshow(raw,origin='lower',interpolation='nearest',
-				cmap=mpl.cm.__dict__[cmap_name],**kwargs_to_imshow)
+				cmap=mpl.cm.__dict__[cmap_name],zorder=1,**kwargs_to_imshow)
 			if style=='imshow' and do_fancy_interp: 
 				if normed: ax.set_aspect(1.0)
 				else: ax.set_aspect(float(raw.shape[1])/raw.shape[0])
 			else: ax.set_aspect(float(len(sns_this))/(max_count if not normed else nbins_normed))
 		else: raise Exception
-		ax.set_title('%s-%s'%tuple([work.vars['names']['short'].get(p,p) for p in combo]))
+		ax.set_title('%s-%s'%tuple([work.vars.get('names',{}).get('short',{}).get(p,p) for p in combo]))
 		if normed: ax.set_ylabel('score')
 		else: ax.set_ylabel('bonds')
-		ax.set_xticks([])
+		#! have not added grid lines on normed yet
+		if not normed:
+			ax.set_xticks(images_extra[combo]['xticks'])
+			ax.xaxis.grid(True,which='major',zorder=0)
+			ax.set_axisbelow(True)
+		else: ax.set_xticks([])
+		ax.set_xticklabels([])
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 		ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
 	extras = [make_legend(axes[-1],replicate_mapping_this=replicate_mapping_this,
@@ -394,16 +422,17 @@ def plots_actinlink():
 
 def plots_ptdins():
 	"""Plot actinlink bonds analysis including merged replicates."""
+
 	#!!! note that the normalized plots do not appear to be different than the absolute counts, but there
 	#!!! ... should be variation between lipid-lipid combinations when we normalize because there are 
 	#!!! ... different numbers of lipids
+
 	figspec = {}
 	global post_debugger
 	post_debugger = {}
 	kind_map = {'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
 		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
 	# no need to norm because the concentrations are identical
-	normed = False
 	merged = False
 	symmetrize = True
 	#! see note about about normalization
@@ -411,7 +440,7 @@ def plots_ptdins():
 		for key,kind in kind_map.items():
 			name = key+('.normed' if normed else '')
 			figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
-	#! testing figspec = {'salt.normed':figspec['salt.normed']}
+	#! testing figspec = {'hbonds.normed':figspec['hbonds.normed']}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
 @autoplot(plotrun)
