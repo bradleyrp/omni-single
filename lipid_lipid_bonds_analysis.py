@@ -88,6 +88,8 @@ def plot_bonds(name,kinds,**kwargs):
 	resnames_exclude = ['POPC']
 	def get_norm_factor(sn,combo):
 		if normed:
+			if 'PtdIns' in combo:
+				combo = tuple([c if c!='PtdIns' else work.meta[sn]['ptdins_resname'] for c in combo])
 			nmols = [nmol_counts.get(sn,nmol_counts[dict(replicate_mapping).get(sn,[sn])[0]])[r] 
 				for r in combo]
 			norm_factor = nmols[0]*nmols[1]
@@ -392,17 +394,23 @@ def plots_actinlink():
 
 def plots_ptdins():
 	"""Plot actinlink bonds analysis including merged replicates."""
+	#!!! note that the normalized plots do not appear to be different than the absolute counts, but there
+	#!!! ... should be variation between lipid-lipid combinations when we normalize because there are 
+	#!!! ... different numbers of lipids
 	figspec = {}
 	global post_debugger
 	post_debugger = {}
-	kind_map = {'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],'hbonds_salt':['hydrogen_bonding','salt_bridges']}
+	kind_map = {'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
+		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
 	# no need to norm because the concentrations are identical
 	normed = False
 	merged = False
 	symmetrize = True
-	for key,kind in kind_map.items():
-		name = key+('.normed' if normed else '')
-		figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
+	#! see note about about normalization
+	for normed in [True,False][1:]:
+		for key,kind in kind_map.items():
+			name = key+('.normed' if normed else '')
+			figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
 	#! testing figspec = {'salt.normed':figspec['salt.normed']}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
