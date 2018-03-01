@@ -79,18 +79,16 @@ def plot_bonds(name,kinds,**kwargs):
 	normed = kwargs.get('normed',False)
 	symmetrize = kwargs.get('symmetrize',False)
 	# fancy imshow method is a great substitute for error bars
-	style = kwargs.get('style',['bars','imshow'][-1])
+	style = kwargs.get('style',['bars','imshow'][0])
 	#! hardcoded settings
-	do_fancy_interp = True
-	fancy_interp_max = ['absolute','global','local'][1]
-	#! only 10 bins look good if you do not do the advanced interpolation method
-	nbins_normed = 10.
-	norm_global_max = False
+	fancy_interp_max = ['global','local'][0]
+	bars_max = ['global','local'][0]
 	# aesthetics
 	wspace = kwargs.get('wspace',0.4)
 	hspace = kwargs.get('hspace',0.2)
 	legend_ncols = kwargs.get('legend_ncols',1)
 	#! ignoring POPC for now
+	#! farm this out to the specs
 	resnames_exclude = ['POPC']
 	def get_norm_factor(sn,combo):
 		if normed:
@@ -232,157 +230,123 @@ def plot_bonds(name,kinds,**kwargs):
 				post_norm_interp[combo][sn] = dict(counts_normed=counts_normed,
 					vals_u=vals_u,counts_u=counts_u,idx=idx,norm_factor=norm_factor,counts=counts)
 			post_norm[combo] = obs_by_snum
-		#! simple image method which may be deprecated by the superior interpolation method
-		#! THIS SECTION IS DEPRECATED. Use the "fancy" method even when not doing normalization
-		if not do_fancy_interp:
-			#! changes at the end of the following are incorrect.
-			# get the global maximum of the normed counts
-			max_norm = max([np.concatenate(i).max() for i in post_norm.values()])
-			bins_global = np.linspace(0,max_norm,nbins_normed)
-			images = {}
-			for combo in combos_u:
-				sns_this = [sn for sn in sns_by_mapping if combo in post[sn]]
-				images[combo] = []
-				norm_max_local = np.concatenate(post_norm[combo]).max()
-				bins_local = np.linspace(0,norm_max_local,nbins_normed)
-				for item,sn in zip(post_norm[combo],sns_this):
-					"""
-					in this standard method we use uniform bins to make a uniform image however this fails
-					to look reasonable because the distributions with the largest normalization factor
-					end up looking like steps with nothing between. to put it another way, when we take a few 
-					columns of integer values and divide them by a different float to normalize them, they still 
-					take a very small number of values, but placing them all in uniform bins makes the ones that 
-					have shrunk the most or have the largest normalization factors to occupy discrete steps that 
-					the others do not. they then end up taking discrete values on a continuum, leaving a lot of 
-					whitespace in between. this is especially jarring when we use one maximum per combination.
-					current solution is to use a small number of bins to handle the problem. proposed best 
-					solution is to do an elaborate interpolation which maintains the area density of the counts
-					to avoid being misleading by making thinner columns for the simulations with the highest
-					amounts of normalization, and then eliminating whitespace by mapping the discrete normalized 
-					values onto the full number of bins somehow. the advanced method will really help with
-					the clarity of the plot. 20 bins looks better than 10, but starts to have the whitespace 
-					problem while 10 looks indistinct and more like a rorschach. this motivated the advanced 
-					interpolation method
-					"""
-					# a second problem is that the global max shows lots of high-likelihood PIP2-PIP2 bonds
-					# ... for the 10% system so all the other tiles are mostly white. it would be good to plot 
-					# ... both with and without the global max for comparison
-					if norm_global_max: bins = bins_global
-					else: bins = bins_local
-					hist,_ = np.histogram(item,bins=bins,normed=True)
-					images[combo].append(hist)
-				images[combo] = np.array(images[combo])
-				# reformulate by simulation color (sorry this is messy. written quickly but works)
-				images[combo] = (np.concatenate((np.tile(np.ones(images[combo].shape),(3,1,1)),
-					[images[combo]]))*np.tile(np.array(mpl.colors.to_rgba(color_by_simulation(sn))),
-					(images[combo].shape[0],images[combo].shape[1],1)).transpose((2,0,1))).transpose((2,1,0))
 		# loop over normed data and interpolate. note that iterpolation is *essential* to rendering
 		# ... this data correctly because we have integer counts normalized by floats (see note above)
-		else:
-			images,images_extra = {},{}
-			for combo in combos_u:
-				sns_this = [sn for sn in sns_by_mapping if sn in post and combo in post[sn]]
-				# the number of bins is the maximum of the discrete count of bins. we could modify this later to 
-				# ... exclude some whitespace if necessary
-				nbins = float(max_count)
-				# if we are norming we use a standard resolution and then round into the bins
-				if normed: base_res = 1000
-				# if we are not norming we keep absolute counts
-				else: base_res = int(nbins)
-				# we construct a high resolution image and just round things onto it
-				image = np.zeros((base_res,base_res,4))
-				shrink_max = float(min([v['norm_factor'] for k,v in post_norm_interp[combo].items()]))
-				# after normalization, the top of the bar is the maximum count by the maximum shrink
-				max_factor = nbins/shrink_max
-				# assume we want a square tile so the width of the simulation with the maximum shrink should be
-				# one over the number of simulations
-				#! sns_this is wrong!
-				width_base = 1./len(sns_this)
-				# the base area is the area of one tile, corresponding to one bin in the simulation with the max
-				# ... shrink, hence the one that runs all the way to the top, which will be larger than the others
-				# ... because it has the smallest normalization factor.
-				area_base = 1.0/nbins*width_base
-				for sn in sns_this:
-					# each simulation has a maximum value given by the shrink factor
-					vals_u,counts_u,idx,norm_factor,counts_normed,counts = [post_norm_interp[combo][sn][k] 
-						for k in ['vals_u','counts_u','idx','norm_factor','counts_normed','counts']]
-					# this is the maximum for this simulation after the normalization factor
-					post_norm_interp[combo][sn]['max_this_abs'] = max_this_abs = float(nbins)/norm_factor
-					post_norm_interp[combo][sn]['max_this_rel'] = max_this_rel = max_this_abs/max_factor
-					# bin heights are given in relative units
-					post_norm_interp[combo][sn]['height_bins'] = height_bins = max_this_rel/nbins
-					# bin widths depend on the base area to maintain constant area for each bin
-					post_norm_interp[combo][sn]['width_bins'] = width_bins = area_base/height_bins
-				# second pass to make the image is necessary to get the width sums
-				total_width = sum([post_norm_interp[combo][s]['width_bins'] for s in post_norm_interp[combo]])
-				xpos = 0
-				images_extra[combo] = dict(xticks=[])
-				for sn in sns_this:
-					vals_u,counts_u,idx,norm_factor,counts_normed,counts = [post_norm_interp[combo][sn][k] 
-						for k in ['vals_u','counts_u','idx','norm_factor','counts_normed','counts']]
-					width_bins = post_norm_interp[combo][sn]['width_bins']/total_width
-					height_bins = post_norm_interp[combo][sn]['height_bins']
-					# at this point we have the relative height, the bin heights, and the unique counts
-					# ... however the observations do not need to span the whole set so we have to slot them 
-					# ... into place. we use the following trick: multiply by norm factor and you get ints.
-					# ... note that rounding is essential otherwise you get repeats
-					bins_which = np.round(vals_u*norm_factor).astype(int)
-					# normalize the intensity by max instead of sum
-					bins_intensity = counts_u.astype(float)/counts_u.max()
-					for bin_num,intensity in zip(bins_which[bins_which>0],bins_intensity[bins_which>0]):
-						# now we are ready to assemble the squares
-						lrbt = np.array([xpos,xpos+width_bins,
-							bin_num*height_bins,(bin_num+1)*height_bins])
-						inds = np.round(lrbt*base_res).astype(int)
-						# if we multiply the rgba value by intensity then it fades to grey
-						# ... so instead we multiply only the alpha by intensity. this fades to background
-						# ... and there is nothing behind it so no overlays. this looks better.
-						image[inds[0]:inds[1],inds[2]:inds[3]] = np.array(mpl.colors.to_rgba(
-							color_by_simulation(sn)))*np.array([1.,1.,1.,intensity])
-					images_extra[combo]['xticks'].append((inds[1]-0.5)/total_width)
-					xpos += width_bins
-				# transpose so the image looks correct on imshow using the 3-dimensional color values
-				images[combo] = np.transpose(image,(1,0,2))/image.max()
+		images,images_extra = {},{}
+		for combo in combos_u:
+			sns_this = [sn for sn in sns_by_mapping if sn in post and combo in post[sn]]
+			# the number of bins is the maximum of the discrete count of bins. we could modify this later to 
+			# ... exclude some whitespace if necessary
+			nbins = float(max_count)
+			# if we are norming we use a standard resolution and then round into the bins
+			if normed: base_res = 1000
+			# if we are not norming we keep absolute counts
+			else: base_res = int(nbins)
+			# we construct a high resolution image and just round things onto it
+			image = np.zeros((base_res,base_res,4))
+			shrink_max = float(min([v['norm_factor'] for k,v in post_norm_interp[combo].items()]))
+			# after normalization, the top of the bar is the maximum count by the maximum shrink
+			max_factor = nbins/shrink_max
+			# assume we want a square tile so the width of the simulation with the maximum shrink should be
+			# one over the number of simulations
+			#! sns_this is wrong!
+			width_base = 1./len(sns_this)
+			# the base area is the area of one tile, corresponding to one bin in the simulation with the max
+			# ... shrink, hence the one that runs all the way to the top, which will be larger than the others
+			# ... because it has the smallest normalization factor.
+			area_base = 1.0/nbins*width_base
+			for sn in sns_this:
+				# each simulation has a maximum value given by the shrink factor
+				vals_u,counts_u,idx,norm_factor,counts_normed,counts = [post_norm_interp[combo][sn][k] 
+					for k in ['vals_u','counts_u','idx','norm_factor','counts_normed','counts']]
+				# this is the maximum for this simulation after the normalization factor
+				post_norm_interp[combo][sn]['max_this_abs'] = max_this_abs = float(nbins)/norm_factor
+				post_norm_interp[combo][sn]['max_this_rel'] = max_this_rel = max_this_abs/max_factor
+				# bin heights are given in relative units
+				post_norm_interp[combo][sn]['height_bins'] = height_bins = max_this_rel/nbins
+				# bin widths depend on the base area to maintain constant area for each bin
+				post_norm_interp[combo][sn]['width_bins'] = width_bins = area_base/height_bins
+			# second pass to make the image is necessary to get the width sums
+			total_width = sum([post_norm_interp[combo][s]['width_bins'] for s in post_norm_interp[combo]])
+			xpos = 0
+			images_extra[combo] = dict(xticks=[])
+			for sn in sns_this:
+				vals_u,counts_u,idx,norm_factor,counts_normed,counts = [post_norm_interp[combo][sn][k] 
+					for k in ['vals_u','counts_u','idx','norm_factor','counts_normed','counts']]
+				width_bins = post_norm_interp[combo][sn]['width_bins']/total_width
+				height_bins = post_norm_interp[combo][sn]['height_bins']
+				# at this point we have the relative height, the bin heights, and the unique counts
+				# ... however the observations do not need to span the whole set so we have to slot them 
+				# ... into place. we use the following trick: multiply by norm factor and you get ints.
+				# ... note that rounding is essential otherwise you get repeats
+				bins_which = np.round(vals_u*norm_factor).astype(int)
+				# normalize the intensity by max instead of sum
+				bins_intensity = counts_u.astype(float)/counts_u.max()
+				for bin_num,intensity in zip(bins_which[bins_which>0],bins_intensity[bins_which>0]):
+					# now we are ready to assemble the squares
+					lrbt = np.array([xpos,xpos+width_bins,
+						bin_num*height_bins,(bin_num+1)*height_bins])
+					inds = np.round(lrbt*base_res).astype(int)
+					# if we multiply the rgba value by intensity then it fades to grey
+					# ... so instead we multiply only the alpha by intensity. this fades to background
+					# ... and there is nothing behind it so no overlays. this looks better.
+					image[inds[0]:inds[1],inds[2]:inds[3]] = np.array(mpl.colors.to_rgba(
+						color_by_simulation(sn)))*np.array([1.,1.,1.,intensity])
+				images_extra[combo]['xticks'].append((inds[1]-0.5)/total_width)
+				xpos += width_bins
+			# transpose so the image looks correct on imshow using the 3-dimensional color values
+			images[combo] = np.transpose(image,(1,0,2))/image.max()
 		max_row_global = max([max(np.where(np.sum(v[:,:,:3].sum(axis=2),axis=1)>0)[0]) for v in images.values()])
 	# plot
+	collected_means = {}
 	axes,fig = square_tiles(len(combos_u),figsize=16,wspace=wspace,hspace=hspace)
 	for cnum,combo in enumerate(combos_u):
+		collected_means[combo] = {}
 		ax = axes[cnum]
 		#! bars style is superceded by the imshow style
 		if style=='bars':
 			counter = 0
+			sns_this = [sn for sn in sns_by_mapping if sn in post and combo in post[sn]]
 			for sn in sns_this:
+				collected_means[combo][sn] = []
 				if combo in post[sn]:
 					norm_factor = get_norm_factor(sn,combo)
 					mean = post[sn][combo].mean()/norm_factor
 					std = post[sn][combo].std()/norm_factor
+					collected_means[combo][sn].append(mean+std)
 					ax.bar([counter],mean,width=1,color=color_by_simulation(sn))
 					#! error bar is really huge hence the distribution is not normal. previously:
-					#! ... ax.errorbar([counter],mean-std,mean+std,xerr=0,
-					#! ... zorder=3,fmt='none',ecolor='k',lw=0.5)
+					ax.errorbar([counter],mean,std,xerr=0,
+						zorder=3,fmt='none',ecolor='k',lw=0.5)
 					counter += 1
 		elif style=='imshow':
 			cmap_name = 'binary'
-			if do_fancy_interp and fancy_interp_max=='global': 
+			if fancy_interp_max=='global': 
 				raw = images[combo][:max_row_global]
-			elif do_fancy_interp and fancy_interp_max=='local':
+				max_row_this = max_row_global
+			elif fancy_interp_max=='local':
 				# find the maximum row with a nonzero element (excluding opacity)
 				# ... note that this line was written quickly using a sum trick over columns
 				max_row_this = max(np.where(np.sum(image[:,:,:3].sum(axis=2),axis=1)>0)[0])
 				raw = images[combo][:max_row_this]
-			else: raw = images[combo]
+			else: 
+				raw = images[combo]
+				max_row_this = base_res-1
 			#! interesting note: had to do the transpose when the image is made after switching to 4-d
 			#! ... image values and then I had to change axis commands and array slicing and the shape 
 			#! ... indexing in the aspect ratio in five places to correct this single upstream transpose\
 			kwargs_to_imshow = {}
-			if normed: kwargs_to_imshow['extent'] = [0.,1.,0.,1.]
+			max_y = 1./((max_row_this+1.)/base_res*get_norm_factor(sn,combo))
+			if normed: kwargs_to_imshow['extent'] = [0.,1.,0.,max_y]
 			ax.imshow(raw,origin='lower',interpolation='nearest',
 				cmap=mpl.cm.__dict__[cmap_name],zorder=1,**kwargs_to_imshow)
-			if style=='imshow' and do_fancy_interp: 
-				if normed: ax.set_aspect(1.0)
-				else: ax.set_aspect(float(raw.shape[1])/raw.shape[0])
-			else: ax.set_aspect(float(len(sns_this))/(max_count if not normed else nbins_normed))
 		else: raise Exception
+		if style=='imshow': 
+			if normed: 
+				#! ax.set_aspect(1.0)
+				ax.set_aspect(1./max_y)
+			else: ax.set_aspect(float(raw.shape[1])/raw.shape[0])
+		#else: ax.set_aspect(float(len(sns_this))/(max_count if not normed else nbins_normed))
 		ax.set_title('%s-%s'%tuple([work.vars.get('names',{}).get('short',{}).get(p,p) for p in combo]))
 		if normed: ax.set_ylabel('score')
 		else: ax.set_ylabel('bonds')
@@ -395,6 +359,11 @@ def plot_bonds(name,kinds,**kwargs):
 		ax.set_xticklabels([])
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 		ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
+	if style=='bars':
+		if bars_max=='global':
+			max_y = max([max([max(i) for i in m.values()]) for m in collected_means.values()])
+			for ax in axes:
+				ax.set_ylim((0,max_y))
 	extras = [make_legend(axes[-1],replicate_mapping_this=replicate_mapping_this,
 		keys=[i for i,j in replicate_mapping_this],ncol=legend_ncols)]
 	title_names = {'hydrogen_bonding':'hydrogen bonds','salt_bridges':'salt bridges'}
@@ -434,13 +403,14 @@ def plots_ptdins():
 		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
 	# no need to norm because the concentrations are identical
 	merged = False
-	symmetrize = True
+	symmetrize = False
 	#! see note about about normalization
-	for normed in [True,False][1:]:
+	for normed in [True,False]:
 		for key,kind in kind_map.items():
 			name = key+('.normed' if normed else '')
 			figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
-	#! testing figspec = {'hbonds.normed':figspec['hbonds.normed']}
+	#! testing
+	figspec = {'hbonds.normed':figspec['hbonds.normed']}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
 @autoplot(plotrun)
