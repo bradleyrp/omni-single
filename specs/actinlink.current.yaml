@@ -331,7 +331,7 @@ plots:
       hydrogen_bonding:
         protein: false
       salt_bridges:
-        distance_cutoff: 3.4
+        distance_cutoff: 2.2
   protein_structure_review:
     script: protein_structure_review.py
     calculation: protein_rmsd
