@@ -6,8 +6,12 @@ LIPID-LIPID hydrogen bond and salt-bridge analysis
 
 import itertools
 
+### LOAD
+
 def load_actinlink(data):
-	"""Plot settings for the "actinlink" project. Called by load() and sent to globals."""
+	"""
+	Plot settings for the "actinlink" project. Called by load() and sent to globals.
+	"""
 	sns = actinlink_sns_mdia2
 	color_by_simulation = actinlink_color_by_simulation
 	replicate_mapping = actinlink_replicate_mapping
@@ -22,7 +26,9 @@ def load_actinlink(data):
 	return outgoing
 
 def load_ptdins(data):
-	"""Plot settings for the "ptdins" project. Called by load() and sent to globals."""
+	"""
+	Plot settings for the "ptdins" project. Called by load() and sent to globals.
+	"""
 	collection = 'asymmetric_all_no_mixed'
 	sns = work.metadata.collections[collection]
 	if set(sns)!=set(work.sns()): raise Exception('plot is set up for %s'%collection)
@@ -44,26 +50,27 @@ def load_ptdins(data):
 
 @autoload(plotrun)
 def load():
-	"""Load once and export to globals. Uses project-specific load-functions."""
+	"""
+	Load once and export to globals. Uses project-specific load-functions.
+	"""
 	data,calc = work.plotload('lipid_lipid_bonds_analysis')
 	# format of the bonds data
 	rowspec = ['subject_resname','subject_resid','subject_atom',
 		'target_resname','target_resid','target_atom']
 	# load switch by project name
 	project_name = os.path.basename(os.getcwd())
-	#! this does not work with plot_supervised. do not do this!
-	# load to locals then automatically to globals
+	# write to locals so the Observer can export to globals
 	_locals = globals()['load_%s'%project_name](data=data)
-	#locals().update(**_locals)
+
+### PLOT
 
 def make_legend(ax,replicate_mapping_this,ncol=1,keys=None):
-	"""Make a legend."""
-	# redundant with plot-lipid_rdfs.pf
+	"""Make a legend. Note that this is redundant with plot-lipid_rdfs.py."""
 	legendspec = []
 	for sn_general,sns in replicate_mapping_this:
 		if not keys or sn_general in keys:
 			legendspec.append(dict(
-				#! preference for one-liners is getting the best of me!
+				#! absurd one-liners below
 				name=extra_labels.get(sn_general,work.meta.get(sn_general,{}).get('label','')),
 				patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=color_by_simulation(sns[0]))))
 	patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
@@ -74,22 +81,25 @@ def make_legend(ax,replicate_mapping_this,ncol=1,keys=None):
 	return legend
 
 def plot_bonds(name,kinds,**kwargs):
-	"""Plot the distributions of observed bond counts."""
+	"""
+	Plot the distributions of observed bond counts.
+	"""
 	merged = kwargs.get('merged',False)
 	normed = kwargs.get('normed',False)
 	symmetrize = kwargs.get('symmetrize',False)
 	# fancy imshow method is a great substitute for error bars
-	style = kwargs.get('style',['bars','imshow'][0])
-	#! hardcoded settings
-	fancy_interp_max = ['global','local'][0]
-	bars_max = ['global','local'][0]
+	style = kwargs.get('style',['bars','imshow'][1])
+	# count scaling applies to bars and imshow counts (not normalized scores)
+	count_scaling = kwargs.get('count_scaling',['absolute','global','local'][1])
+	count_scaling_norm = kwargs.get('count_scaling_norm',['global','local'][0])
 	# aesthetics
 	wspace = kwargs.get('wspace',0.4)
 	hspace = kwargs.get('hspace',0.2)
 	legend_ncols = kwargs.get('legend_ncols',1)
 	#! ignoring POPC for now
 	#! farm this out to the specs
-	resnames_exclude = ['POPC']
+	resnames_exclude = []#['POPC']
+	debug_black_background = kwargs.get('debug_black_background',False)
 	def get_norm_factor(sn,combo):
 		if normed:
 			if 'PtdIns' in combo:
@@ -99,7 +109,7 @@ def plot_bonds(name,kinds,**kwargs):
 			norm_factor = nmols[0]*nmols[1]
 		else: norm_factor = 1.0
 		return norm_factor
-	global post
+	global post,post_norm
 	post = {}
 	global replicate_mapping_this
 	if merged: replicate_mapping_this = replicate_mapping 
@@ -127,6 +137,7 @@ def plot_bonds(name,kinds,**kwargs):
 					rows = np.where(np.all((
 						bonds[:,rowspec.index('subject_resname')]==combo[0],
 						bonds[:,rowspec.index('target_resname')]==combo[1],
+						bonds[:,rowspec.index('subject_resid')]!=bonds[:,rowspec.index('target_resid')],
 						),axis=0))[0]
 					if len(rows)>0:
 						if sn_group not in post: post[sn_group] = {}
@@ -244,6 +255,10 @@ def plot_bonds(name,kinds,**kwargs):
 			else: base_res = int(nbins)
 			# we construct a high resolution image and just round things onto it
 			image = np.zeros((base_res,base_res,4))
+			#! debugging below
+			if debug_black_background:
+				image[...,:3] = 0.0
+				image[...,3] = 1.0
 			shrink_max = float(min([v['norm_factor'] for k,v in post_norm_interp[combo].items()]))
 			# after normalization, the top of the bar is the maximum count by the maximum shrink
 			max_factor = nbins/shrink_max
@@ -296,62 +311,73 @@ def plot_bonds(name,kinds,**kwargs):
 				xpos += width_bins
 			# transpose so the image looks correct on imshow using the 3-dimensional color values
 			images[combo] = np.transpose(image,(1,0,2))/image.max()
-		max_row_global = max([max(np.where(np.sum(v[:,:,:3].sum(axis=2),axis=1)>0)[0]) for v in images.values()])
+		max_row_global = max([max(np.where(np.sum(v[:,:,:3].sum(axis=2),axis=1)>0)[0]) 
+			for v in images.values()])
 	# plot
 	collected_means = {}
 	axes,fig = square_tiles(len(combos_u),figsize=16,wspace=wspace,hspace=hspace)
 	for cnum,combo in enumerate(combos_u):
 		collected_means[combo] = {}
 		ax = axes[cnum]
-		#! bars style is superceded by the imshow style
-		if style=='bars':
-			counter = 0
-			sns_this = [sn for sn in sns_by_mapping if sn in post and combo in post[sn]]
-			for sn in sns_this:
-				collected_means[combo][sn] = []
-				if combo in post[sn]:
-					norm_factor = get_norm_factor(sn,combo)
-					mean = post[sn][combo].mean()/norm_factor
-					std = post[sn][combo].std()/norm_factor
-					collected_means[combo][sn].append(mean+std)
+		# always tabulate with bars to get the global max which is more convenient then the elaborate
+		# ... imshow manipulations required to standardize the y-axes for the imshow version
+		counter = 0
+		sns_this = [sn for sn in sns_by_mapping if sn in post and combo in post[sn]]
+		for sn in sns_this:
+			collected_means[combo][sn] = []
+			if combo in post[sn]:
+				norm_factor = get_norm_factor(sn,combo)
+				mean = post[sn][combo].mean()/norm_factor
+				std = post[sn][combo].std()/norm_factor
+				collected_means[combo][sn].append(mean+std)
+				if style=='bars':
 					ax.bar([counter],mean,width=1,color=color_by_simulation(sn))
 					#! error bar is really huge hence the distribution is not normal. previously:
 					ax.errorbar([counter],mean,std,xerr=0,
 						zorder=3,fmt='none',ecolor='k',lw=0.5)
-					counter += 1
-		elif style=='imshow':
+				counter += 1
+		if style=='imshow':
 			cmap_name = 'binary'
-			if fancy_interp_max=='global': 
-				raw = images[combo][:max_row_global]
-				max_row_this = max_row_global
-			elif fancy_interp_max=='local':
-				# find the maximum row with a nonzero element (excluding opacity)
-				# ... note that this line was written quickly using a sum trick over columns
+			if not normed:
+				# when normed, this option is not extremely useful because it trims all images by their 
+				# ... common lack of whitespcae, but since they have different maximum scores, then we cannot 
+				# ... compare their scores directly. hence it does the opposite of its name!
+				if count_scaling=='global': 
+					raw = images[combo][:max_row_global]
+					max_row_this = max_row_global
+				# local also trims the most whitespace possible for each simulation but leaves you with 
+				# ... different scaling on the y-axis when the data are normed by composition
+				elif count_scaling=='local':
+					# find the maximum row with a nonzero element (excluding opacity)
+					# ... note that this line was written quickly using a sum trick over columns
+					max_row_this = max(np.where(np.sum(image[:,:,:3].sum(axis=2),axis=1)>0)[0])
+					raw = images[combo][:max_row_this]
+				# when normed the following option creates different y-axis and a lot of whitespace because 
+				# ... it assumes that each combo could have the maximum discrete count for all bonds, 
+				# ... divided by the normalization factor for that specific combination (by composition) 
+				# ... hence it is not useful (when normed)
+				elif count_scaling=='absolute':
+					raw = images[combo]
+					max_row_this = base_res-1
+				else: raise Exception
+			# we ignore the other methods given above for norming because 
+			else:
 				max_row_this = max(np.where(np.sum(image[:,:,:3].sum(axis=2),axis=1)>0)[0])
 				raw = images[combo][:max_row_this]
-			else: 
-				raw = images[combo]
-				max_row_this = base_res-1
 			#! interesting note: had to do the transpose when the image is made after switching to 4-d
 			#! ... image values and then I had to change axis commands and array slicing and the shape 
 			#! ... indexing in the aspect ratio in five places to correct this single upstream transpose\
 			kwargs_to_imshow = {}
-			max_y = 1./((max_row_this+1.)/base_res*get_norm_factor(sn,combo))
+			max_y = max([post[sn][combo].max()/get_norm_factor(sn,combo) for sn in post if combo in post[sn]])
 			if normed: kwargs_to_imshow['extent'] = [0.,1.,0.,max_y]
 			ax.imshow(raw,origin='lower',interpolation='nearest',
 				cmap=mpl.cm.__dict__[cmap_name],zorder=1,**kwargs_to_imshow)
-		else: raise Exception
-		if style=='imshow': 
-			if normed: 
-				#! ax.set_aspect(1.0)
-				ax.set_aspect(1./max_y)
-			else: ax.set_aspect(float(raw.shape[1])/raw.shape[0])
-		#else: ax.set_aspect(float(len(sns_this))/(max_count if not normed else nbins_normed))
+		if style=='imshow' and not normed: ax.set_aspect(float(raw.shape[1])/raw.shape[0])
 		ax.set_title('%s-%s'%tuple([work.vars.get('names',{}).get('short',{}).get(p,p) for p in combo]))
 		if normed: ax.set_ylabel('score')
 		else: ax.set_ylabel('bonds')
 		#! have not added grid lines on normed yet
-		if not normed:
+		if not normed and style=='imshow':
 			ax.set_xticks(images_extra[combo]['xticks'])
 			ax.xaxis.grid(True,which='major',zorder=0)
 			ax.set_axisbelow(True)
@@ -359,22 +385,36 @@ def plot_bonds(name,kinds,**kwargs):
 		ax.set_xticklabels([])
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 		ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
+		if normed and count_scaling_norm=='local':
+			y_max_this = max([max(i) for i in collected_means[combo].values()])
+			ax.set_ylim((0,y_max_this))
+			if style=='imshow':
+				ax.set_aspect(1./float(y_max_this))
+			else: ax.set_aspect('auto')
+	# maximum from the bars is useful as a global maximum on the imshow
+	max_y_bars = max([max([max(i) for i in m.values()]) for m in collected_means.values()])
 	if style=='bars':
-		if bars_max=='global':
-			max_y = max([max([max(i) for i in m.values()]) for m in collected_means.values()])
-			for ax in axes:
-				ax.set_ylim((0,max_y))
+		if (normed and count_scaling_norm=='global') or (not normed and count_scaling=='global'):
+			for ax in axes: ax.set_ylim((0,max_y_bars))
+	#! normed-max is currently handled at the project level
+	elif style=='imshow' and normed and count_scaling_norm=='global':
+		for ax in axes:
+			normed_y_max_global = max_y_bars
+			ax.set_ylim((0,normed_y_max_global))
+			ax.set_aspect('auto')
 	extras = [make_legend(axes[-1],replicate_mapping_this=replicate_mapping_this,
 		keys=[i for i,j in replicate_mapping_this],ncol=legend_ncols)]
 	title_names = {'hydrogen_bonding':'hydrogen bonds','salt_bridges':'salt bridges'}
 	extras.append(plt.suptitle(' and '.join(title_names[k] for k in kinds)+
 		(' (normalized)' if normed else ''),fontsize=20,y=0.92))
-	picturesave('fig.lipid_lipid_bonds.%s.%s'%(style,name),work.plotdir,
+	picturesave('fig.lipid_lipid_bonds.%s'%(name),work.plotdir,
 		backup=False,version=True,meta={},extras=extras)
 	post_debugger[tuple(kinds)] = post
 
 def plots_actinlink():
-	"""Plot actinlink bonds analysis including merged replicates."""
+	"""
+	Plot actinlink bonds analysis including merged replicates.
+	"""
 	figspec = {}
 	global post_debugger
 	post_debugger = {}
@@ -384,33 +424,37 @@ def plots_actinlink():
 	for normed in [True,False]:
 		for merged in [True,False]:
 			for key,kind in kind_map.items():
-				name = key+('.merged' if merged else '')+('.normed' if normed else '')
-				figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
-	#! testing figspec = {'salt.normed':figspec['salt.normed']}
+				for style in ['imshow','bars']:
+					for count_scaling in ['global','local']:
+						name = '%s.%s'%(style,key)+('.merged' if merged else '')+\
+							('.normed' if normed else '')+('.local' if count_scaling=='local' else '')
+						figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,
+							'symmetrize':symmetrize,'style':style,
+							'count_scaling_norm':count_scaling,'count_scaling':count_scaling}
+	test_key = ['imshow.hbonds_salt.normed.local',None][-1]
+	if test_key: figspec = {test_key: figspec[test_key]}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
 def plots_ptdins():
-	"""Plot actinlink bonds analysis including merged replicates."""
-
-	#!!! note that the normalized plots do not appear to be different than the absolute counts, but there
-	#!!! ... should be variation between lipid-lipid combinations when we normalize because there are 
-	#!!! ... different numbers of lipids
-
+	"""
+	Plot actinlink bonds analysis including merged replicates.
+	"""
+	raise Exception('fix naming!')
 	figspec = {}
 	global post_debugger
 	post_debugger = {}
-	kind_map = {'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
+	kind_map = {
+		'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
 		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
-	# no need to norm because the concentrations are identical
+	#! no need to norm because the concentrations are identical
 	merged = False
 	symmetrize = False
-	#! see note about about normalization
 	for normed in [True,False]:
 		for key,kind in kind_map.items():
 			name = key+('.normed' if normed else '')
-			figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize}
-	#! testing
-	figspec = {'hbonds.normed':figspec['hbonds.normed']}
+			figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,
+				'symmetrize':symmetrize}
+	# singleton test: figspec = {'hbonds.normed':figspec['hbonds.normed']}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
 @autoplot(plotrun)
