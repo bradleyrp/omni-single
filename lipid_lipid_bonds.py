@@ -7,8 +7,7 @@ supercedes lipid_lipid_bonds_analysis
 
 import seaborn as sb
 import pandas as pd
-import itertools
-import collections
+import itertools,collections,copy
 
 def load_generic(**kwargs):
 	"""
@@ -71,8 +70,7 @@ class PlotBonds:
 		self.name = kwargs.pop('name')
 		self.dataspec = kwargs.pop('dataspec',{})
 		self.style = self.dataspec.pop('style','violin')
-		self.shared_y = self.dataspec.pop('shared_y',False)
-		self.legend_pad = self.dataspec.pop('legend_pad',None)
+		self.legend_pad = self.dataspec.pop('legend_pad',3.0)
 		self.key_residues = self.dataspec.pop('key_residues',[])
 		# per the hydrogen_bonding.py calculation, donor is listed first
 		self.donor_acceptor = self.dataspec.pop('donor_acceptor',True)
@@ -168,7 +166,16 @@ class PlotBonds:
 		# post-processing to sum bond types (first dimension) then concatenate replicates
 		for sn_group in post:
 			for combo in post[sn_group]:
-				post[sn_group][combo] = np.concatenate(np.array(post[sn_group][combo]).sum(axis=0))
+				counts_by_rep = []
+				for rep in zip(*post[sn_group][combo]):
+					counts_by_bond = []
+					for i in rep:
+						if len(i)>0: counts_by_bond.append(i)
+					cbb = np.array(counts_by_bond)
+					if len(cbb.shape)>1: cbb = cbb.sum(axis=0)
+					counts_by_rep.append(cbb)
+				post[sn_group][combo] = np.concatenate(counts_by_rep)
+				#! prev: post[sn_group][combo] = np.concatenate(np.array(post[sn_group][combo]).sum(axis=0))
 		if self.symmetric:
 			post_symmetric = {}
 			for sn in post:
@@ -191,8 +198,8 @@ class PlotBonds:
 	def plot(self,style):
 		"""
 		A note on reading the y-axis. It counts bonds per <the left/first/corresponding lipid> with the other.
-		So if you have a value of 0.2 on the left y-axis for PtdIns-DOPE and it is ??? on the right, this 
-		means that there are 0.2 bonds for each PtdIns to a DOPE or ??? bonds for each DOPE to a PtdIns.
+		So if you have a value of 0.2 on the left y-axis for PtdIns-DOPE and it is 0.04 on the right, this 
+		means that there are 0.2 bonds for each PtdIns to a DOPE or 0.04 bonds for each DOPE to a PtdIns.
 		"""
 		if self.style=='violin_special':
 			def get_nmols(sn,top):
@@ -201,7 +208,8 @@ class PlotBonds:
 				else: nmols = nmols[0]
 				return nmols
 			y_max = {}
-			res = self.key_residues
+			if self.key_residues: res = self.key_residues 
+			else: res = list(set([i for j in self.index.keys() for i in j]))
 			for ii,r1 in enumerate(res):
 				for jj,r2 in enumerate(res):
 					# note that the donor comes first by convention in the raw data
@@ -216,7 +224,7 @@ class PlotBonds:
 					# ... which has implications for how you read the data in the other direction but 
 					# ... otherwise the plots are very similar. obviously this is *extremely pedantic* but 
 					# ... we plot it anyway in case you are interested
-					# !!! are you sure?
+					#!!! edit the comments above!
 					top = (r1,r2) if self.donor_acceptor else (r2,r1)
 					ax = self.axes[ii][jj]
 					if (self.symmetric and ii>jj) or (
@@ -242,7 +250,7 @@ class PlotBonds:
 					# critical note: if we reverse the direction of the donor-acceptor order then we have to
 					# ... flip the normalization as well otherwise the axes will be wrong and the whole point
 					# ... of plotting both directions (admittedly a pedantic, completist effort) will be lost
-					factor_adjust = 1./nmols[0 if self.donor_acceptor else 1]
+					factor_adjust = 1./nmols[0]
 					# carefully choose distributions in the canonical ordering by sns
 					data_this = [self.data[(top_lookup,sn)]*factor_adjust 
 						if (top_lookup,sn) in self.data else [] for sn in sns]
@@ -267,49 +275,12 @@ class PlotBonds:
 					twin = ax.twinx()
 					yticks = ax.get_yticks()
 					factors_rescale = float(nmols[0])/nmols[1]
-					if not self.donor_acceptor: factors_rescale = 1./factors_rescale
 					# the twin does not use the correct formatting so we just fix it here
 					twin.set_yticklabels(['%.2f'%i for i in yticks*factors_rescale])
 					twin.set_yticks(yticks)
 					twin.set_ylim((0,y_max_val))
 					ax.set_yticklabels(['%.2f'%i for i in yticks])
-		else:
-			raise Exception('sorry the original plot schemes are deprecated!')
-			for ax,top in zip(self.axes,self.index.keys()):
-				#! somewhat custom titles
-				ax.set_title('%s-%s'%tuple([
-					work.vars.get('names',{}).get('short',{}).get(p,p) for p in top]))
-				keys = self.index[top]
-				if style=='bars':
-					op = lambda x:x.mean()
-					ax.bar(range(len(keys)),[op(self.data[(top,k)]) for k in keys])
-				elif style=='violin':
-					# data are ordered by simulation
-					colors = [color_by_simulation(sn) for sn in sns]
-					palette = dict(zip(range(len(self.index)),colors))
-					outgoing = dict(data=[self.data[(top,k)] for k in self.index[top]])
-					vp = sb.violinplot(ax=ax,bw=1.0,cut=0,linewidth=0,palette=palette,
-						labels=[work.meta.get(sn,{}).get('ptdins_label',sn) for sn in sns],
-						**outgoing)
-					self.dump.append(vp)
-					ax.set_xticklabels([])
-				else: raise Exception
-			if self.shared_y:
-				max_y = max([ax.get_ylim()[1] for ax in self.axes])
-				for ax in self.axes: ax.set_ylim((0,max_y))
-			if self.dataspec['bonds_per_lipid']:
-				for ax,top in zip(self.axes,self.index.keys()):
-					ax = self.axes[ii][jj]
-					nmols = list(set([tuple([float(nmol_counts[sn][c]) for c in top]) for sn in sns]))
-					if len(nmols)!=1: raise Exception('cannot report bonds per lipid when compositions vary')
-					else: nmols = nmols[0]
-					twin = ax.twinx()
-					yticks = ax.get_yticks()
-					# the twin does not use the correct formatting so we just fix it here
-					twin.set_yticklabels(['%.2f'%i for i in yticks/nmols[1]*nmols[0]])
-					twin.set_yticks(yticks)
-					twin.set_ylim(ax.get_ylim())
-					ax.set_yticklabels(['%.2f'%i for i in yticks])
+		else: raise Exception('invalid or deprecated style %s'%self.style)
 		title_names = {'hydrogen_bonding':'hydrogen bonds','salt_bridges':'salt bridges'}
 		self.title = ' and '.join([title_names[k] for k in self.dataspec['kinds']])
 		if self.title_style=='suptitle':
@@ -322,7 +293,6 @@ class PlotBonds:
 		for sn_general,sns in self.replicate_mapping_this:
 			if not keys or sn_general in keys:
 				legendspec.append(dict(
-					#! absurd one-liners below
 					name=extra_labels.get(sn_general,work.meta.get(sn_general,{}).get('label','')),
 					patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=color_by_simulation(sns[0]))))
 		patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
@@ -363,41 +333,33 @@ def load():
 plotrun.routine = []
 if __name__=='__main__':
 
-	# deprecated loops over too many combinations!
+	#! farm out key residues to the ptdins function or the specs?
+	# default settings
+	resnames_exclude = ['POPC']
+	merged_opts = [False,True][:1]
+	key_residues = ['PtdIns','DOPS','DOPE','CHL1'][::-1]
+	# different types of bonds
 	kind_map = {
 		'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
 		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
-	kind_map = {'hbonds':['hydrogen_bonding']} #!
 	figspec = {(key+
-		{'violin':''}[style]+
+		{'violin':'','violin_special':''}[style]+
 		{1:'.normed',0:''}[normed]+
-		{1:'.scaled',0:''}[shared_y]+
-		{1:'',0:'.directions'}[symmetric]):{
-			'merged':merged,'kinds':kind,'normed':normed,'symmetric':symmetric,
-			'style':style,'shared_y':shared_y}
-			for style in ['violin']
-			for normed in [False,True]
+		{1:'.merged',0:''}[merged]+
+		{1:'.symmetric',0:''}[symmetric]):{
+			'merged':merged,'kinds':kind,'normed':normed,
+			'resnames_exclude':resnames_exclude,
+			'key_residues':key_residues,
+			'symmetric':symmetric,
+			'style':style}
+			for style in ['violin_special']
 			for symmetric in [True,False]
-			for merged in [False]
-			for shared_y in [True,False]
+			for normed in [True,False]
+			for merged in merged_opts
 			for key,kind in kind_map.items()}
-	figspec = {} #! special method is actually the only method
-	# hydrogen bond special comparisons include donor and acceptor
-	for donor_acceptor in [True,False]:
-		for special_symmetric in [True,False]:
-			figspec['hbonds.special.%s.%s'%(
-				'donor_acceptor' if donor_acceptor else 'acceptor_donor',
-				'symmetric' if special_symmetric else 'asymmetric')] = {
-				'kinds':['hydrogen_bonding'],'special':True,
-				'legend_pad':3.0,'resnames_exclude':['POPC'],
-				'key_residues':['PtdIns','DOPS','DOPE','CHL1'][::-1],
-				'special_symmetric':special_symmetric,'donor_acceptor':donor_acceptor}
-	# salt bridge special comparison has no direction so we only plot symmetric
-	figspec['salt.special'] = {
-		'kinds':['salt_bridges'],'special':True,
-		'legend_pad':3.0,'resnames_exclude':['POPC'],
-		'key_residues':['PtdIns','DOPS','DOPE','CHL1'],
-		'special_symmetric':True,'donor_acceptor':True}
+	# plot with acceptors first as a consistency check
+	figspec['hbonds.normed.acceptor_donor'] = dict(donor_acceptor=False,
+		**copy.deepcopy(figspec['hbonds.normed']))
 	test_key = ['salt.special',None][-1]
 	if test_key: figspec = {test_key: figspec[test_key]}
 	for name,spec in figspec.items():
