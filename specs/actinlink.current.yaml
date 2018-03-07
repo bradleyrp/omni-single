@@ -16,9 +16,10 @@ variables:
     resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
     resnames_protein: ["GLH", "ILE", "ALAD", "GLUH", "GLN", "HISH", "ASN1", "HYP", "GLY", "HIP", "ARGN", "MSE", "CYS1", "GLU", "CYS2", "CYS", "HISE", "ASP", "SER", "HSD", "HSE", "PRO", "CYX", "ASPH", "ORN", "HSP", "HID", "HIE", "LYN", "DAB", "ASN", "CYM", "HISD", "VAL", "THR", "HISB", "HIS", "HIS1", "HIS2", "TRP", "HISA", "ACE", "ASH", "CYSH", "PGLU", "LYS", "PHE", "ALA", "QLN", "MET", "LYSH", "NME", "LEU", "ARG", "TYR"]
     head_atoms: 
-      PI2P: 'N  C12  C13  C14  C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C  C11 H11A H11B  P  O13  O14  O12  O11   C1   HA   HB   C2   HS N   HN1   HN2   HN3   C12  H12A   C13  O13A  O13B   C11  H11A  H11B     P   O13   O14   O12 O11    C1    HA    HB    C2    HS C12   H2   O2  HO2  C13   H3   O3  HO3  C14   H4   O4   P4 OP42 OP43 OP44  C15   H5   O5   P5  OP52 OP53 OP54  H52  C16   H6   O6  HO6  C11   H1    P  O13  O14  O12  O11   C1   HA   HB   C2   HS'
+      PI2P: 'N C12 C13 C14 C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C C11 H11A H11B P O13 O14 O12 O11 C1 HA HB C2 HS N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B P O13 O14 O12 O11 C1 HA HB C2 HS C12 H2 O2 HO2 C13 H3 O3 HO3 C14 H4 O4 P4 OP42 OP43 OP44 C15 H5 O5 P5 OP52 OP53 OP54 H52 C16 H6 O6 HO6 C11 H1 P O13 O14 O12 O11 C1 HA HB C2 HS'
       DOPE: 'N HN1 HN2 HN3 C12 H12A H12B C11 H11A H11B P O13 O14 O11 O12 C1 '#HA HB C2 HS O21 C21 O22 C22 H2R H2S C3 HX HY O31 C31 O32 C32'
       DOPS: 'N HN1 HN2 HN3 C12 H12A C13 O13A O13B C11 H11A H11B P O13 O14 O12 O11 C1'
+    headless_selection: 'not hydrogen and (resname CHL1 or ((resname DOPE or resname DOPS or resname POPC or resname PI2P) and (name "C2.+" or name "C3.+")))'
   slices:
     steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
     current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
@@ -52,20 +53,16 @@ collections:
   single:
     - mdia2bilayerphys
   cursor:
-    - mdia2bilayerphys
-    - mdia2bilayerphys2
     - mdia2bilayer_nochl2
     - mdia2bilayer_nochl3 
     - mdia2bilayer10
-    - mdia2bilayer30
     - mdia2bilayer10_2
+    - mdia2bilayerphys
+    - mdia2bilayerphys2
+    - mdia2bilayer30
     - mdia2bilayer30_2
 
 meta:
-  #! note that this short_namer must be compatible with the spots prefixer!
-  #! removing the "v" here hence breaking compatibility with the previous slices
-  #short_namer: "lambda sn,spot : 'v'+re.findall('(.+)',sn)[0]"
-  #short_namer: "lambda sn,spot: sn"
   mdia2bilayerphys:
     name:               "mdia2bilayerphys r1"
     ptdins_resname:     "PI2P"
@@ -156,6 +153,7 @@ meta:
     label:              "mDia2, 30% $PIP_2$ (r2)"
     label_compact:      "mDia2 with\n30% $PIP_2$ (r2)"
     index_top_monolayer: 1
+
 slices:
   # mdia2bilayerphys -> /home/share/lolabu/simulations/mdia2bilayerphys
   mdia2bilayerphys: 
@@ -225,6 +223,20 @@ calculations:
             resnames: +selectors/resnames_lipid_chol
             lipid_tip: "name P or name H3'"
             type: com
+          lipid_chol_com_headless:
+            monolayer_cutoff: 1.4
+            resnames: +selectors/resnames_lipid_chol
+            # custom code in python must create the MDAnalysis-compatible "selstring" text
+            type: custom
+            custom: |
+              sel_all = uni.select_atoms('all')
+              sel_lipids = ' or '.join(['resname %s'%i for i in selector['resnames']])
+              sel_tail_names = ' or '.join(['name %s'%j for j in [
+                i for i in np.unique(sel_all.names) if re.match('^C(2|3)\d{2,}',i)]])
+              selstring = '(not name H*) and ((%s) or ((%s) and (%s)))'%(
+                'resname CHL1',sel_lipids,sel_tail_names)
+            selection: +selectors/headless_selection
+            lipid_tip: "name P or name H3'"
   contacts:
     group: all
     slice_name: current
@@ -289,6 +301,7 @@ calculations:
     specs:
       distance_cutoff: 
         loop: [2.2,3.4,4.6]
+
 plots:
   video_maker:
     script: video_maker.py
@@ -323,9 +336,18 @@ plots:
     specs:
       cutoff_salt_bridge: 3.4
       cutoff_hydrogen_bonds: 3.4
-  lipid_lipid_bonds_analysis:
+  lipid_lipid_bonds_analysis: # deprecated
     autoplot: True
     script: lipid_lipid_bonds_analysis.py
+    collections: cursor
+    calculation:
+      hydrogen_bonding:
+        protein: false
+      salt_bridges:
+        distance_cutoff: 2.2
+  lipid_lipid_bonds:
+    autoplot: True
+    script: lipid_lipid_bonds.py
     collections: cursor
     calculation:
       hydrogen_bonding:
@@ -347,8 +369,9 @@ plots:
     calculation: lipid_rdfs
 
 deprecated:
-  #! this was interfering with actinlink_lipid_lipid_bonds above !!!
-  hydrogen_bonding: #! note that these images named "bonding_subset" may be from an earlier round of analysis?
+  #! this was interfering with actinlink_lipid_lipid_bonds above
+  #! note that these images named "bonding_subset" may be from an earlier round of analysis?
+  hydrogen_bonding: 
     calculation: hydrogen_bonding
     collections: cursor
     specs:
