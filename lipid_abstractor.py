@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import time
+import time,re
 import numpy as np
 import MDAnalysis
 from joblib import Parallel,delayed
@@ -38,6 +38,10 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	elif 'type' in selector and selector['type'] == 'select' and 'selection' in selector:
 		if 'resnames' not in selector: raise Exception('add resnames to the selector')
 		selstring = selector['selection']
+	elif selector.get('type',None)=='custom':
+		custom_exec_vars = dict(uni=uni,selector=selector)
+		exec(selector['custom'],globals(),custom_exec_vars)
+		selstring = custom_exec_vars['selstring']
 	else: raise Exception('\n[ERROR] unclear selection %s'%str(selector))
 
 	#---compute masses by atoms within the selection
