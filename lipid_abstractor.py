@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import time
+import time,re
 import numpy as np
 import MDAnalysis
 from joblib import Parallel,delayed
@@ -38,6 +38,10 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	elif 'type' in selector and selector['type'] == 'select' and 'selection' in selector:
 		if 'resnames' not in selector: raise Exception('add resnames to the selector')
 		selstring = selector['selection']
+	elif selector.get('type',None)=='custom':
+		custom_exec_vars = dict(uni=uni,selector=selector)
+		exec(selector['custom'],globals(),custom_exec_vars)
+		selstring = custom_exec_vars['selstring']
 	else: raise Exception('\n[ERROR] unclear selection %s'%str(selector))
 
 	#---compute masses by atoms within the selection
@@ -57,13 +61,17 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		else: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
 	else: masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
 	
-	resids = sel.resids
-	#---create lookup table of residue indices
-	if len(sel.resids)==len(np.unique(sel.resids)):
-		divider = [np.where(resids==r) for r in np.unique(resids)]
-	#---note that redundant residue numbering requires special treatment
+	# note that the following sequence has been reworked to reflect apparent changes in the 
+	# ... residue-handling. previously we used `if len(sel.resids)==len(np.unique(sel.resids)):` but this
+	# ... is now incompatible
+	resids = sel.residues.resids
+	# create lookup table of residue indices
+	if len(resids)==len(np.unique(resids)):
+		divider = [np.where(sel.resids==r) for r in np.unique(resids)]
+	# note that redundant residue numbering requires special treatment
 	else:
-		if ('type' in selector) and (selector['type'] in ['com','select']) and ('resnames' in selector):
+		#! note that the resid handling change above may not have been implemented in the custom method below
+		if (('type' in selector) and (selector['type'] in ['com','select']) and ('resnames' in selector)):
 			#---note that MDAnalysis sel.residues *cannot* handle redundant numbering
 			#---note also that some test cases have redundant residues *and* adjacent residues with
 			#---...the same numbering. previously we tried a method that used the following sequence:
@@ -124,7 +132,9 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 				#---in the careful method the sel from above is broken but allsel[lipids] is correct
 				sel = allsel[lipids]
 				masses = np.array([mass_table[i[0]] for i in sel.atoms.names])
-		else: raise Exception('residues have redundant resids and selection is not the easy one')
+		else: 
+			import ipdb;ipdb.set_trace()
+			raise Exception('residues have redundant resids and selection is not the easy one')
 
 	#---load trajectory into memory	
 	trajectory,vecs = [],[]
@@ -132,7 +142,8 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		status('loading frame',tag='load',i=fr,looplen=nframes)
 		uni.trajectory[fr]
 		trajectory.append(sel.positions/lenscale)
-		vecs.append(sel.dimensions[:3])
+		#! critical fix: you must cast the dimensions or you get repeated vectors
+		vecs.append(np.array(uni.trajectory[fr].dimensions[:3]))
 	vecs = np.array(vecs)/lenscale
 
 	checktime()
@@ -174,6 +185,9 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 		topologize_tolerance=separator.get('topologize_tolerance',None))
 	#---get the indices from the leaflet finder
 	monolayer_indices = leaflet_finder.monolayer_indices
+	# for convenience when doing planar bilayers we put the zero index on top
+	top_mono = np.argmax([atoms_separator[0][monolayer_indices==i][:,2].mean() for i in range(2)])
+	if top_mono!=0: monolayer_indices = 1-monolayer_indices
 
 	checktime()
 	coms_out = np.array(coms)

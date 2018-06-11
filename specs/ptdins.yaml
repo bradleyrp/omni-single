@@ -1,3 +1,5 @@
+director:
+  legacy_specs: True
 slices:
   membrane-v509:
     groups: 
@@ -124,6 +126,17 @@ variables:
     Cal: 2.6
     K: 3.0
   names:
+    # short is only used in lipid_lipid_bonds_analysis
+    short:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PI(4,5)P$_2$"
+      P35P: "PI(3,5)P$_2$"
+      PIPP: "PI(4,5)P$_2^{-3}$"
+      PIPU: "PI(4,5)P$_2^{-5}$"
     proper_residue_names_long:
       CHL1: Cholesterol
       DOPC: DOPC
@@ -247,7 +260,7 @@ collections:
     - membrane-v534
 
 meta:
-  short_namer: 'lambda sn,spot : ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
+  short_namer: 'lambda sn,spot=None: ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
   membrane-v509:
     composition_name:    symmetric
     cation:              NA
@@ -512,15 +525,6 @@ calculations:
     uptype: simulation
     slice_name: current
     collections: asymmetric
-  salt_bridges_lipid_lipid:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      distance_cutoff: 3.4
-
-calculations_aside:
   ion_binding:
     group: all
     uptype: simulation
@@ -556,6 +560,14 @@ calculations_aside:
           upstream:
             lipid_abstractor:
               selector: lipid_com
+calculations_retired_or_discarded:
+  salt_bridges_lipid_lipid:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      distance_cutoff: 3.4
   #! too many combinations! hits memory
   contacts:
     group: all
@@ -566,7 +578,6 @@ calculations_aside:
       object: lipid
       cutoff:
         loop: [3.4]
-
 plots:
   undulations_ptdins: 
     calculation: undulations
@@ -578,7 +589,9 @@ plots:
       ion_binding_combinator:
         zonecut: 2.2
       # ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
-  hydrogen_bonding:
+  hydrogen_bonding_real:
+    #! rename was necessary for lipid_lipid_bonds_analysis, which was otherwise redirecting here!
+    script: plot-hydrogen_bonding.py
     calculation: hydrogen_bonding
     collections: all
     specs:
@@ -719,6 +732,25 @@ plots:
           - membrane-v530
           - membrane-v531
           - membrane-v532
+  hydration_lenticular:
+    calculation: 
+      hydration:
+        atom_filter: "^O"
+        distance_metric: "r"
+    collections: all
+    specs:
+      # set the cutoffs according to distance_metric
+      distance_ranges_by_metric:
+        "z": [0.0,50.0,0.5]
+        "r": [1.2,4.0,0.05]
+      # one plot for each group of simulations
+      sns:
+        position_45:
+          - membrane-v531
+          - membrane-v532
+        position_35:
+          - membrane-v533
+          - membrane-v534
   head_angle_contour:
     calculation: head_angle
   ptdins_snapshots:
@@ -744,9 +776,16 @@ plots:
         selector: lipid_chol_com
       hydrogen_bonding: {}
   ptdins_partners:
+    autoplot: True
     collections: all
     calculation:
-      lipid_mesh_partners: {}
+      lipid_mesh_partners:
+        upstream:
+          lipid_abstractor:
+            selector:
+              loop:
+                - lipid_com
+                - lipid_chol_com
   ptdins_diffusion_legacy:
     collections: all
     calculation:
@@ -777,3 +816,12 @@ plots:
     calculation: 
       lipid_abstractor:
         selector: lipid_com
+  lipid_lipid_bonds_analysis:
+    autoplot: True
+    script: lipid_lipid_bonds_analysis.py
+    collections: asymmetric_all
+    calculation:
+      hydrogen_bonding: {}
+      salt_bridges:
+        distance_cutoff: 2.2
+

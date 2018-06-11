@@ -55,7 +55,10 @@ extrana:
   - look-times.ipynb
   # actinlink dev files
   - actinlink_video_viewer.ipynb
-  - script-check-times.py
+  #? possibly retired?
+  - plot-actinlink_video_interactive.py
+  # reports
+  - report-2018.01.12.ipynb
 
 plots:
   # passing
@@ -63,11 +66,12 @@ plots:
     - undulation_spectra
     - plot_height_profiles
   undulations_videos.py: passing
-  # testing next, actinlink
-  plot-actinlink_video.py:
-  plot-actinlink_video_interactive.py:
+  # recently-developed limbo needs confirmed and documented:
+  actinlink_bonds_analysis.py: passing
+  actinlink_bonds_analysis_review.ipynb: passing,at large
+  #! note that art_ptdins.pyc ends up on the unaccounted list probably because execute?
+  video_maker.py: passing on actinlink
   # testing next
-  plot-actinlink_videos.py:
   plot-ucc.py:
   plot-martini_video.py:
   plot-curvature_undulation_coupling_drilldown.py:
@@ -223,3 +227,7 @@ timewise:
     notes: |
       added backrun to compute and we print dots to the log file for each frame so it does not get bloated
       made a `make clear_stale` method to clear error dat files if a compute job is killed which is useful
+  2018.01.25.1700:
+    notes: |
+      merged development branches for omnicalc and corresponding changes on factory into master and tested. 
+      note extensive testing and updated biophyscode portal

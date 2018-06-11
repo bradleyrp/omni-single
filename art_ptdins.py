@@ -14,10 +14,14 @@ _art_words = ['colorize','barmaker']
 _art_words += ['uniquify','catalog','delve','delveset','delveset_list',
 	'BarGrouper','barspecs_stylized','colorscale',
 	'make_bar_formats','legend_maker_stylized','sidestack_images','get_blank_border',
-	'ptdins_manuscript_settings']
+	'ptdins_manuscript_settings','residue_codes']
+#! extras for actinlink
+_art_words += ['actinlink_monolayer_indexer','actinlink_replicate_mapping','actinlink_color_by_simulation',
+	'actinlink_extra_labels','color_by_simulation','actinlink_sns_mdia2','actinlink_color_by_simulation']
 
 #---canonical colors for this project from brewer2mpl
 import brewer2mpl
+import re
 
 palette_colors = dict([(val,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[key]) for key,val in enumerate('red blue green purple orange yellow brown pink grey'.split())])
 	
@@ -580,3 +584,69 @@ def ptdins_manuscript_settings():
 	colors_ions = {'NA':'green','Na,Cal':'bluegreen','MG':'pink','Cal':'blue','K':'grey',}
 	hatches_lipids = {'PI2P':'//','P35P':'-','PIPU':'xx','PIPP':'++','SAPI':''}
 	return dict(colors_ions=colors_ions,colors=colors,hatches_lipids=hatches_lipids)
+
+residue_codes = {'ARG':'R','HIS':'H','LYS':'K','ASP':'D','GLU':'E',
+	'SER':'S','THR':'T','ASN':'N','GLN':'Q','CYS':'C','SEL':'U','GLY':'G','PRO':'P',
+	'ALA':'A','ILE':'I','LEU':'L','MET':'M','PHE':'F','TRP':'W','TYR':'Y','VAL':'V'}
+
+#! actinlink settings
+
+def actinlink_monolayer_indexer(sn,abstractor):
+	if abstractor=='lipid_chol_com':
+		#! had to add 'mdia2bilayer10' for this to get lipid_rdfs to work
+		if sn in ['mdia2bilayer10','mdia2bilayer10_2','mdia2bilayer30_2']: return 1
+		else: return 0
+	elif abstractor=='lipid_com':
+		if sn in ['mdia2bilayerphys2','mdia2bilayer30_2']: return 1
+		else: return 0
+	else: raise Exception
+
+actinlink_replicate_mapping = [('pip2_20_no_chol',['mdia2bilayer_nochl2','mdia2bilayer_nochl3']),
+	('pip2_10',['mdia2bilayer10','mdia2bilayer10_2']),
+	('pip2_20',['mdia2bilayerphys','mdia2bilayerphys2']),
+	('pip2_30',['mdia2bilayer30','mdia2bilayer30_2'])]
+
+actinlink_extra_labels = {
+	'pip2_20_no_chol':r'mDia2, 20% $PIP_2$, no CHOL ($\times2$)',
+	'pip2_20':r'mDia2, 20% $PIP_2$ ($\times2$)',
+	'pip2_30':r'mDia2, 30% $PIP_2$ ($\times2$)',
+	'pip2_10':r'mDia2, 10% $PIP_2$ ($\times2$)',}
+
+def actinlink_color_by_simulation(sn):
+	"""
+	Choose colors for each simulation across many plots.
+	"""
+	replicate_mapping = actinlink_replicate_mapping
+	#! remove from actinlink_bonds_analysis
+	#! move to art? this is used elsewhere, in plot-ptdins_partners.py
+	# tetradic colors via https://www.sessions.edu/color-calculator/
+	colors = ['#ff6c28','#28c6ff','#a928ff','#ffd828']
+	# tetradic colors via http://paletton.com/#uid=7030Z0kqbujggFvlnx6qcY+wDkl
+	#! these colors must exactly match the ordering in the replicate matching
+	colors = ['#f2b52c','#2e47a4','#22b93c','#f23a2c']
+	refs = ['^mdia2bilayer_nochl','^mdia2bilayer10','^mdia2bilayer(?!(_nochl|[0-9]))','^mdia2bilayer30']
+	ref_to_color = dict(zip(refs,colors))
+	matches = [color for ref,color in ref_to_color.items() if re.match(ref,sn)]
+	if len(matches)>1: raise Exception
+	elif len(matches)==0:
+		#! color order must match the replicate mapping order
+		return dict(zip(zip(*replicate_mapping)[0],colors))[sn]
+	else: return matches[0]
+
+actinlink_sns_mdia2 = ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayer10','mdia2bilayer10_2',
+	'mdia2bilayerphys','mdia2bilayerphys2','mdia2bilayer30','mdia2bilayer30_2']
+
+def make_legend(ax,keys=None):
+	#! copied from plot-lipid_rdfs.pf
+	# legend at last tile
+	legendspec = []
+	for sn_general,sns in replicate_mapping:
+		if not keys or sn_general in keys:
+			legendspec.append(dict(name=extra_labels[sn_general],
+				patch=mpl.patches.Rectangle((0,0),1.0,1.0,fc=color_by_simulation(sns[0]))))
+	patches,labels = [list(j) for j in zip(*[(i['patch'],i['name']) for i in legendspec])]
+	legend = ax.legend(patches,labels,loc='upper left',bbox_to_anchor=(1.0,0.0,1.,1.))
+	frame = legend.get_frame()
+	frame.set_edgecolor('k')
+	frame.set_facecolor('w')
+	return legend

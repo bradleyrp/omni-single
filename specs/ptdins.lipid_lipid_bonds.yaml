@@ -1,0 +1,154 @@
+# UNIT TEST FOR LIPID-LIPID BONDS
+# requires preexisting dataset
+
+director:
+  # backwards compatibility for OmniCalc 2015-2016 (not typically necessary)
+  legacy_specs: True
+  art_director: art_ptdins.py
+  renamer: 'lambda sn,spot=None: ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
+  redacted: True
+
+variables:
+  selectors:
+    ions: (name NA or name CL or name MG or name Cal or name K)
+  slices:
+    current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
+    current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
+
+slices:
+  membrane-v509:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':28000,'end':108000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':28000,'end':108000,'skip':1}
+  membrane-v510:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':24000,'end':104000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':24000,'end':104000,'skip':1}
+  membrane-v511:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':24000,'end':104000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':24000,'end':104000,'skip':1}
+  membrane-v530:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v531:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v532:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v533:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v534:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v514:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v515:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v536:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: +slices/current
+      current_ions: +slices/current_ions
+  membrane-v538:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  membrane-v542:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':0,'end':48000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
+  membrane-v543:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':0,'end':48000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
+
+collections:
+  all:
+    - membrane-v536
+    - membrane-v538
+    - membrane-v530
+    - membrane-v542
+    - membrane-v531
+    - membrane-v533
+    - membrane-v532
+    - membrane-v534
+
+calculations:
+  hydrogen_bonding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
+  salt_bridges:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      distance_cutoff: 
+        loop: [2.2,3.4,4.6]
+plots:
+  lipid_lipid_bonds_analysis:
+    autoplot: True
+    script: lipid_lipid_bonds_analysis.py
+    collections: asymmetric_all
+    calculation:
+      hydrogen_bonding: {}
+      salt_bridges:
+        distance_cutoff: 2.2
