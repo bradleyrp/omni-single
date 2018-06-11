@@ -1,30 +1,43 @@
 #!/usr/bin/env python
 
 """
-Plot bilayer areas for the ptdins project.
+Plot undulation spectra and height profiles.
 """
 
+from codes.looptools import basic_compute_loop
 from codes.undulate import calculate_undulations
 from codes.undulate_plot import undulation_panel,add_undulation_labels,add_axgrid,add_std_legend
+# height correlation requires scipy
+import scipy
+import scipy.spatial
+
 
 @autoload(plotrun)
 def load():
 	"""Load the data."""
-	#---condition for loading the data
-	if 'data' not in globals(): 
-		#---load once
-		global data,calc,data_prot
-		data,calc = plotload('undulations',work)
-		try: data_prot,_ = plotload('protein_abstractor',work)
-		#---not all bilayers have proteins
+	if False:
+		data,calc = plotload('undulations')
+		try: data_prot,_ = plotload('protein_abstractor')
+		# not all bilayers have proteins
 		except: data_prot = {}
+		sns = work.sns()
+	else:
+		collections = ['focus','enth']
+		# reload the data with more simulations
+		#! move this to a conditional in the autoload to avoid repetition
+		data,calc = plotload('undulations',collections=collections)
+		try: data_prot,_ = plotload('protein_abstractor',collections=collections)
+		# not all bilayers have proteins
+		except: data_prot = {}
+		#! work.sns is getting weirdly set?
+		sns = data.keys()
 
 @autoplot(plotrun)
 def plot_height_profiles():
 	"""
 	Plot the bilayer height profile with protein positions.
 	"""
-	#---one plot per simulation
+	# one plot per simulation
 	for sn in work.sns():
 		mesh = data[sn]['data']['mesh']
 		surf = mesh.mean(axis=0).mean(axis=0)
@@ -62,23 +75,23 @@ def undulation_spectra(style='all_on_one'):
 	Manage different plot combinations.
 	This is currently under development, and needs to be resolved with plot-analyze_dextran_undulations.py.
 	"""
-	#---external settings
+	# external settings
 	plotspecs = work.plots[plotname].get('specs',{})
 	wavevector_limits = plotspecs.get('wavevector_limits',[1.0])
-	#---top level sweep over plot settings and styles
+	# top level sweep over plot settings and styles
 	sweep_specs = {
 		'wavevector_limit':wavevector_limits,
 		'style':['all_on_one'],
-		#---! need custom heights for average_normal
+		# ! need custom heights for average_normal
 		'midplane_method':['flat','average','average_normal'][:-1],}
-	#---get colors first from art which always
+	# get colors first from art which always
 	colors_reqs = ['binned','fitted','line']
 	if colors!=None: 
-		#---must match the receiver in the plot function
+		# must match the receiver in the plot function
 		sweep_specs['color'] = [dict([(sn,dict([(key,colors[sn]) 
 			for key in colors_reqs])) for sn in colors])]
-	#---we could also get the colors systematically from the metadata here?
-	#---fallback randomly generates random colors
+	# we could also get the colors systematically from the metadata here?
+	# fallback randomly generates random colors
 	else: 
 		def random_colormaker(x,n,name='jet'): 
 			return mpl.cm.__dict__[name](np.linspace(0.,1.0,len(work.sns()))[x]/n)
@@ -86,13 +99,13 @@ def undulation_spectra(style='all_on_one'):
 			for key in colors_reqs])) for snum,sn in enumerate(work.sns())])
 		sweep_specs['color'] = [colors_random]
 	plots_this = sweeper(**sweep_specs)
-	#---settings
+	# settings
 	art = {'fs':{'legend':12}}
-	#---loop over all plot settings and styles
+	# loop over all plot settings and styles
 	for pnum,plotspec in enumerate(plots_this):
-		#---unpack settings
+		# unpack settings
 		style = plotspec['style']
-		#---router over plot layouts
+		# router over plot layouts
 		if style=='all_on_one':
 			figsize = (5,5)
 			layout = {'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]}
@@ -102,7 +115,7 @@ def undulation_spectra(style='all_on_one'):
 				plot_undulation_spectrum(ax,sn,**plotspec)
 			decorate_undulation_plot(ax=ax,art=art)
 		else: raise Exception('invalid plot style %s'%style)
-		#---save the plot, with relevant keys
+		# save the plot, with relevant keys
 		meta_reqs = ['midplane_method','wavevector_limit','style']
 		meta = dict([(key,plotspec[key]) for key in meta_reqs])
 		picturesave('fig.undulations',work.plotdir,backup=False,version=True,meta=meta)
@@ -113,7 +126,7 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 	"""
 	mesh = data[sn]['data']['mesh']
 	surf = mesh.mean(axis=0)
-	#---! somewhat amazing that the following is necessary, but it is
+	#! somewhat amazing that the following is necessary, but it is
 	surf = (surf - np.tile(surf.reshape(len(surf),-1).mean(axis=1),
 		(surf.shape[1],surf.shape[2],1)).transpose(2,0,1))
 	vecs = data[sn]['data']['vecs']
@@ -148,3 +161,104 @@ def decorate_undulation_plot(ax,art):
 	add_undulation_labels(ax,art=art)
 	add_std_legend(ax,loc='upper right',art=art)
 	add_axgrid(ax,art=art)
+
+def compute_protein_proximity_height_correlation(fr,pbc=False):
+	"""Calculation for basic_compute_loop to correlate membrane height with proximity to proteins."""
+	global surf,vecs,protein_pts
+	# gather points
+	surf = mesh[fr]
+	ngrid = surf.shape
+	if pbc: surf = np.tile(surf,(3,3))
+	vec = vecs[fr]
+	#! unpack pts per the structure of points_all
+	pts_this = np.concatenate(protein_pts[fr])[...,:2]
+	# get XY points for the grid
+	if not pbc:
+		xypts = np.concatenate(np.transpose(np.meshgrid(*[np.linspace(0,v,n) 
+			for v,n in zip(vec[:2],ngrid)])))
+	else:
+		xypts = np.concatenate(np.transpose(np.meshgrid(*[np.linspace(0,3*v,3*n) 
+			for v,n in zip(vec[:2],ngrid)])))
+		pts_this += vec[:2]
+	# round because the cKDTree is finnicky
+	pts_back = pts_this
+	pts_fore = np.floor(xypts*10.**3)/10.**3
+	# make the tree
+	tree = scipy.spatial.ckdtree.cKDTree(pts_back,boxsize=vec[:2]*(3 if pbc else 1))
+	close,nns = tree.query(pts_fore,k=1)
+	# return the minimum distance to the protein and the bilayer height
+	return np.array([close,surf.reshape(-1)]).T
+
+def plot_height_proximity_correlation(**kwargs):
+	"""
+	Plot the instantaneous membrane height vs proximity to protein points.
+	"""
+	import seaborn as sb
+	# stash to globals to iterate the plot aesthetics
+	if 'post' not in globals():
+		global post,mesh,vecs,protein_pts
+		post = {}
+		sample_rate = 1
+		for sn in sns:
+			# points_all for the dimer simulations has dimensions frames, monomer, points, xyz
+			protein_pts = data_prot[sn]['data']['points_all']
+			vecs = data[sn]['data']['vecs']
+			nframes = len(vecs)
+			mesh = data[sn]['data']['mesh'].mean(axis=0)
+			ngrid = mesh.shape[-2:]
+			mesh -= np.tile(mesh.reshape(nframes,-1).mean(axis=1),(ngrid[0],ngrid[1],1)).transpose((2,0,1))
+			incoming = basic_compute_loop(compute_protein_proximity_height_correlation,
+				looper=[dict(fr=fr) for fr in range(0,nframes,sample_rate)])
+			post[sn] = dict(sizes=[len(i) for i in incoming],incoming=np.concatenate(incoming))
+
+	# testing seaborn 2D histogram
+	if False:
+		binw = 0.5
+		rmax,zmax = [max([np.abs(v['incoming'][:,i]).max() for v in post.values()]) for i in range(2)]
+		bins = np.arange(0,rmax+binw,binw)
+		for snum,sn in enumerate(sns):
+			sample = post[sn]['incoming'][::1]
+			fig = sb.jointplot(x=sample.T[0],y=sample.T[1],kind='kde',
+				space=0,color='k',xlim=(0,rmax),ylim=(-zmax,zmax))
+			fig.savefig(os.path.join(work.plotdir,'fig.height_by_proximity.%s.png'%sn))
+
+	# testing seaborn lvplot
+	if False:
+		binw = 1.0
+		axes,fig = square_tiles(len(sns),figsize=(8,8))
+		for snum,sn in enumerate(sns):
+			ax = axes[snum]
+			rmax,zmax = [max([np.abs(v['incoming'][:,i]).max() for v in post.values()]) for i in range(2)]
+			bins = np.arange(0,rmax+binw,binw)
+			sample = post[sn]['incoming'][::len(post[sn]['incoming'])/1000]
+			binned = [sample[np.all((sample.T[0]>=bins[ii],sample.T[0]<=bins[ii+1]),axis=0)][:,1] for ii,i in enumerate(bins[:-1])]
+			sb.lvplot(data=binned,ax=ax, scale="linear", palette="mako")
+		plt.savefig(os.path.join(work.plotdir,'fig.debug.png'))
+
+	# regular plot
+	binw = 1.0
+	axes,fig = square_tiles(1,figsize=(8,8))
+	ax = axes[0]
+	pbc_spacing = min([min(data[sn]['data']['vecs'].mean(axis=0)[:2]) for sn in sns])
+	colors = sb.color_palette("hls",len(sns))
+	for snum,sn in enumerate(sns):
+		rmax,zmax = [max([np.abs(v['incoming'][:,i]).max() for v in post.values()]) for i in range(2)]
+		bins = np.arange(0,rmax+binw,binw)
+		rate = 1
+		sample = post[sn]['incoming'][::rate]
+		binned = [sample[np.all((sample.T[0]>=bins[ii],sample.T[0]<=bins[ii+1]),axis=0)][:,1] for ii,i in enumerate(bins[:-1])]
+		means = np.array([np.mean(i) for i in binned])
+		stds = np.array([np.std(i) for i in binned])
+		ax.plot(bins[:-1],means,label=sn,color=colors[snum])
+		ax.fill_between(bins[:-1],means-stds,means+stds,alpha=0.1,color=colors[snum])
+	# there is very little difference between doing the expensive PBC
+	ax.set_xlim((0.,pbc_spacing/2.))
+	ax.axhline(0,c='k',lw=1)
+	plt.legend()
+	plt.savefig(os.path.join(work.plotdir,'fig.debug.png'))
+
+plotrun.routine = []
+if __name__=='__main__': 
+
+	plot_height_proximity_correlation()
+	pass
