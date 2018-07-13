@@ -261,7 +261,8 @@ def water_distribution_sweep_plot_with_snapshots():
 	water_distribution_sweep_plot(incoming=dict(fig=fig,ax=axes[0]),
 		fs=dict(xlabel=20,ylabel=20,ylabel_inset=16,xlabel_inset=16,colorbar_label=12))
 	picturesave('fig.hydration_distribution.snapshots',
-		work.plotdir,backup=False,version=True,meta={},extras=extras)
+		#! added revision after changing the labels
+		work.plotdir,backup=False,version=True,meta={'revision':'2018.07.13'},extras=extras)
 
 ###---STANDARD
 

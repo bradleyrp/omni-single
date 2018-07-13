@@ -320,7 +320,7 @@ class BarGrouper:
 		for arg in args: self.namesdict[arg] = val
 
 def legend_maker_stylized(ax,sns_this,work,title=None,ncol=1,
-	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None,
+	bbox=(1.05,0.0,1.,1.),loc='upper left',fs=16,extra_legends=None,fancy=True,
 	comparison_spec=None,lipid_resnames=None,sns_explicit=None,bar_formats=None):
 	"""
 	############## copied from hydrogen bonding!
@@ -391,9 +391,9 @@ def legend_maker_stylized(ax,sns_this,work,title=None,ncol=1,
 	if not patches: patches,labels = [mpl.patches.Rectangle((0,0),1.0,1.0,fc='w')],['empty']
 	legend = ax.legend(patches,labels,loc=loc,fontsize=fs,
 		ncol=ncol,title=title,bbox_to_anchor=bbox,labelspacing=1.2,
-		handleheight=2.0,markerscale=0.5,shadow=True,fancybox=True)
+		handleheight=2.0,markerscale=0.5,shadow=fancy,fancybox=fancy)
 	frame = legend.get_frame()
-	frame.set_edgecolor('black')
+	frame.set_edgecolor('black' if fancy else 'white')
 	frame.set_facecolor('white')
 	return legend,patches
 

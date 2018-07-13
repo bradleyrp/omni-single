@@ -4,6 +4,7 @@ import os,glob,re,time
 import numpy as np
 import sklearn
 import sklearn.neighbors
+import copy
 
 vecnorm = lambda vec: vec/np.linalg.norm(vec)
 vecangle = lambda v1,v2 : np.arccos(np.dot(vecnorm(v1),vecnorm(v2)))*(180./np.pi)
@@ -93,30 +94,34 @@ def salt_bridges(grofile,trajfile,**kwargs):
 		mol = land.itps[land.objects[resname]['fn']][resname]
 		#---collect all possible hydrogen bond acceptors
 		#---! forbid water here for salt bridge calculation
+		#! it was an error to redefine acceptor names here because they get overwritten!
 		acceptor_names = [i['atom'] for i in mol['atoms'] if re.match('^(N|O|S)',i['atom']) and i!='OW']
-		h_name = [i['atom'] for i in mol['atoms'] if re.match('^H',i['atom'])]	
-		donor_candidates = [(j,k) for j,k in [(int(i['i']),int(i['j'])) 
-			for i in mol['bonds']] 
-			if any([re.match('^H',mol['atoms'][l-1]['atom']) for l in [j,k]]) 
-			and any([mol['atoms'][m-1]['atom'] in acceptor_names for m in [j,k]])]
-		donor_names = []
-		for d in [(mol['atoms'][i-1]['atom'],mol['atoms'][j-1]['atom']) for i,j in donor_candidates]:
-			if d not in donor_names: donor_names.append(d)
+		#! note that I am preempting the bug here. previously used some logic to get hydrogen
+		#! the following assumes that both donors and acceptors are NOS.
+		#! NOTE THAT THE POINT OF THIS CALCULATION IS THAT WE HAVE CATIONS BRIDGING TWO NEGATIVE
+		#!   HEAVY ATOMS AND THERE ARE VERY FEW POSITIVE HEAVY CHARGES IN LIPIDS ANYWAY
+		#!   ONLY EXCEPTION IS DOPE ETHANOLAMINE
+		donor_names = [i['atom'] for i in mol['atoms'] if re.match('^(N|O|S)',i['atom']) and i!='OW']
 		hydrogen_bond_ref[resname] = {'acceptors':acceptor_names,'donors':donor_names}
 	#---water-naming is hard-coded 
-	hydrogen_bond_ref['water'] = {'donors':[('OW','HW1'),('OW','HW2')],'acceptors':['OW']}
+	#! hydrogen_bond_ref['water'] = {'donors':[('OW','HW1'),('OW','HW2')],'acceptors':['OW']}
 	#---assemble the names
-	donors_names = sorted(list(set([m for n in [zip(*i['donors'])[0] 
-		for i in hydrogen_bond_ref.values() if i['donors']!=[]] for m in n])))
-	hydrogens_names = sorted(list(set([m for n in [zip(*i['donors'])[1] 
-		for i in hydrogen_bond_ref.values() if i['donors']!=[]] for m in n])))
+	#! note that there were two bugs: first I was using hydrogens for a salt bridge calculation (!)
+	#!   and second this was using the zero even though the bonds could be symmetric. the solution was to 
+	#!   search through mol['bonds'] and the reversed 
+	#donors_names = sorted(list(set([m for n in [zip(*i['donors'])[0] 
+	#	for i in hydrogen_bond_ref.values() if i['donors']!=[]] for m in n])))
+	donors_names = sorted(list(set([m for n in [i['donors'] for i in hydrogen_bond_ref.values() 
+		if i!=[]]for m in n])))
+	#hydrogens_names = sorted(list(set([m for n in [zip(*i['donors'])[1] 
+	#	for i in hydrogen_bond_ref.values() if i['donors']!=[]] for m in n])))
 	acceptors_names = sorted(list(set([m for n in [i['acceptors'] 
 		for i in hydrogen_bond_ref.values() if i!=[]]for m in n])))
 	#---generate atom groups
 	donors = uni.select_atoms(' or '.join(['name %s'%i for i in donors_names]))
 	acceptors = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
-	hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))
-
+	#hydrogens = uni.select_atoms(' or '.join(['name %s'%i for i in hydrogens_names]))
+	
 	#---! not necessary
 	if False:
 
@@ -135,8 +140,8 @@ def salt_bridges(grofile,trajfile,**kwargs):
 
 	#---! use acceptor names for both donor and acceptor pairs for this calculation. that is, we do not 
 	#---! ...require an intervening hydrogen
-
-	donors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptor_names]))
+	#! incorrectly used acceptors_names. fixed now
+	donors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
 	donors_resids = np.unique(donors_side.resids)
 
 	#---! not necessary
@@ -183,7 +188,8 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	acceptors_names = np.unique([j for k in [i.get('acceptors',[]) 
 		for i in hydrogen_bond_ref.values()] for j in k])
 	#---! use acceptor_names not acceptors_names
-	acceptors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptor_names]))
+	#! NO THAT IS WRONG
+	acceptors_side = uni.select_atoms(' or '.join(['name %s'%i for i in acceptors_names]))
 
 	#---extend to include salt bridges
 	#---some systems have two types of cations
@@ -207,7 +213,6 @@ def salt_bridges(grofile,trajfile,**kwargs):
 		all_cation_coords.append(cations_side.positions/lenscale)
 	status('completed caching in %.1f minutes'%((time.time()-st)/60.),tag='status')
 	#---the preceding code is identical to the beginning of hydrogen_bonding
-
 	#---export variables
 	from codes import hbonds
 	hbonds.hydrogen_bond_ref = hydrogen_bond_ref
@@ -234,8 +239,9 @@ def salt_bridges(grofile,trajfile,**kwargs):
 	start = time.time()
 	out_args = {'distance_cutoff':distance_cutoff}
 	if run_parallel:
-		incoming_salt = Parallel(n_jobs=4,verbose=10 if debug else 0)(
-			delayed(hbonds.salt_bridges_framewise,has_shareable_memory)(fr,**out_args) 
+		#! use require='sharedmem' instead of delayed(func,has_shareable_memory) for late era joblib
+		incoming_salt = Parallel(n_jobs=4,verbose=10 if debug else 0,require='sharedmem')(
+			delayed(hbonds.salt_bridges_framewise)(fr,**out_args) 
 			for fr in framelooper(nframes,start=start))
 	else: 
 		incoming,incoming_salt = [],[]

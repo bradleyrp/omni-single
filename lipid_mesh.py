@@ -3,7 +3,7 @@
 import sys,time
 from numpy import *
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+# from joblib.pool import has_shareable_memory
 
 from codes.mesh import *
 from base.timer import checktime

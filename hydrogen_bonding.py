@@ -210,8 +210,9 @@ def hydrogen_bonding(grofile,trajfile,**kwargs):
 	start = time.time()
 	out_args = {'distance_cutoff':distance_cutoff,'angle_cutoff':angle_cutoff}
 	if run_parallel:
-		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
-			delayed(hbonds.hbonder_framewise,has_shareable_memory)(fr,**out_args) 
+		# removed has_shareable_memory
+		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0,require='sharedmem')(
+			delayed(hbonds.hbonder_framewise)(fr,**out_args) 
 			for fr in framelooper(nframes,start=start))
 	else: 
 		incoming = []

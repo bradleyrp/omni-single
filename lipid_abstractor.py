@@ -4,7 +4,7 @@ import time,re
 import numpy as np
 import MDAnalysis
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+# from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper
 from base.timer import checktime
 import codes.mesh
@@ -30,6 +30,9 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	#---select residues of interest
 	selector = kwargs['calc']['specs']['selector']
 	nojumps = kwargs['calc']['specs'].get('nojumps','')
+	#! if the separator depends on the selector you can put it there
+	#! note that the script must accomodate multiply looping formats in the meta
+	separator = selector.get('separator',kwargs['calc']['specs'].get('separator',{}))
 
 	#---center of mass over residues
 	if 'type' in selector and selector['type'] == 'com' and 'resnames' in selector:
@@ -161,13 +164,15 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 
 	#---identify leaflets
 	status('identify leaflets',tag='compute')
-	separator = kwargs['calc']['specs'].get('separator',{})
 	leaflet_finder_trials = separator.get('trials',3)
 	#---preselect a few frames, always including the zeroth
 	selected_frames = [0]+list(np.random.choice(np.arange(1,nframes),leaflet_finder_trials,replace=False))
     #---alternate lipid representation is useful for separating monolayers
 	if 'lipid_tip' in separator:
 		tip_select = separator['lipid_tip']
+		#! instead of making the tip selection a composition of the selection and the tip, it is independent
+		#! ... which is essential if you have a difficult separation e.g. if the lipids are headless. you can
+		#! ... put the separator at the top of the specs or inside each selector to customize this properly
 		sel = uni.select_atoms(tip_select)
 		atoms_separator = []
 		for fr in selected_frames:
@@ -186,7 +191,9 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	#---get the indices from the leaflet finder
 	monolayer_indices = leaflet_finder.monolayer_indices
 	# for convenience when doing planar bilayers we put the zero index on top
-	top_mono = np.argmax([atoms_separator[0][monolayer_indices==i][:,2].mean() for i in range(2)])
+	try: top_mono = np.argmax([atoms_separator[0][monolayer_indices==i][:,2].mean() for i in range(2)])
+	except:
+		import ipdb;ipdb.set_trace()
 	if top_mono!=0: monolayer_indices = 1-monolayer_indices
 
 	checktime()
@@ -201,7 +208,6 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 				(np.transpose(np.tile(vecs[:-1],(nobjs,1,1)))/2.))[d].astype(int)
 			shift = (np.cumsum(-1*shift_binary,axis=0)*np.transpose(np.tile(vecs[:-1,d],(nobjs,1))))
 			coms_out[1:,:,d] += shift
-
 	#---pack
 	attrs,result = {},{}
 	attrs['selector'] = selector
@@ -213,5 +219,5 @@ def lipid_abstractor(grofile,trajfile,**kwargs):
 	result['points'] = coms_out
 	result['resids'] = np.array(np.unique(resids))
 	result['resids_exact'] = resids
-	attrs['separator'] = kwargs['calc']['specs']['separator']
+	attrs['separator'] = separator
 	return result,attrs	

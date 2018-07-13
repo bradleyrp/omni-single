@@ -523,7 +523,9 @@ def get_pairs(sn,resname_filter=None,nranked=10,any_combos=False,**kwargs):
 		del memory
 		memory = {}
 		status('fetching mesh object for %s'%sn,tag='load')
-		memory['lipid_mesh_%s'%sn] = work.plotload('load_mesh',sns=[sn])[0][sn]['data']
+		#! no longer works after updates to plotload:
+		#! ... memory['lipid_mesh_%s'%sn] = work.plotload('load_mesh',sns=[sn])[0][sn]['data']
+		memory['lipid_mesh_%s'%sn] = work.plotload('load_mesh')[0][sn]['data']
 		lipid_mesh = memory['lipid_mesh_%s'%sn]
 	#---loop over rankings. these are somewhat arbitrary because we have subselected so hard
 	ranking = np.argsort([obs.T[i].sum(axis=0).mean() for i in map_red_to_obs])[::-1]
@@ -653,6 +655,14 @@ def render_machine_mesh_review(render_spec,r2m,zoom=False):
 	tag_mesh_fn = re.sub('snapshot','snapshot_mesh_review%s'%('_zoom' if zoom else ''),render_spec['fn'])
 	picturesave(tag_mesh_fn,render_spec['tempdir'],backup=False,version=True,meta={},extras=[])
 
+#! hacking this in for now
+def get_gmx_sources(self,calc,sn):
+	if not hasattr(work,'source'): work.parse_sources()
+	gro,xtc = [os.path.join(self.postdir,'%s.%s'%(calc['extras'][sn]['slice_path'],suf))
+		for suf in ['gro','xtc']]
+	tpr = self.source.get_last(sn,subtype='tpr')
+	return dict(gro=gro,tpr=tpr,xtc=xtc)
+
 def render_machine(**method):
 	"""
 	Handle the request to render a snapshot by figuring out which part of the simulation to plot, how 
@@ -678,7 +688,8 @@ def render_machine(**method):
 		render_spec = dict(sn=method['sn'],pair=pair,
 			frame=pair['frame_actual'],tempdir=folder,fn=filetag,
 			hydrogen_bonds=pair['hydrogen_bonds'])
-		render_spec.update(**work.get_gmx_sources(sn=method['sn'],calc=calc))
+		#! the following fails! due to updates
+		render_spec.update(**get_gmx_sources(work,sn=method['sn'],calc=calc))
 		#---apply modifiers
 		render_modifiers = method.get('render_modifiers',{})
 		if type(render_modifiers) in [list,tuple]: 
@@ -955,12 +966,12 @@ if 'systematic_snapshotter' in routine:
 		resname_filter=['PtdIns','DOPE'],
 		render_modifiers={'associates':['CHL1'],'barnacles':['CHL1'],'lipid_colors':lipid_colors})
 		for sn in sns])
-	if 0: methods.extend([dict(sn=sn,nranked=10,
+	if 1: methods.extend([dict(sn=sn,nranked=10,
 		supername='v14_ptdins_chl1_with_dope_chl1',
 		resname_filter=['PtdIns','CHL1'],
 		render_modifiers={'associates':['CHL1','DOPE'],'barnacles':['CHL1','DOPE'],
 			'lipid_colors':lipid_colors})
-		for sn in ['membrane-v532','membrane-v534']])
+		for sn in ['membrane-v531','membrane-v532','membrane-v534']])
 	#---! incomplete version 11: hydrogen bond plots extended to new lipids
 	if 0: methods.extend([dict(sn=sn,nranked=10,
 		supername='v11_ptdins_dops_assoc_chl1_barnacles_chl1_ptdins',
@@ -976,7 +987,7 @@ if 'systematic_snapshotter' in routine:
 		resname_filter=['PtdIns'])
 		for sn in sns])
 	#---version 15: closer water without coloring
-	if 1: methods.extend([dict(sn=sn,nranked=10,
+	if 0: methods.extend([dict(sn=sn,nranked=10,
 		supername='v15_ptdins_solvated',
 		render_modifiers={'no_tail':True,'lipid_color_specific':'black'},
 		lipid_style={'goodsell':True,'style':'Licorice 0.15 12.0 12.0'},

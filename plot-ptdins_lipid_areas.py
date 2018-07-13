@@ -25,14 +25,15 @@ def make_plots():
 	"""
 	Plot summary and comprehensive plots.
 	"""
-	import ipdb;ipdb.set_trace()
-	if False: plot_areas(out_fn='lipid_areas',lims2d=(195,210),
-		sns2d=['membrane-v%3d'%i for i in [534,532,533,531,536,530,538]],
-		sns3d=['membrane-v%3d'%i for i in [536,534,532,533,531,530,538]])
-	sns_symmetric = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
-	sns_symmetric3d = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
-	plot_areas(out_fn='lipid_areas.symmetric',labels3d=True,
-		sns2d=sns_symmetric,sns3d=sns_symmetric3d,lims2d=(240,265))
+	if True: 
+		plot_areas(out_fn='lipid_areas',lims2d=(0.65,0.7), #! (195,210), lims now for area per lipid
+			sns2d=['membrane-v%3d'%i for i in [534,532,533,531,536,530,538]],
+			sns3d=['membrane-v%3d'%i for i in [536,534,532,533,531,530,538]])
+	else:
+		sns_symmetric = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
+		sns_symmetric3d = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
+		plot_areas(out_fn='lipid_areas.symmetric',labels3d=True,
+			sns2d=sns_symmetric,sns3d=sns_symmetric3d,lims2d=(240,265))
 
 def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	"""
@@ -50,9 +51,11 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 		for snum,sn in enumerate(sns_this):
 			top_mono = work.meta[sn].get('index_top_monolayer',0)
 			dat = data['lipid_areas2d'][sn]['data']
+			#! hacking to per-lipid areas
+			norm_factor = 300.0 #! for cholesterol systems
 			#---! note that 2D areas should be equal between leaflets up to minor approximation errors
-			area2d = dat['areas%d'%top_mono].sum(axis=1).mean()
-			area2d_err = dat['areas%d'%top_mono].sum(axis=1).std()
+			area2d = dat['areas%d'%top_mono].sum(axis=1).mean()/norm_factor
+			area2d_err = dat['areas%d'%top_mono].sum(axis=1).std()/norm_factor
 			ax.bar([snum],[area2d],width=1.0,lw=0,edgecolor='w',
 				color=plotspec['colors'][plotspec['colors_ions'][work.meta[sn]['cation']]],
 				hatch=plotspec['hatches_lipids'][work.meta[sn]['ptdins_resname']])
@@ -88,9 +91,9 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	axdup[0].set_xticks([])
 	axdup[1].set_xticks([])
 	for ax in axdup: 
-		ax.set_yticklabels(ax.get_yticks(),fontsize=16)
+		ax.set_yticklabels(['%.02f'%i for i in ax.get_yticks()],fontsize=16)
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
-	axdup[0].set_ylabel('bilayer area (2D) $\mathrm{({nm}^{2})}$',fontsize=20)
+	axdup[0].set_ylabel('area per lipid (2D) $\mathrm{({nm}^{2})}$',fontsize=20)
 	#---end broken axis modifications
 	#---plot 3D areas
 	ax = axes[1][0]
@@ -99,20 +102,22 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 		top_mono = work.meta[sn].get('index_top_monolayer',0)
 		bot_mono = {0:1,1:0}[top_mono]
 		dat = data['lipid_areas3d'][sn]['data']
-		top_area = dat['areas%d'%top_mono].sum(axis=1).mean()
-		bot_area = dat['areas%d'%bot_mono].sum(axis=1).mean()
+		#! hacking to per-lipid areas
+		norm_factor = 300.0 #! for cholesterol systems
+		top_area = dat['areas%d'%top_mono].sum(axis=1).mean()/norm_factor
+		bot_area = dat['areas%d'%bot_mono].sum(axis=1).mean()/norm_factor
 		ax.bar([snum],[top_area-bot_area],bottom=[bot_area],width=1.0,lw=0,edgecolor='w',
 			color=plotspec['colors'][plotspec['colors_ions'][work.meta[sn]['cation']]],
 			hatch=plotspec['hatches_lipids'][work.meta[sn]['ptdins_resname']])
-		yerr_top = dat['areas%d'%top_mono].sum(axis=1).std()
-		yerr_bot = dat['areas%d'%bot_mono].sum(axis=1).std()
+		yerr_top = dat['areas%d'%top_mono].sum(axis=1).std()/norm_factor
+		yerr_bot = dat['areas%d'%bot_mono].sum(axis=1).std()/norm_factor
 		ax.errorbar([snum],[top_area],yerr=[yerr_top],alpha=1.0,lw=4.0,c='k')
 		ax.errorbar([snum],[bot_area],yerr=[yerr_bot],alpha=1.0,lw=4.0,c='k')
 	#---aesthetics
 	ax.set_xticks([])
-	ax.set_yticklabels(ax.get_yticks(),fontsize=16)
+	ax.set_yticklabels(['%.02f'%i for i in ax.get_yticks()],fontsize=16)
 	ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
-	ax.set_ylabel('leaflet areas (3D) $\mathrm{({nm}^{2})}$',fontsize=20)
+	ax.set_ylabel('area per lipid by leaflet (3D) $\mathrm{({nm}^{2})}$',fontsize=20)
 	ax.set_xlim((-0.5-0.25,len(sns_this)+2.5))
 	#---symmetric has bars that are too small so we add extra labels
 	if labels3d:
@@ -138,7 +143,7 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	el = mpl.patches.Ellipse((2,-1),0.5,0.5)
 	for yy in range(2):
 		color = '#bdbdbd'
-		ann = ax.annotate(['outer\nleaflet','inner\nleaflet'][yy],
+		ann = ax.annotate(['inner\nleaflet','outer\nleaflet'][yy],
 			xy=(snum+0.5,[top_area,bot_area][yy]),xycoords='data',
 			xytext=(35,0),textcoords='offset points',
 			size=12,va="center",bbox=dict(boxstyle="round",fc=color,ec="none"),
@@ -152,8 +157,55 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	#---legend below
 	kwargs = dict(bbox=(0.5,-0.1),loc='upper center',ncol=2)
 	legend,patches = legend_maker_stylized(axes[0][1],work=work,
-		sns_this=sns_this,bar_formats=bar_formats,comparison_spec=comparison_spec,**kwargs)
+		sns_this=sns_this,bar_formats=bar_formats,comparison_spec=comparison_spec,fancy=False,**kwargs)
 	patches.append(legend)
 	fig.delaxes(axes[0][2])
 	picturesave('fig.%s'%out_fn,
 		work.plotdir,backup=False,version=True,meta={},extras=patches)
+
+plotrun.routine = None #[]
+if __name__=='__main__':
+
+	kb = 1.38064852*10**-23 # m2 kg s-2 K-1 or J/K or N-m/K
+	factor = 2*kb*300*(10**-9/(10**-9)**2)**2*10**3 # nm to meters in two terms, then from N/m to mN/m
+	#! note that values are 2.5x10^-7 mN/m
+
+	area_compressibility = {}
+	for sn in sns:
+		dat = data['lipid_areas2d'][sn]['data']
+		top_mono = work.meta[sn].get('index_top_monolayer',0)
+		area2d = dat['areas%d'%top_mono]
+		area_compressibility[sn] = factor*area2d.mean()/area2d.std()**2
+
+	axes,fig = panelplot(figsize=(12,10),
+		layout={'out':{'grid':[1,1],'wspace':0.4},
+		'ins':[{'grid':[1,2]}]})
+
+	sns_collect = [['membrane-v%d'%i for i in j] for j in [
+		[536,538,530,531,532,533,534],
+		[509,514,515,510,511]]]
+	for pnum,sns_this in enumerate(sns_collect):
+		ax = axes[pnum]
+		plotspec = ptdins_manuscript_settings()
+		for snum,sn in enumerate(sns_this):
+			ax.bar([snum],[area_compressibility[sn]],width=1.0,lw=0,edgecolor='w',
+				color=plotspec['colors'][plotspec['colors_ions'][work.meta[sn]['cation']]],
+				hatch=plotspec['hatches_lipids'][work.meta[sn]['ptdins_resname']])
+		ax.set_xticks([])
+		ax.set_ylabel('$K_A\,(k_B T)??$')
+		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')	
+		if pnum==0: ax.set_title('asymmetric')
+		elif pnum==1: ax.set_title('symmetric')
+		else: raise Exception
+		if pnum==0:
+			sns_all = list(set([i for j in sns_collect for i in j]))
+			bar_formats = make_bar_formats(sns_all,work=work)
+			kwargs = dict(bbox=(0.5,-0.1),loc='upper center',ncol=3)
+			comparison_spec = dict(ptdins_names=list(set([work.meta[sn]['ptdins_resname'] 
+				for sn in sns_all])),
+				ion_names=list(set([work.meta[sn]['cation'] for sn in sns_all])))
+			legend,patches = legend_maker_stylized(ax,work=work,
+				sns_this=sns_all,bar_formats=bar_formats,
+				comparison_spec=comparison_spec,fancy=False,**kwargs)
+	picturesave('fig.area_compressibility',
+		work.plotdir,backup=False,version=True,meta={},extras=[legend])

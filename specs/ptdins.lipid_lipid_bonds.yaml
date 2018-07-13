@@ -115,8 +115,115 @@ slices:
       current: {'pbc':'mol','groups':['all'],'start':0,'end':48000,'skip':100}
       current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
 
+meta:
+  membrane-v509:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v510:
+    composition_name:    symmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v511:
+    composition_name:    symmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v514:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}^{-5}_{2}}$"
+    ptdins_resname:      PIPU
+  membrane-v515:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}^{-3}_{2}}$"
+    ptdins_resname:      PIPP
+  membrane-v530:
+    composition_name:    asymmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+    hydration_cutoff:    2.6
+  membrane-v531:
+    composition_name:    asymmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v532:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v533:
+    composition_name:    asymmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(3,5)P}_{2}}$"
+    ptdins_resname:      P35P
+  membrane-v534:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(3,5)P}_{2}}$"
+    ptdins_resname:      P35P
+  membrane-v536:
+    composition_name:    asymmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI}}$"
+    ptdins_resname:      SAPI
+    ### !!!
+    index_top_monolayer: 1
+  membrane-v538:
+    composition_name:    asymmetric
+    cation:              K
+    anion:               CL
+    ion_label:          "$\\mathrm{{K}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v542:
+    composition_name:    asymmetric
+    cation:              "Na,Cal"
+    cations:            ['NA','Cal']
+    cation_relevant:     Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v543:
+    composition_name:    symmetric
+    cation:              "Na,Cal"
+    cations:            ['NA','Cal']
+    cation_relevant:     Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+
 collections:
-  all:
+  asymmetric_all:
     - membrane-v536
     - membrane-v538
     - membrane-v530
@@ -131,7 +238,7 @@ calculations:
     group: all
     uptype: simulation
     slice_name: current
-    collections: all
+    collections: asymmetric_all
     specs:
       angle_cutoff: 160.0
       distance_cutoff: 3.4
@@ -139,7 +246,7 @@ calculations:
     group: all
     uptype: simulation
     slice_name: current
-    collections: all
+    collections: asymmetric_all
     specs:
       distance_cutoff: 
         loop: [2.2,3.4,4.6]

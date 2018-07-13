@@ -60,6 +60,7 @@ def load():
 	# load switch by project name
 	project_name = os.path.basename(os.getcwd())
 	# write to locals so the Observer can export to globals
+	#! note that previous uses of the Observer may have forgotten to get _locals from the function
 	_locals = globals()['load_%s'%project_name](data=data)
 
 ### PLOT
@@ -116,7 +117,8 @@ def plot_bonds(name,kinds,**kwargs):
 	else: replicate_mapping_this = [(sn,[sn]) for sn in sns]
 	# tabulate nframes by simulation
 	nframes_by_sn = dict([(sn,len(data['salt_bridges'][sn]['data']['observations'])) for sn in sns])
-	valid_frames_by_kind = dict([(sn,dict([(k,data[k][sn]['data']['valid_frames']) for k in kinds])) for sn in sns])
+	valid_frames_by_kind = dict([(sn,dict([(k,data[k][sn]['data']['valid_frames']) for k in kinds])) 
+		for sn in sns])
 	# tabulate the bonds
 	for sn_group,sns_this in replicate_mapping_this:
 		for snum,sn in enumerate(sns_this):
@@ -197,13 +199,17 @@ def plot_bonds(name,kinds,**kwargs):
 			post_symmetric[sn] = {}
 			combos_sym = list(set([tuple(sorted(i)) for i in post[sn].keys()]))
 			for combo in combos_sym:
-				post_symmetric[sn][combo] = np.sum([post[sn][c] for c in post[sn] if set(c)==set(combo)],axis=0)
+				post_symmetric[sn][combo] = np.sum([post[sn][c] for c in post[sn] 
+					if set(c)==set(combo)],axis=0)
 		post = post_symmetric
 	# reformulate post into images
 	combos_u = list(set([k for j in [i.keys() for i in post.values()] for k in j]))
 	sns_by_mapping = list(zip(*replicate_mapping_this))[0]
 	try: max_count = int(np.concatenate([np.concatenate(post[sn].values()) for sn in post]).max())
-	except: max_count = int(np.concatenate([np.array(post[sn].values()).reshape(-1) for sn in post]).max())
+	except: 
+		try: max_count = int(np.concatenate([np.array(post[sn].values()).reshape(-1) for sn in post]).max())
+		except: 
+			max_count = int(np.array([i for j in post[sn].values() for i in j for sn in post]).max())
 	if style=='imshow':
 		images = dict([(combo,{}) for combo in combos_u])
 		for combo in combos_u:
@@ -439,22 +445,25 @@ def plots_ptdins():
 	"""
 	Plot actinlink bonds analysis including merged replicates.
 	"""
-	raise Exception('fix naming!')
 	figspec = {}
 	global post_debugger
 	post_debugger = {}
 	kind_map = {
 		'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
 		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
-	#! no need to norm because the concentrations are identical
 	merged = False
-	symmetrize = False
-	for normed in [True,False]:
-		for key,kind in kind_map.items():
-			name = key+('.normed' if normed else '')
-			figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,
-				'symmetrize':symmetrize}
-	# singleton test: figspec = {'hbonds.normed':figspec['hbonds.normed']}
+	symmetrize = True
+	for normed in [True,False][:1]:
+		for style in ['imshow','bars'][-1:]:
+			for key,kind in kind_map.items():
+				for count_scaling in ['global','local']:
+					name = '%s.%s'%(style,key)+('.merged' if merged else '')+\
+						('.normed' if normed else '')+('.local' if count_scaling=='local' else '')
+					figspec[name] = {'merged':merged,'kinds':kind,'normed':normed,
+						'symmetrize':symmetrize,'style':style,
+						'count_scaling_norm':count_scaling,'count_scaling':count_scaling}
+	test_key = ['imshow.hbonds_salt.normed.local',None][-1]
+	if test_key: figspec = {test_key: figspec[test_key]}
 	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
 
 @autoplot(plotrun)
@@ -463,5 +472,95 @@ def plots():
 	project_name = os.path.basename(os.getcwd())
 	globals()['plots_%s'%project_name]()	
 
+def plots():
+	"""
+	Plot *many* versions of this visualization.
+	Deprecated plot function (see custom versions above).
+	"""
+	kind_map = {
+		'hbonds':['hydrogen_bonding'],'salt':['salt_bridges'],
+		'hbonds_salt':['hydrogen_bonding','salt_bridges']}
+	figspec = {
+		('%s.%s'%(style,key)+
+		{1:'.merged',0:''}[merged]+
+		{1:'.normed',0:''}[normed]+
+		{'local':'.local','global':''}[count_scaling]):{
+			'merged':merged,'kinds':kind,'normed':normed,'symmetrize':symmetrize,
+			'style':style,'count_scaling_norm':count_scaling,'count_scaling':count_scaling}
+			for normed in [True,False]
+			for merged in [True,False]
+			for key,kind in kind_map.items()
+			for style in ['imshow','bars']
+			for count_scaling in ['global','local']
+			for symmetrize in [True,False]}
+	figspecs = {}
+	test_key = ['imshow.hbonds.normed.local',None][-1]
+	if test_key: figspec = {test_key: figspec[test_key]}
+	for key,spec in figspec.items(): plot_bonds(name=key,**spec)
+
 plotrun.routine = None
-if __name__=='__main__': pass
+if __name__=='__main__': 
+
+	sn = 'membrane-v532'
+	kind = ['hydrogen_bonding','salt_bridges'][-1]
+	bonds,obs = [data[kind][sn]['data'][k] for k in ['bonds','observations']]
+	red_idx = obs.mean(axis=0).argsort()[::-1]
+	counts_top = obs.mean(axis=0)[red_idx]
+	red = bonds[red_idx][:,np.array([0,2,3,5])]
+	_,idx = np.unique(red,return_index=True,axis=0)
+	# ranked_bonds tells us the most common hbonds while counts_top gives the prevalence
+	ranked_bonds = red[np.sort(idx)]
+	# atom_ranks gives the prevalence ranking for a specific atom on the target lipid
+	atom_ranks = {'acceptor':{},'donor':{}}
+	# select bonds where one participant is a PIP2
+	# the donor is the first set of columns on the bond list
+	for name,i,j in [('donor',0,1),('acceptor',2,3)]:
+		these_inds = np.where(ranked_bonds[:,0]=='PI2P')[0]
+		for t in these_inds: 
+			if ranked_bonds[t,j] not in atom_ranks[name]: 
+				atom_ranks[name][ranked_bonds[t,j]] = counts_top[t]
+			else: atom_ranks[name][ranked_bonds[t,j]] += counts_top[t]
+	pass
+
+	#!!! do not use the variable script
+	this_script = {}
+	scale_factor = {'hydrogen_bonding':0.2,'salt_bridges':0.1}[kind]
+	for color,name in [(9,'donor'),(10,'acceptor')]:
+		this_script[name] = ('\n'.join(["set i %(ind)d;set size %(size)f;mol addrep $molno;mol modcolor $i $molno ColorID %(color)d;mol modselect $i $molno name %(name)s;mol modstyle $i $molno Points $size;mol modstyle $i $molno Beads $size 12.0;mol modmaterial $i $molno EdgyGlass"%{'size':scale_factor*j,'ind':ii+2,'name':i,'color':color} for ii,(i,j) in enumerate(atom_ranks[name].items())]))
+
+	this_script['header'] = """
+
+color Display Background white
+display projection Orthographic
+
+set molno 0
+mol new PI2P.gro
+mol delrep 0 $molno
+
+mol addrep $molno
+mol modstyle 0 $molno DynamicBonds 1.700000 0.100000 6.000000
+mol addrep $molno
+mol modstyle 1 $molno Licorice 0.100000 10.000000 10.000000
+
+"""
+	this_script['middle'] = """
+
+set molno 1
+mol new PI2P.gro
+mol delrep 0 $molno
+
+mol addrep $molno
+mol modstyle 0 $molno DynamicBonds 1.700000 0.100000 6.000000
+mol addrep $molno
+mol modstyle 1 $molno Licorice 0.100000 10.000000 10.000000
+
+"""
+
+	with open('/home/rpb/omicron/factory/calc/ptdins/aside-pip2-hbond-sites/run_%s.tcl'%kind,'w') as fp:
+		for key in 'header donor middle acceptor'.split():
+			fp.write(this_script[key]+'\n\n')
+
+"""
+ABSOLUTELY DO NOT USE THIS FILE UNLESS YOU ARE DOING THE STUFF ABOVE WITH VMD
+SEE lipid_lipid_bonds.py instead!!!
+"""

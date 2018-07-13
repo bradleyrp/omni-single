@@ -6,8 +6,6 @@ Looping tools.
 
 import sys,time
 import joblib
-from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
 from base.tools import framelooper
 
 def basic_compute_loop(compute_function,looper,run_parallel=True,debug=None):
@@ -23,10 +21,17 @@ def basic_compute_loop(compute_function,looper,run_parallel=True,debug=None):
 		sys.quit()
 	start = time.time()
 	if run_parallel:
-		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
-			delayed(compute_function,has_shareable_memory)(**looper[ll]) 
-			for ll in framelooper(len(looper),start=start))
-	else: 
+		import joblib
+		from joblib import Parallel,delayed
+		if joblib.__version__<0.12:
+			from joblib.pool import has_shareable_memory
+			incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
+				delayed(compute_function,has_shareable_memory)(**looper[ll]) 
+				for ll in framelooper(len(looper),start=start))
+		else:
+			incoming = Parallel(n_jobs=8,verbose=10 if debug else 0,require='sharedmem')(
+				delayed(compute_function)(**looper[ll]) 
+				for ll in framelooper(len(looper),start=start))
 		incoming = []
 		for ll in framelooper(len(looper)):
 			incoming.append(compute_function(**looper[ll]))

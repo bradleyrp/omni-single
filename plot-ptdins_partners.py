@@ -114,7 +114,7 @@ def plot_partners_ptdins():
 				layout={'out':{'grid':[1,2],'wratios':[1,2],'wspace':0.1},
 				'ins':[{'grid':[2,1]} for i in range(2)]}),},
 		'comprehensive':{
-			#---! what's wrong with v536 has only POPC-POPC
+			#! what's wrong with v536 has only POPC-POPC
 			#! just a guess since I noticed this: wrong monolayer index! almost certainly!
 			'sns':[i for i in work.metadata.collections['asymmetric_all'] if i!='membrane-v536'],
 			'extras':{'small_labels_ax3':True,'error_bars':False,
@@ -126,18 +126,44 @@ def plot_partners_ptdins():
 				3:dict(nn=3,abstractor='lipid_chol_com'),},
 			'panelspec':dict(figsize=(18,30),
 				layout={'out':{'grid':[1,1]},
-				'ins':[{'grid':[4,1],'wspace':0.1} for i in range(1)]}),},}
+				'ins':[{'grid':[4,1],'wspace':0.1} for i in range(1)]}),},
+		'summary_mesh':{
+			'sns':work.metadata.collections['position'],
+			'extras':{'special':True,'summary':True,'legend_below':True,
+				'ax_for_ylabel':2,'baseline':0.0,'ax_mods':{
+					0:{'set_title':{'label':'${Mg}^{2+}$','fontsize':18}},
+					1:{'set_title':{'label':'${Ca}^{2+}$','fontsize':18}}}},
+			'specs':{
+				2:dict(nn=3,abstractor='lipid_com',combos=[['Ptdins','Ptdins','Ptdins']]),
+				3:dict(nn=2,abstractor='lipid_com'),},
+			'panelspec':dict(figsize=(12,12),
+				layout={'out':{'grid':[2,1]},'ins':[{'grid':[1,2]},{'grid':[1,2],
+				'wratios':[1,6],'wspace':0.1},]}),},}
+	if 'summary_mesh' in specs:
+		#! replot causes an error: `DataPack instance has no attribute 'this'`
+		#! hacking through the extra tools. there might already be a better solution to this
+		#! actually just moved it to a separate script
+		from codes.voronoi_mesh_snapshot import plot_snapshots
+		# recap the load from ptdins_voronoi_snapshots
+		data_mesh = plotload('ptdins_celltest',plotload_version=2)
+		sns_mesh = work.sns()
+		specs['summary_mesh']['specs'][0] = {'external':plot_snapshots,'kwargs':{
+			'data':data_mesh,'sn':'membrane-v531','mn':0}}
+		specs['summary_mesh']['specs'][1] = {'external':plot_snapshots,'kwargs':{
+			'data':data_mesh,'sn':'membrane-v532','mn':0}}
 	if False: specs = {
 		'comprehensive_symmetric':{
 			'sns':work.metadata.collections['symmetric_all'],
 			'extras':{'small_labels_ax3':True,'error_bars':False,
-				'all_y_labels':True,'legend_everywhere':True},
+				'all_y_labels':True,'legend_everywhere':True,},
 			'specs':{
 				0:dict(nn=2,abstractor='lipid_com'),
 				1:dict(nn=3,abstractor='lipid_com'),},
 			'panelspec':dict(figsize=(18,16),
 				layout={'out':{'grid':[1,1]},
 				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},}
+	specs_filter_keys = ['summary_mesh']
+	if specs_filter_keys: specs = dict([(i,j) for i,j in specs.items() if i in specs_filter_keys])
 	for figname,spec in specs.items(): 
 		plot_partners_basic(figname=figname,**spec)
 
@@ -217,13 +243,18 @@ def plot_partners_actinlink():
 
 def plot_partners_basic(sns,figname,specs,panelspec,extras):
 	"""Summarize the lipid mesh partners."""
-	baseline = 1.0
+	baseline = extras.get('baseline',1.0)
 	sns_reorder = sns
 	plotspec = ptdins_manuscript_settings()
 	axes,fig = panelplot(**panelspec)
 	try: axes = [i for j in axes for i in j]
 	except: pass
 	for axnum,details in specs.items():
+		if 'external' in details:
+			ax = axes[axnum]
+			#! we call the function only injecting the axis in addition to the kwargs
+			details['external'](ax=ax,**details['kwargs'])	
+			continue
 		nn = details['nn']
 		kwargs_to_postdat = {}
 		if extras.get('monolayer_indexer',False): 
@@ -250,12 +281,14 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 				hatch = extras.get('hatch',plotspec['hatches_lipids'][work.meta[sn]['ptdins_resname']])
 				ax.bar([xpos],[ypos],
 					width=2*half_width,bottom=baseline,
-					color=color,
+					color=color,align='center',
 					hatch=hatch,**({'label':work.meta[sn]['ion_label']} if cnum==len(combos)-1 else {}))
 				y_err = postdat[sn]['ratios_err'][cnum]
 				if extras.get('error_bars',True): ax.errorbar(xpos,ypos+baseline,yerr=y_err,
 					alpha=1.0,lw=2.0,c='k')
 				max_y,min_y = max((max_y,ypos+baseline+y_err)),min((min_y,ypos+baseline-y_err))
+		if baseline==0.0:
+			ax.set_ylim((0.0,ax.get_ylim()[1]))
 		ax.set_xlim(-half_width-half_width/2.,(len(sns))*len(combos)-
 			half_width+(len(combos)-1)*combo_spacer+half_width/2.)
 		ax.axhline(1.0,c='k',lw=2)
@@ -305,11 +338,14 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		s0,s1,s2,s3 = spread_prop.reshape(-1)
 		shift_down = ((1.-s2)-(1.-s0)*(s3-1.)/(s1-1.))
 		axes[1].set_ylim((axes[1].get_ylim()[0],axes[1].get_ylim()[1]+shift_down))
-	axes[0].set_ylabel('observations relative to chance',fontsize=16)
+	axes[extras.get('ax_for_ylabel',0)].set_ylabel('observations relative to chance',fontsize=16)
 	if extras.get('four_plots',False):
 		axes[1].set_ylabel('observations relative to chance',fontsize=16)
 	if extras.get('all_y_labels',False):
 		for ax in axes: ax.set_ylabel('observations relative to chance',fontsize=16)
+	for key,vals in extras.get('ax_mods',{}).items():
+		#! hacking extremely quickly here
+		for i,j in vals.items(): getattr(axes[key],i)(**j)
 	picturesave('fig.lipid_mesh_partners.%s'%figname,work.plotdir,
 		backup=False,version=True,meta={},extras=[legend])#,form='pdf')
 

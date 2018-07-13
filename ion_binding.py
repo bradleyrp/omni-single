@@ -2,13 +2,14 @@
 
 import time
 from numpy import *
+import numpy as np
 import MDAnalysis
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+# from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper
 import re
 
-from codes.binding import *
+#! deprecated? from codes.binding import *
 
 def ion_binding(grofile,trajfile,**kwargs):
 
@@ -24,8 +25,9 @@ def ion_binding(grofile,trajfile,**kwargs):
 	compute_parallel = False
 	
 	#---prepare universe	
-	grofile,trajfile = [work.slice(sn)['current']['all'][i] for i in ['gro','xtc']]
-	uni = MDAnalysis.Universe(work.postdir+grofile,work.postdir+trajfile)
+	#! is this deprecated? grofile,trajfile = [work.slice(sn)['current']['all'][i] for i in ['gro','xtc']]
+	#! uni = MDAnalysis.Universe(work.postdir+grofile,work.postdir+trajfile)
+	uni = MDAnalysis.Universe(grofile,trajfile)
 	nframes = len(uni.trajectory)
 	#---MDAnalysis uses Angstroms not nm
 	lenscale = 10.
@@ -42,8 +44,9 @@ def ion_binding(grofile,trajfile,**kwargs):
 	for fr in range(nframes):
 		status('loading frame',tag='load',i=fr,looplen=nframes)
 		uni.trajectory[fr]
-		trajectory_lipids[fr] = sel_lipids.coordinates()/lenscale
-		trajectory_ions[fr] = sel_ions.coordinates()/lenscale
+		#! mdanalysis removed coordinates(), using positions with cast to be sure
+		trajectory_lipids[fr] = np.array(sel_lipids.positions)/lenscale
+		trajectory_ions[fr] = np.array(sel_ions.positions)/lenscale
 		vecs[fr] = sel_lipids.dimensions[:3]/lenscale
 
 	monolayer_indices = kwargs['upstream']['lipid_abstractor']['monolayer_indices']

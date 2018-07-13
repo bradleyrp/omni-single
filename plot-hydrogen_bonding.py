@@ -20,19 +20,21 @@ if is_live:
 show_static,press = True,not is_live
 #---aesthetics
 mpl.rcParams['hatch.linewidth'] = 1.5
-#---hatch color was controllable here in mpl v2.0.0 but they reverted
-mpl.rcParams['hatch.color'] = 'w'
+#---hatch color was controllable here in 2.0.0 but it reverted and then was fixed
+mpl.rcParams['hatch.color'] = 'k'
 #---old plot behavior
 _old_school = True
+#---renamed the metadata
+plotname = 'hydrogen_bonding_standard'
 
 #---block: IMPORT THE DATA
 if 'data' not in globals(): 
 	#---! bad to declare here
 	global figsize_all,press_routine,interesting,bar_formats_style
-	sns,(data,calc) = work.sns(),plotload('hydrogen_bonding',work)
-	data_salt,calc_salt = plotload('salt_bridges',work)
+	sns,(data,calc) = work.sns(),plotload(plotname)
+	data_salt,calc_salt = plotload('salt_bridges')
 	#---set the plot targets in the YAML for multiuse scripts
-	plotspecs = work.plots[plotname]['specs']
+	plotspecs = work.plots['hydrogen_bonding_standard']['specs']
 	#---subselect interesting bars from the master set
 	interesting = plotspecs.get('interesting',{})
 	press_routine = plotspecs.get('press_routine',['summary','interesting'])
@@ -60,7 +62,7 @@ def dimmer(bar,child):
 	bar.set_facecolor('w')
 	child.set_hatch(None)
 
-def count_hydrogen_bonds_by_sn(bonds,obs,nmols):
+def count_hydrogen_bonds_by_sn_original(bonds,obs,nmols,debug=False):
 	"""!!!"""
 	#---! artifacts of the new plot scheme!!! this needs revisited
 	#global relevant_resnames,nmols_recount
@@ -89,6 +91,7 @@ def count_hydrogen_bonds_by_sn(bonds,obs,nmols):
 	#---! CHECK THE MEANING OF THIS NUMBER, COMBINATORICALLY-WISE
 	#---subsample the obs matrix (frames by combos) to pick out each unique resname combo
 	#---summing over the first axis adds up all unique instances of a particular combo
+	#! ryan is debugging and things the error is here. obs needs to be sampled again
 	counts_by_pair = [obs[:,np.where(resnames_combos==p)[0]].sum(axis=1) for p in pairs[lipid_only]]
 	#---counts are normalized by the number of each species (note that 400 choose 2 is 79800)
 	norm_combos = lambda i,j: (nmols[i]*nmols[j])
@@ -101,6 +104,68 @@ def count_hydrogen_bonds_by_sn(bonds,obs,nmols):
 	aliased_names = np.array([[pip2_alias(i) for i in j] for j in pairs[lipid_only]])
 	result = dict(zip([tuple(i) for i in aliased_names],props_mean))
 	result_err = dict(zip([tuple(i) for i in aliased_names],props_std))
+	if debug: 
+		import ipdb
+		ipdb.set_trace()
+	return {'result':result,'result_err':result_err}
+
+def count_hydrogen_bonds_by_sn(bonds,obs,nmols,debug=False):
+	"""!!!"""
+	#---! artifacts of the new plot scheme!!! this needs revisited
+	#global relevant_resnames,nmols_recount
+	#---filter out intralipid hydrogen bonds
+	#---some simulations have no salt bridges at all
+	if False:
+		try: resids_d = bonds[:,1].astype(int)
+		except: return {'result':{},'result_err':{}}
+		resids_a = bonds[:,4].astype(int)
+		inter_inds = np.where(resids_d!=resids_a)[0]
+		inter = bonds[inter_inds]
+		#---catalog bonding pairs by residue
+		resnames_combos = np.transpose((inter[:,0],inter[:,3]))
+		if relevant_resnames: 
+			resnames_combos = resnames_combos[np.where(np.all([
+				np.in1d(resnames_combos[:,i],relevant_resnames) for i in range(2)],axis=0))]
+		inds,counts = uniquify(resnames_combos)
+		pairs = resnames_combos[inds]
+		#---discard sol
+		lipid_only = np.where(np.all(pairs!='SOL',axis=1))[0]
+		#---cut cholesterol in half because it is in both leaflets and POPC does not make hbonds
+		nmols_leaflet = 400 
+		if nmols_recount:
+			nmols_recount_f = eval(nmols_recount)
+			nmols = nmols_recount_f(nmols)
+		#---get the proportions relative to combos
+		#---! CHECK THE MEANING OF THIS NUMBER, COMBINATORICALLY-WISE
+		#---subsample the obs matrix (frames by combos) to pick out each unique resname combo
+		#---summing over the first axis adds up all unique instances of a particular combo
+		#! ryan is debugging and things the error is here. obs needs to be sampled again
+		counts_by_pair = [obs[:,np.where(resnames_combos==p)[0]].sum(axis=1) for p in pairs[lipid_only]]
+	else:
+		try: resids_d = bonds[:,1].astype(int)
+		except: return {'result':{},'result_err':{}}
+		resids_a = bonds[:,4].astype(int)	
+		filt = np.all((resids_a!=resids_d,bonds[:,0]!='SOL',bonds[:,3]!='SOL'),axis=0)
+		resnames_combos = np.transpose((bonds[filt][:,0],bonds[filt][:,3]))
+		inds,counts = uniquify(resnames_combos)
+		pairs = resnames_combos[inds]
+		lipid_only = np.where(np.all(pairs!='SOL',axis=1))[0]
+		counts_by_pair = [obs.T[filt].T[:,np.where(np.all(
+			resnames_combos==p,axis=1))[0]].sum(axis=1) for p in pairs[lipid_only]]
+	#---counts are normalized by the number of each species (note that 400 choose 2 is 79800)
+	norm_combos = lambda i,j: (nmols[i]*nmols[j])
+	props_mean = np.array([float(counts_by_pair[k].mean())/norm_combos(i,j)
+		for k,(i,j) in enumerate(pairs[lipid_only])])
+	props_std = np.array([float(counts_by_pair[k].std())/norm_combos(i,j)
+		for k,(i,j) in enumerate(pairs[lipid_only])])
+	#---convert pairs to PtdIns alias
+	pip2_alias = lambda x: 'PtdIns' if x in work.vars['selectors']['resnames_PIP2'] else x
+	aliased_names = np.array([[pip2_alias(i) for i in j] for j in pairs[lipid_only]])
+	result = dict(zip([tuple(i) for i in aliased_names],props_mean))
+	result_err = dict(zip([tuple(i) for i in aliased_names],props_std))
+	if debug: 
+		import ipdb
+		ipdb.set_trace()
 	return {'result':result,'result_err':result_err}
 
 def count_hydrogen_bonds(data,bonds_key='bonds'):
@@ -313,12 +378,13 @@ def postprep(sns):
 	posts = dict([(key,{}) for key in ['hbonds','salt']])
 	for key,(bonds_key,data_name) in [('hbonds',('bonds','data')),('salt',('bonds_salt','data_salt'))]:
 		this_data = globals()[data_name]
-		posts[key] = dict([(sn,
-			count_hydrogen_bonds_by_sn(
+		posts[key] = {}
+		for sn in sns:
+			posts[key][sn] = count_hydrogen_bonds_by_sn(
 				bonds=this_data[sn]['data'][bonds_key],
 				obs=this_data[sn]['data']['observations'],
-				nmols=dict(zip(this_data[sn]['data']['resnames'],this_data[sn]['data']['nmols'])))) 
-			for sn in sns])
+				nmols=dict(zip(this_data[sn]['data']['resnames'],this_data[sn]['data']['nmols'])),
+				debug=False if sn=='membrane-v538' else False)
 	#---merge the two calculations
 	posts['both'] = {}
 	for sn in sns:
@@ -464,8 +530,10 @@ if press and 'summary' in press_routine:
 		'bonding.hbonds':{'posts_subkey':'hbonds','title':'hydrogen bonds'},
 		'bonding.both_hbonds_salt':{
 			'posts_subkey':'both','title':'hydrogen bonds + salt bridges'},}
+	#! debugging
+	#! press_specs = {'bonding.hbonds':{'posts_subkey':'hbonds','title':'hydrogen bonds'},}
 	#---which simulations to compare
-	sns_sets = dict([(comparison,reorder_by_ion(work.specs['collections'][comparison],ion_order))
+	sns_sets = dict([(comparison,reorder_by_ion(work.metadata.collections[comparison],ion_order))
 		for comparison in collections])
 	#---batch of figures with a loop over figure types and simulation sets
 	for comparison,sns in sns_sets.items():
@@ -487,7 +555,7 @@ if press and 'interesting' in press_routine:
 		comparison = ispec['comparison']
 		bond_type = ispec['bond_type']
 		#---get simulations for this comparison
-		sns = work.specs['collections'][comparison]
+		#! previous omnicalc used: sns = work.metadata.collections[comparison]
 		postpreps = postprep(sns)
 		render_interesting_hydrogen_bonds(ispec=ispec,sns=sns,postpreps=postpreps,save=True)
 
@@ -495,6 +563,8 @@ if press and 'interesting' in press_routine:
 if press and 'snapshot_examples' in press_routine:
 	#---loop over layouts
 	for layout_name,layout in copy.deepcopy(work.plots[plotname]['specs']['snapshot_examples'].items()):
+		#! hacking on 2018.03.30
+		if layout_name!='layout_2': continue
 		matches = layout.pop('matches',{})
 		arrangement = layout.pop('arrangement',None)
 		figsize = layout.pop('figsize',None)
@@ -517,7 +587,7 @@ if press and 'snapshot_examples' in press_routine:
 				ispec = interesting[iname]
 				comparison = ispec['comparison']
 				bond_type = ispec['bond_type']
-				sns = work.specs['collections'][comparison]
+				sns = work.metadata.collections[comparison]
 				legend = render_interesting_hydrogen_bonds(ispec=ispec,postpreps=postprep(sns),
 					sns=sns,fig=fig,ax=ax,save=False,do_legend=pnum==len(matches)-1)
 				if pnum==len(matches)-1: legends.append(legend)
@@ -545,7 +615,7 @@ if press and 'snapshot_examples' in press_routine:
 				ispec = interesting[iname]
 				comparison = ispec['comparison']
 				bond_type = ispec['bond_type']
-				sns = work.specs['collections'][comparison]
+				sns = work.metadata.collections[comparison]
 				#---sometimes the legend causes a NoneType problem on get_window_extent
 				legend = render_interesting_hydrogen_bonds(ispec=ispec,postpreps=postprep(sns),
 					sns=sns,fig=fig,ax=ax,save=False,do_legend=pnum==len(matches)-1,style='alt')
