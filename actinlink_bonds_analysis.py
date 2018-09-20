@@ -10,9 +10,7 @@ plotrun.routine = [
 	'snapshots',
 	'bound_lipids_summary',
 	'mesh_lamplight',
-	][-1:]
-
-plotrun.routine = []
+	][:1]
 
 import time,copy,collections,glob
 from joblib import Parallel,delayed
@@ -26,6 +24,7 @@ import brewer2mpl
 def load():
 
 	### SETTINGS
+	dpi,img_form = 300,'pdf'
 	residue_types = {'ARG':'basic','HIS':'basic','LYS':'basic',
 		'ASP':'acidic','GLU':'acidic','SER':'polar','THR':'polar','ASN':'polar','GLN':'polar',
 		'ALA':'hydrophobic','VAL':'hydrophobic','ILE':'hydrophobic','LEU':'hydrophobic',
@@ -56,6 +55,17 @@ def load():
 		'pip2_20':r'mDia2'+'\n'+r'20% $PIP_2$ ($\times2$)',
 		'pip2_30':r'mDia2'+'\n'+r'30% $PIP_2$ ($\times2$)',
 		'pip2_10':r'mDia2'+'\n'+r'10% $PIP_2$ ($\times2$)',}
+	#! updated labels
+	extra_labels = {
+		'pip2_20_no_chol':r'mDia2, 20% $PIP_2$, 0% CHOL',
+		'pip2_20':r'mDia2, 20% $PIP_2$, 20% CHOL',
+		'pip2_30':r'mDia2, 30% $PIP_2$, 20% CHOL',
+		'pip2_10':r'mDia2, 10% $PIP_2$, 20% CHOL',}
+	extra_labels_short = {
+		'pip2_20_no_chol':r'mDia2'+'\n'+'20% $PIP_2$'+'\n'+'0% CHOL',
+		'pip2_20':r'mDia2'+'\n'+r'20% $PIP_2$'+'\n'+'20% CHOL',
+		'pip2_30':r'mDia2'+'\n'+r'30% $PIP_2$'+'\n'+'20% CHOL',
+		'pip2_10':r'mDia2'+'\n'+r'10% $PIP_2$'+'\n'+'20% CHOL',}
 	for key,val in extra_labels.items(): 
 		work.metadata.meta[key] = dict(label=val)
 	for key,val in extra_labels_short.items(): 
@@ -595,7 +605,7 @@ def plot_charging_histograms_by_lipid(sup):
 		sup_name,cutoff_this,work.vars['names']['short'].get(target_resname,target_resname)),fontsize=16)
 	meta = dict(tags=sup.tags) if sup.tags else {}
 	picturesave(sup.make_output_name(),work.plotdir,
-		backup=False,version=True,meta=meta,extras=[legend,suptitle])
+		backup=False,version=True,meta=meta,extras=[legend,suptitle],dpi=dpi,form=img_form)
 
 def get_cutoff(sup):
 	if sup.dataspec['data_bonds'] in ['data_salt','data_salt_hbonds']: 
@@ -752,7 +762,7 @@ def plot_charging_histograms_stacked(sup,show_zero=False,total=False,
 	meta = dict(tags=sup.tags) if sup.tags else {}
 	extras.append(fig.suptitle('%s'%sup_name,fontsize=16))
 	picturesave(sup.make_output_name(),work.plotdir,
-		backup=False,version=True,meta=meta,extras=extras)
+		backup=False,version=True,meta=meta,extras=extras,dpi=dpi,form=img_form)
 
 def plot_summary(sup,**kwargs):
 	"""
@@ -835,7 +845,7 @@ def plot_summary(sup,**kwargs):
 	extras.append(legend)
 	meta = dict(tags=sup.tags) if sup.tags else {}
 	picturesave(sup.make_output_name(),work.plotdir,
-		backup=False,version=True,meta=meta,extras=extras)
+		backup=False,version=True,meta=meta,extras=extras,dpi=dpi,form=img_form)
 
 def plot_colorstreak_contact_map(sup,bar_style=False,**kwargs):
 	"""
@@ -959,7 +969,7 @@ def plot_colorstreak_contact_map(sup,bar_style=False,**kwargs):
 	if False: plt.setp(legend.get_title(),fontsize=plotspec['fs_legend_title'])
 	meta = dict(tags=sup.tags) if sup.tags else {}
 	picturesave(sup.make_output_name(),work.plotdir,
-		backup=False,version=True,meta=meta,extras=extras)
+		backup=False,version=True,meta=meta,extras=extras,dpi=dpi,form=img_form)
 
 def prepare_all_orders(*routine):
 	"""
@@ -1080,7 +1090,7 @@ def master_bond_distribution_plotter():
 	This is one of two plot routines: the other is meant to make snapshots.
 	"""
 	# overall plot styles to make
-	routine = ['contact_maps','charging'][:]
+	routine = ['contact_maps','charging'][-1:]
 	orders = prepare_all_orders(*routine)
 	#! to develop a single plot, skip the render function and trim the orders list
 	#! i = 'charging histograms salt explicit' ; orders = {i:orders[i]}
@@ -1279,7 +1289,7 @@ def summary_panels(sns,group,bond,nsnaps,figsize=(10,10),tag=''):
 			ax.imshow(image)
 			ax.axis('off')
 	picturesave('fig.snapshot_summary.bond_%s.group_%s%s'%(bond,group,'' if not tag else '.'+tag),
-		directory=work.plotdir,meta={})
+		directory=work.plotdir,meta={},dpi=dpi,form=img_form)
 
 @autoplot(plotrun)
 def snapshots():
@@ -1386,7 +1396,7 @@ def bound_lipids_summary():
 		frame.set_edgecolor(sup.ps.get('legend_edge_color','k'))
 		frame.set_facecolor('white')
 		picturesave('fig.bound_lipids.summary.%s'%score,work.plotdir,
-			backup=False,version=True,meta={},extras=[legend])
+			backup=False,version=True,meta={},extras=[legend],dpi=dpi,form=img_form)
 
 def get_lipid_indices_absolute():
 	"""Use the cholesterol-laden meshes to get the right indices.

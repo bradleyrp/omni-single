@@ -301,6 +301,7 @@ class PlotBonds:
 						continue
 					ax = self.axes[ii][jj]
 					ax.set_ylim((0,y_max_val))
+					if not self.normed: ax.set_ylabel('bonds')
 					if not bonds_per_lipid or not self.normed: continue
 					nmols = get_nmols(top,strict=bonds_per_lipid)
 					twin = ax.twinx()
@@ -390,7 +391,7 @@ def plot():
 	# plot with acceptors first as a consistency check
 	figspec['hbonds.normed.acceptor_donor'] = dict(donor_acceptor=False,
 		**copy.deepcopy(figspec['hbonds.normed']))
-	test_key = ['hbonds_salt.merged.symmetric',None][-1]
+	test_key = ['hbonds_salt.merged.symmetric',None,'hbonds.symmetric'][-1]
 	if test_key: figspec = {test_key: figspec[test_key]}
 	for name,spec in figspec.items():
 		pb = PlotBonds(dims=(1,0),name=name,dataspec=spec)
