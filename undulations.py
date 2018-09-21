@@ -3,7 +3,7 @@
 import time
 import numpy as np
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+#from joblib.pool import has_shareable_memory
 
 from codes.mesh import makemesh_regular
 from base.timer import checktime
@@ -36,8 +36,8 @@ def undulations(**kwargs):
 	mesh = [[],[]]
 	for mn in range(2):
 		start = time.time()
-		mesh[mn] = Parallel(n_jobs=work.nprocs,verbose=0)(
-			delayed(makemesh_regular,has_shareable_memory)(
+		mesh[mn] = Parallel(n_jobs=work.nprocs,verbose=0,require='sharedmem')(
+			delayed(makemesh_regular)(
 				trajectory[fr][np.where(monolayer_indices==mn)],vecs[fr],grid)
 			for fr in framelooper(nframes,start=start,text='monolayer %d, frame'%mn))
 	checktime()

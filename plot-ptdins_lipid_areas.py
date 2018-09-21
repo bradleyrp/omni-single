@@ -26,9 +26,10 @@ def make_plots():
 	Plot summary and comprehensive plots.
 	"""
 	if True: 
+		# added v599 in sensible places now that it is ready
 		plot_areas(out_fn='lipid_areas',lims2d=(0.65,0.7), #! (195,210), lims now for area per lipid
-			sns2d=['membrane-v%3d'%i for i in [534,532,533,531,536,530,538]],
-			sns3d=['membrane-v%3d'%i for i in [536,534,532,533,531,530,538]])
+			sns2d=['membrane-v%3d'%i for i in [534,532,599,533,531,536,530,538]],
+			sns3d=['membrane-v%3d'%i for i in [599,536,534,532,533,531,530,538]])
 	else:
 		sns_symmetric = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
 		sns_symmetric3d = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
@@ -118,7 +119,7 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	ax.set_yticklabels(['%.02f'%i for i in ax.get_yticks()],fontsize=16)
 	ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 	ax.set_ylabel('area per lipid by leaflet (3D) $\mathrm{({nm}^{2})}$',fontsize=20)
-	ax.set_xlim((-0.5-0.25,len(sns_this)+2.5))
+	ax.set_xlim((-0.5-0.25,len(sns_this)+3.0)) # increased padding from 2.5 to 3 for labels
 	#---symmetric has bars that are too small so we add extra labels
 	if labels3d:
 		tagbox_ptdins = dict(facecolor='w',lw=1,alpha=1.0,boxstyle="round,pad=0.5")
@@ -161,46 +162,103 @@ def plot_areas(out_fn,sns2d,sns3d,lims2d=None,labels3d=False):
 	patches.append(legend)
 	fig.delaxes(axes[0][2])
 	picturesave('fig.%s'%out_fn,
-		work.plotdir,backup=False,version=True,meta={},extras=patches)
+		work.plotdir,backup=False,version=True,meta={},extras=patches,form='svg')
 
-plotrun.routine = None #[]
+plotrun.routine = None
+
 if __name__=='__main__':
 
+	art = {'fs':{'label':16,'title':20}}
+	mpl.rcParams['hatch.linewidth'] = 1.5
 	kb = 1.38064852*10**-23 # m2 kg s-2 K-1 or J/K or N-m/K
-	factor = 2*kb*300*(10**-9/(10**-9)**2)**2*10**3 # nm to meters in two terms, then from N/m to mN/m
+	factor = 2*kb*310*(10**-9/(10**-9)**2)**2*10**3 # nm to meters in two terms, then from N/m to mN/m
+	unit_factor = 1000.
 	#! note that values are 2.5x10^-7 mN/m
+	"""
+	see Waheed and Edholm: K_A = 2 a kBT / (sig_a)^2 / N
+	a is the area per lipid, or 2A/N
+	sig_a is the mean-squared fluctuations in the area per lipid
+	use factor above for N/m or just 2.0 for kBT
+	NOTE. you get way higher values when you use lipid_com or lipid_chol_com
+	instead, it is best to use lipid_chol_com_headless, which gives experimental values
+	this makes sense since cholesterol is a molecule and the headgroups can really screw up the fluctuations
+	I would imagine the increase in compressibility is because the headgroup decreases the variance in lipid 
+	areas, which is in the denominator
+	recall the design decisions: cholesterol is a lipid, use tails (i.e. headless), 
+	then average over time, then lipids
+	"""
+	# use a formal for total area and area fluctuation i.e. without including N_lipids. !! this is way off
+	ka_func = lambda x: (factor*x.sum(axis=1).mean()/area2d.sum(axis=1).std()**2*unit_factor).mean()
+	# several ways to do this. average time and lipid together
+	ka_func = lambda x: (factor*x.mean()/area2d.std()**2/N_lipids*unit_factor)
+	# several ways to do this. average time then by lipid
+	#   this means we are using the timewise fluctuations, and then collecting statistics over lipids
+	#   furthermore I think this more closely matches 
+	ka_func = lambda x: (factor*x.mean(axis=0)/x.std(axis=0)**2*unit_factor).mean()
+	# trying time on the oustide, lipids on the inside since MSD is typically over lipids, instantaneous t
+	ka_func = lambda x: (factor*x.mean(axis=1)/x.std(axis=1)**2/N_lipids*unit_factor).mean()
+	# final decision is the same as above, for obvious reasons. hence order doesn't matter and we 
+	#   treat time and lipid-wise deviations distinctly. note that this formula is 
+	#   best explained in the intro to Waheed and Edholm 2009
+	ka_func = lambda x: (factor*x.mean(axis=0)/x.std(axis=0)**2/N_lipids*unit_factor).mean()
 
+	#! either cholesterol is included or not
 	area_compressibility = {}
 	for sn in sns:
 		dat = data['lipid_areas2d'][sn]['data']
 		top_mono = work.meta[sn].get('index_top_monolayer',0)
 		area2d = dat['areas%d'%top_mono]
-		area_compressibility[sn] = factor*area2d.mean()/area2d.std()**2
-
-	axes,fig = panelplot(figsize=(12,10),
-		layout={'out':{'grid':[1,1],'wspace':0.4},
-		'ins':[{'grid':[1,2]}]})
+		if sn=='membrane-v532':
+			# [STATUS] variance for v532 is 0.0663 # when lipid_chol_com
+			# [STATUS] variance for v532 is 0.0931 # when headless. pattern is the same
+			status('variance for v532 is %.4f'%area2d.std(axis=0).mean())
+		N_lipids = area2d.shape[1]*2 # multiply by 2 for number-symmetric bilayers for total lipid count
+		area_compressibility[sn] = dict(mean=ka_func(area2d))
+		# easy way to get error bars
+		nsegs = 10.
+		subd = ((np.arange(len(area2d))/(len(area2d)/nsegs)).astype(int))
+		if True:
+			area_compressibility[sn]['std'] = np.std([
+				ka_func(area2d[np.where(subd==i)]) for i in np.unique(subd).astype(int)])
+		else: #! probably incorrect
+			x = area2d
+			area_compressibility[sn]['std'] = \
+				(factor*x.std(axis=0)/area2d.std(axis=0)**2/N_lipids*unit_factor).mean()
 
 	sns_collect = [['membrane-v%d'%i for i in j] for j in [
-		[536,538,530,531,532,533,534],
-		[509,514,515,510,511]]]
+		[509,514,515,510,511],
+		[538,536,530,531,533,599,532,534],]]
+	axes,fig = panelplot(figsize=(12,10),
+		layout={'out':{'grid':[1,1]},
+		'ins':[{'grid':[1,2],'wratios':[len(i) for i in sns_collect],'wspace':0.3}]})
 	for pnum,sns_this in enumerate(sns_collect):
 		ax = axes[pnum]
 		plotspec = ptdins_manuscript_settings()
 		for snum,sn in enumerate(sns_this):
-			ax.bar([snum],[area_compressibility[sn]],width=1.0,lw=0,edgecolor='w',
+			ax.bar([snum],[area_compressibility[sn]['mean']],width=1.0,lw=0,edgecolor='w',
 				color=plotspec['colors'][plotspec['colors_ions'][work.meta[sn]['cation']]],
 				hatch=plotspec['hatches_lipids'][work.meta[sn]['ptdins_resname']])
+			ax.errorbar([snum],[area_compressibility[sn]['mean']],yerr=[area_compressibility[sn]['std']],
+				alpha=1.0,lw=4.0,c='k')
 		ax.set_xticks([])
-		ax.set_ylabel('$K_A\,(k_B T)??$')
-		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')	
-		if pnum==0: ax.set_title('asymmetric')
-		elif pnum==1: ax.set_title('symmetric')
+		ax.set_ylabel(r'$K_A\,(dyn/cm)$',fontsize=art['fs']['label'])
+		ax.tick_params(axis='y',which='both',left='off',right='off',
+			labelleft='on',labelsize=art['fs']['label'])	
+		if pnum==0: ax.set_title('symmetric',fontsize=art['fs']['title'])
+		elif pnum==1: ax.set_title('physiological',fontsize=art['fs']['title'])
 		else: raise Exception
 		if pnum==0:
 			sns_all = list(set([i for j in sns_collect for i in j]))
 			bar_formats = make_bar_formats(sns_all,work=work)
-			kwargs = dict(bbox=(0.5,-0.1),loc='upper center',ncol=3)
+			# extra hatching for legend to make the lines smaller because too thick
+			for sn in bar_formats: 
+				if bar_formats[sn].get('hatch'):
+					# only the square one looks bad so we fix it
+					if '+' in bar_formats[sn]['hatch']: 
+						bar_formats[sn]['hatch'] = bar_formats[sn]['hatch'][:-1]
+			# legend_maker_stylized takes 'bbox' for 'bbox_to_anchor'
+			# custom position for legend so it is beneath both axes
+			kwargs = dict(loc='center left',ncol=5,bbox=(-0.15,-0.1))
 			comparison_spec = dict(ptdins_names=list(set([work.meta[sn]['ptdins_resname'] 
 				for sn in sns_all])),
 				ion_names=list(set([work.meta[sn]['cation'] for sn in sns_all])))
@@ -208,4 +266,4 @@ if __name__=='__main__':
 				sns_this=sns_all,bar_formats=bar_formats,
 				comparison_spec=comparison_spec,fancy=False,**kwargs)
 	picturesave('fig.area_compressibility',
-		work.plotdir,backup=False,version=True,meta={},extras=[legend])
+		work.plotdir,backup=False,version=True,meta={},extras=[legend],form='svg')

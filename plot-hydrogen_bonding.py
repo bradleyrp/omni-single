@@ -26,6 +26,8 @@ mpl.rcParams['hatch.color'] = 'k'
 _old_school = True
 #---renamed the metadata
 plotname = 'hydrogen_bonding_standard'
+# added picture version to avoid overwites
+print_version = '2018.07.16'
 
 #---block: IMPORT THE DATA
 if 'data' not in globals(): 
@@ -512,7 +514,7 @@ def render_interesting_hydrogen_bonds(sns,ispec,postpreps,ax=None,fig=None,figsi
 			lipid_resnames=sorted(set([r1 for key in keys for sn,(r1,r2) in key])),bar_formats=bar_formats)
 	#---! still needs: legend, ylabel
 	if save: picturesave('fig.bonding_subset.%s.%s'%(bond_type,ispec['pairname']),work.plotdir,
-		backup=False,version=True,meta={'interesting':ispec},extras=[legend])
+		backup=False,version=True,meta={'interesting':ispec,'print_version':print_version},extras=[legend])
 	return legend if do_legend else None
 
 ###---PLOTTING
@@ -546,7 +548,7 @@ if press and 'summary' in press_routine:
 				**hbonds_bardat(sns=sns,post=posts[spec['posts_subkey']],bar_formats=bar_formats))
 			legend = hbonds_plotter(bars_premade,title=spec['title'],checks=dict([(sn,True) for sn in sns]))
 			picturesave('fig.%s.%s'%(tag,comparison),work.plotdir,
-				backup=False,version=True,meta={},extras=[legend])
+				backup=False,version=True,meta={'print_version':print_version},extras=[legend])
 
 #---block: batch plot the "interesting" subsets of the main plots
 if press and 'interesting' in press_routine:
@@ -597,7 +599,7 @@ if press and 'snapshot_examples' in press_routine:
 				ax.imshow(image)
 				ax.axis('off')
 			picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,
-				backup=False,version=True,meta={},extras=legends)
+				backup=False,version=True,meta={'print_version':print_version},extras=legends)
 		#---showcase bar plots and images on a set of tiles
 		#---! note that this is somewhat repetitive with the above
 		elif arrangement in ['square_tiles','square_tiles_bars_below']:
@@ -664,7 +666,7 @@ if press and 'snapshot_examples' in press_routine:
 						axins.set_xticks([])
 						axins.set_yticks([])
 			picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,
-				backup=False,version=True,meta={},extras=legends)
+				backup=False,version=True,meta={'print_version':print_version},extras=legends)
 		else: raise Exception('invalid arrangement %s'%arrangement)
 
 #---block: interactive plot

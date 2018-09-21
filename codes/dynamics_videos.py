@@ -90,7 +90,9 @@ def render_from_json(request_fn='video_requests.json',catalog_fn='video_catalog.
 			is_complete = os.path.isfile(os.path.join(tempdir,vid_fn))
 			if not is_complete and not cut_spec.get('debug',False): 
 				view.show(quit=True)
-				view.render(name='vid.%s.%s'%(cut_name,sn))
+				kwargs = {}
+				if 'video_size' in cut_spec: kwargs['size'] = cut_spec['video_size']
+				view.render(name='vid.%s.%s'%(cut_name,sn),**kwargs)
 			elif cut_spec.get('debug',False):
 				status('debug mode runs view.show to make a snapshot')
 				view.show(quit=True)
@@ -98,7 +100,7 @@ def render_from_json(request_fn='video_requests.json',catalog_fn='video_catalog.
 			if not cut_spec.get('debug',False):
 				vid_fn_mp4 = os.path.join(tempdir,vid_fn)
 				#---intervene to convert this to webm
-				vid_fn = re.sub('\.mp4$','.webm',vid_fn_mp4)
+				vid_fn = re.sub(r'\.mp4$','.webm',vid_fn_mp4)
 				if not is_complete: bash('ffmpeg -y -i %s -b:v 0 -crf 20 %s'%(vid_fn_mp4,vid_fn))
 				#---save the video file and cut details
 				#---! should you resave more cut information?

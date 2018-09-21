@@ -14,7 +14,7 @@ roundlev = 4
 
 #---block: load the calculation data
 if 'data' not in globals(): 
-	data,calc = plotload(plotname,work)
+	data,calc = plotload(plotname)
 	#---!
 	atom_filter = calc['calcs']['specs']['atom_filter']
 	distance_metric = calc['calcs']['specs']['distance_metric']
@@ -354,5 +354,5 @@ if 'basic' in routine:
 			handleheight=2.0,markerscale=0.5,shadow=True,fancybox=True)
 		#---we must pass-through
 		#---! note this in the lab notebook!
-		picturesave(fn_fig,work.plotdir,backup=False,version=True,
+		picturesave(fn_fig,work.plotdir,backup=False,version=True,form='tiff',
 			meta=dict(atom_filter=atom_filter,distance_metric=distance_metric,**spec),extras=[legend])

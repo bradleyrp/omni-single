@@ -9,7 +9,7 @@ from joblib import Parallel,delayed
 from base.tools import status,framelooper
 import re
 
-#! deprecated? from codes.binding import *
+from codes.binding import *
 
 def ion_binding(grofile,trajfile,**kwargs):
 
@@ -22,7 +22,8 @@ def ion_binding(grofile,trajfile,**kwargs):
 	work = kwargs['workspace']
 	nrank = kwargs['calc']['specs']['nrank']
 	#---! note that the parallel code is severely broken and caused wierd spikes in the distances!!!
-	compute_parallel = False
+	#! on 2018.07.13 trying to revive parallel
+	compute_parallel = True
 	
 	#---prepare universe	
 	#! is this deprecated? grofile,trajfile = [work.slice(sn)['current']['all'][i] for i in ['gro','xtc']]
@@ -71,8 +72,8 @@ def ion_binding(grofile,trajfile,**kwargs):
 				lipid_resids,nrank,includes=lipid_resid_subselect)
 			incoming.append(ans)
 	else:
-		incoming = Parallel(n_jobs=2,verbose=0)(
-			delayed(partnerfinder,has_shareable_memory)
+		incoming = Parallel(n_jobs=4,verbose=0,require='sharedmem')(
+			delayed(partnerfinder)
 				(trajectory_lipids[fr],trajectory_ions[fr],vecs[fr],
 					lipid_resids,nrank,includes=lipid_resid_subselect)
 			for fr in framelooper(nframes,start=start))

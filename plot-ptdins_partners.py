@@ -139,6 +139,57 @@ def plot_partners_ptdins():
 			'panelspec':dict(figsize=(12,12),
 				layout={'out':{'grid':[2,1]},'ins':[{'grid':[1,2]},{'grid':[1,2],
 				'wratios':[1,6],'wspace':0.1},]}),},}
+	# remaking for simplicity
+	specs = {
+		'physiological_no_chol':{
+			#! what's wrong with v536 has only POPC-POPC
+			#! just a guess since I noticed this: wrong monolayer index! almost certainly!
+			'sns':[i for i in work.metadata.collections['asymmetric_all_no_mixed'] if i!='membrane-v536'],
+			'extras':{'small_labels_ax3':True,'error_bars':False,'baseline':0.0,
+				'all_y_labels':True,'legend_everywhere':True},
+			'specs':{
+				0:dict(nn=2,abstractor='lipid_com'),
+				1:dict(nn=3,abstractor='lipid_com'),},
+			'panelspec':dict(figsize=(22,16),
+				layout={'out':{'grid':[1,1]},
+				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},
+		'physiological_chol':{
+			#! what's wrong with v536 has only POPC-POPC
+			#! just a guess since I noticed this: wrong monolayer index! almost certainly!
+			'sns':[i for i in work.metadata.collections['asymmetric_all_no_mixed'] if i!='membrane-v536'],
+			'extras':{'small_labels_ax3':True,'error_bars':False,'baseline':0.0,
+				'all_y_labels':True,'legend_everywhere':True},
+			'specs':{
+				0:dict(nn=2,abstractor='lipid_chol_com'),
+				1:dict(nn=3,abstractor='lipid_chol_com'),},
+			'panelspec':dict(figsize=(30,16),
+				layout={'out':{'grid':[1,1]},
+				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},
+		'symmetric':{
+			#! what's wrong with v536 has only POPC-POPC
+			#! just a guess since I noticed this: wrong monolayer index! almost certainly!
+			'sns':[i for i in work.metadata.collections['symmetric'] if i!='membrane-v536'],
+			'extras':{'small_labels_ax3':True,'error_bars':False,'baseline':0.0,
+				'all_y_labels':True,'legend_everywhere':True},
+			'specs':{
+				0:dict(nn=2,abstractor='lipid_com'),
+				1:dict(nn=3,abstractor='lipid_com'),},
+			'panelspec':dict(figsize=(16,16),
+				layout={'out':{'grid':[1,1]},
+				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},
+		'summary_mesh':{
+			'sns':work.metadata.collections['position'],
+			'extras':{'special':True,'summary':True,'legend_below':True,
+				'ax_for_ylabel':2,'baseline':0.0,'ax_mods':{
+					0:{'set_title':{'label':'${Mg}^{2+}$','fontsize':18}},
+					1:{'set_title':{'label':'${Ca}^{2+}$','fontsize':18}}}},
+			'specs':{
+				2:dict(nn=3,abstractor='lipid_com',combos=[['Ptdins','Ptdins','Ptdins']]),
+				3:dict(nn=2,abstractor='lipid_com'),},
+			'panelspec':dict(figsize=(12,12),
+				layout={'out':{'grid':[2,1]},'ins':[{'grid':[1,2]},{'grid':[1,2],
+				'wratios':[1,6],'wspace':0.1},]}),}
+		}
 	if 'summary_mesh' in specs:
 		#! replot causes an error: `DataPack instance has no attribute 'this'`
 		#! hacking through the extra tools. there might already be a better solution to this
@@ -163,6 +214,7 @@ def plot_partners_ptdins():
 				layout={'out':{'grid':[1,1]},
 				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},}
 	specs_filter_keys = ['summary_mesh']
+	#specs_filter_keys = []
 	if specs_filter_keys: specs = dict([(i,j) for i,j in specs.items() if i in specs_filter_keys])
 	for figname,spec in specs.items(): 
 		plot_partners_basic(figname=figname,**spec)
@@ -347,7 +399,7 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		#! hacking extremely quickly here
 		for i,j in vals.items(): getattr(axes[key],i)(**j)
 	picturesave('fig.lipid_mesh_partners.%s'%figname,work.plotdir,
-		backup=False,version=True,meta={},extras=[legend])#,form='pdf')
+		backup=False,version=True,meta={},extras=[legend],form='svg')
 
 @autoload(plotrun)
 def load():

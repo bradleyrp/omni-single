@@ -169,7 +169,7 @@ class PlotBonds:
 		if 'salt_bridges' in self.dataspec['kinds']:
 			meta['salt_bridge_cutoff'] = calc['salt_bridges']['calcs']['specs']['distance_cutoff']
 		if self.custom_axes: return
-		else: picturesave('fig.lipid_lipid_bonds.%s'%self.name,work.plotdir,
+		else: picturesave('fig.lipid_lipid_bonds.%s'%self.name,work.plotdir,form='svg',
 			backup=False,version=True,meta=meta,extras=self.extras)
 
 	def count_bonds(self,kinds,merged=False):
@@ -305,6 +305,8 @@ class PlotBonds:
 						ax.set_xticks([])
 						ax.set_xticklabels([])
 						continue
+					# removing ticks
+					ax.tick_params(axis=u'both',which=u'both',length=0)
 					# custom titles come from variables-names-short in the metadata
 					ax.set_title(r'%s$-$%s'%tuple([
 						work.vars.get('names',{}).get('short',{}).get(p,p) for p in top]))
@@ -341,7 +343,8 @@ class PlotBonds:
 					elif self.style=='bars':
 						vp = sb.barplot(ax=ax,palette=palette_bars,ci='sd',capsize=0.,**outgoing)
 						for bnum,bar in enumerate(vp.patches):
-							bar.set_hatch(bar_formats[sns[bnum]]['hatch'])
+							# very minor error here: used sns, not self.sns and it messed up the hatching
+							bar.set_hatch(bar_formats[self.sns[bnum]]['hatch'])
 					else: raise Exception
 					ax.set_xticks([])
 					ax.set_xticklabels([])
@@ -482,8 +485,8 @@ def manuscript_plot():
 	"""
 	Special plot that combines some of the lipid-lipid bond counts with snapshots.
 	Note that this was easier than adding the data from this script to the snapshots over in 
-		plot-hydrogen_bonding.py
-		"""
+	plot-hydrogen_bonding.py
+	"""
 
 	import matplotlib.image as mpimg
 	from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -495,28 +498,49 @@ def manuscript_plot():
 		layout = copy.deepcopy(work.metadata.plots[
 			'hydrogen_bonding_standard']['specs']['snapshot_examples'][layout_name])
 		interesting = work.metadata.plots['hydrogen_bonding_standard']['specs']['interesting']
-	layout_name = 'layout_2b'
+	"""
+	incrementing the name
+	2b: original hydrogen bonds, however
+	2c: fixed the hatching
+	2d: added salt bridge bar plots
+	"""
+	rows_extras = ['hbonds','salt'][:]
+	layout_name = 'layout_2d' # went from layout_2b to layout_2c to correct hatching problem on the former
 	#! actually we wstill need "interesting" from earlier
 	interesting = work.metadata.plots['hydrogen_bonding_standard']['specs']['interesting']
 	arrangement = 'square_tiles_bars_below'
 	mesh_inset = True
-	figsize = [16,14]
-	matches = work.metadata.plots['lipid_lipid_bonds']['specs']['images']
-	#! hacking
-	ntiles = 16
+
+	# prepare axes based on layout
+	if len(rows_extras)==1:
+		figsize = [16,14]
+		ntiles = 16
+		axes,fig = square_tiles(ntiles=ntiles,figsize=(12,12),wspace=0.5,favor_rows=True)
+		axes_snapshots = axes[4:] # bars on top
+		#! hacked to get this stuff in the right order sorry
+		axes_snapshots = [axes_snapshots[i] for i in [0,1,4,5,8,9]+[2,3,6,7,10,11]]
+		axes_counts = [axes[:4]]
+	elif set(['hbonds','salt'])==set(rows_extras):
+		figsize = [18,14]
+		nrows_snap = 3
+		nrows_counts = 2
+		nrows = nrows_snap+nrows_counts
+		ncols = 4
+		axes,fig = panelplot(figsize=figsize,layout={'out':{'grid':[nrows,1],'hspace':0.5},'ins':[{'grid':[1,ncols],'wspace':0.5} for i in range(nrows)],})
+		axes_counts = [axes[0],axes[1]]
+		axes_snapshots = [m for n in [axes[i] for i in [2,3,4]] for m in n]
+	else: raise Exception
+
 
 	legends = []
+	matches = work.metadata.plots['lipid_lipid_bonds']['specs']['images']
 	tagbox = dict(facecolor='w',lw=1,alpha=1.0,boxstyle="round,pad=0.5")
 	nsnaps = [len(v) for i in matches for k,v in i.items()]
-	axes,fig = square_tiles(ntiles=ntiles,figsize=(12,12),wspace=0.5,favor_rows=True)
-	axes_snapshots = axes[4:] # bars on top
-	#! hacked to get this stuff in the right order sorry
-	axes_snapshots = [axes_snapshots[i] for i in [0,1,4,5,8,9]+[2,3,6,7,10,11]]
-	#---use the hybrid list/dict structure in the YAML hence the weird structure below
+	# use the hybrid list/dict structure in the YAML hence the weird structure below
 	for pnum,item in enumerate(matches):
 		if len(item)!=1: raise Exception('use list/dict in YAML please')
 		(iname,fns) = item.items()[0]
-		#---first axis is the bar plot
+		# first axis is the bar plot
 		#! hacked
 		axnum = pnum 
 		ax = axes_snapshots[axnum]
@@ -524,23 +548,23 @@ def manuscript_plot():
 		comparison = ispec['comparison']
 		bond_type = ispec['bond_type']
 		#! sns_this = work.metadata.collections[comparison]
-		#---sometimes the legend causes a NoneType problem on get_window_extent
-		#legend = render_interesting_hydrogen_bonds(ispec=ispec,postpreps=postprep(sns),
-		#	sns=sns,fig=fig,ax=ax,save=False,do_legend=pnum==len(matches)-1,style='alt')
-		#---! discarded: if pnum==0: legends.append(legend)
+		# sometimes the legend causes a NoneType problem on get_window_extent
+		#   legend = render_interesting_hydrogen_bonds(ispec=ispec,postpreps=postprep(sns),
+		# sns=sns,fig=fig,ax=ax,save=False,do_legend=pnum==len(matches)-1,style='alt')
+		#! discarded: if pnum==0: legends.append(legend)
 		for fnum,fn in enumerate(fns):
 			#---second axis holds the exemplars
 			if arrangement=='square_tiles': axnum = len(matches)+sum(nsnaps[:pnum])+fnum
 			elif arrangement=='square_tiles_bars_below': axnum = sum(nsnaps[:pnum])+fnum
 			ax = axes_snapshots[axnum]
-			#---previously sent a single image to sidestack but the following routine makes it square
+			# previously sent a single image to sidestack but the following routine makes it square
 			image = mpimg.imread(os.path.join(work.plotdir,fn))
 			border = get_blank_border(image)
 			sizes = np.array([np.ptp(i) for i in border])
 			padding = np.array([(max(sizes)-s)/2. for s in sizes]).astype(int)
 			zooms = np.array([[border[i][0]-1*padding[i],border[i][1]+padding[i]] 
 				for i in range(2)])
-			#---note that you have to reverse the order of dimensions here
+			# note that you have to reverse the order of dimensions here
 			image_zoomed = image[zooms[1][0]:zooms[1][1],zooms[0][0]:zooms[0][1]]
 			ax.imshow(image_zoomed)
 			if False:
@@ -555,13 +579,13 @@ def manuscript_plot():
 					transform=ax.transAxes)
 			legends.append(tb_ion)
 			ax.axis('off')
-			#---handle inset mesh
+			# handle inset mesh
 			if mesh_inset:
 				axins = inset_axes(ax,width="35%",height="35%",loc=3)
 				image = mpimg.imread(os.path.join(work.plotdir,
 					#---! somewhat clumsy renaming scheme to get the mesh snapshots
 					re.sub('.png$','.v1.png',re.sub('snapshot','snapshot_mesh_review_zoom',fn))))
-				#---cut the white space and add some padding
+				# cut the white space and add some padding
 				whites = [10,10]
 				border_lims_raw = get_blank_border(image)
 				sizes = np.array([i.ptp() for i in np.array(border_lims_raw)])
@@ -569,9 +593,9 @@ def manuscript_plot():
 					for ss,s in enumerate(sizes)]).astype(int)
 				border_lims = np.array([[b[0]-padding[bb],b[1]+padding[bb]]
 					for bb,b in enumerate(border_lims_raw)])
-				#---swap in the full image after we use the highlights to zoom
+				# swap in the full image after we use the highlights to zoom
 				image = mpimg.imread(os.path.join(work.plotdir,
-					#---! somewhat clumsy renaming scheme to get the mesh snapshots
+					#! somewhat clumsy renaming scheme to get the mesh snapshots
 					re.sub('.png$','.v1.png',re.sub('snapshot','snapshot_mesh_review',fn))))
 				image_rect = image[slice(*(border_lims[1])),slice(*(border_lims[0]))]
 				axins.imshow(image_rect)
@@ -579,40 +603,74 @@ def manuscript_plot():
 				axins.set_xticks([])
 				axins.set_yticks([])
 
-	key = 'hbonds'
-	merged = False
-	kind = ['hydrogen_bonding']
-	normed = True
 	style = 'bars'
-	symmetric = True
+	# loop over included salt bridge and hydrogen bond rows
+	for knum,key in enumerate(rows_extras):
+		kind = [{'hbonds':'hydrogen_bonding','salt':'salt_bridges'}[key]]
+		axes_reorder = dict(enumerate(axes_counts[knum]))
+		merged = False
+		normed = True
+		symmetric = True
+		spec_this = {
+			'merged':merged,'kinds':kind,'normed':normed,'resnames_exclude':resnames_exclude,
+			'key_residues':key_residues,'symmetric':symmetric,'legend_position':legend_position,
+			'title_style':title_style,'style':style}
+		spec_this['legend_position'] = None
+		# ensure PtdIns comes first in this instance
+		spec_this['donor_acceptor'] = False
+		name_this = (key+{'violin_special':'','bars':''}[style]+{1:'.normed',0:''}[normed]+
+			{1:'.merged',0:''}[merged]+{1:'.symmetric',0:''}[symmetric])
+		sb.set_style("white")
+		axes_mapping = {('PtdIns','PtdIns'):0,('DOPS','PtdIns'):1,('DOPE','PtdIns'):2,('CHL1','PtdIns'):3,}
+		sns_custom = ['membrane-v536','membrane-v538','membrane-v531',
+			'membrane-v533','membrane-v599','membrane-v532','membrane-v534']
+		#! global pb
+		pb = PlotBonds(dims=(1,0),name=name_this,dataspec=spec_this,
+			y_axis_align=False,y_axis_label=True,sns_custom=sns_custom,
+			custom_axes=dict(fig=fig,axes_reorder=axes_reorder,axes_mapping=axes_mapping))
+		# legend first, since it runs long
+		if knum==0: 
+			ax_legend = axes_reorder[3]
+			legends.append(pb.make_legend(ax=ax_legend,ncol=1,fancy=pb.style=='bars'))
 
-	spec_this = {
-		'merged':merged,'kinds':kind,'normed':normed,'resnames_exclude':resnames_exclude,
-		'key_residues':key_residues,'symmetric':symmetric,'legend_position':legend_position,
-		'title_style':title_style,'style':style}
-	spec_this['legend_position'] = None
-	# ensure PtdIns comes first in this instance
-	spec_this['donor_acceptor'] = False
-	name_this = (key+{'violin_special':'','bars':''}[style]+{1:'.normed',0:''}[normed]+
-		{1:'.merged',0:''}[merged]+{1:'.symmetric',0:''}[symmetric])
-	sb.set_style("white")
-	axes_reorder = dict(enumerate(axes[:4]))
-	ax_legend = axes[3]
-	axes_mapping = {('PtdIns','PtdIns'):0,('DOPS','PtdIns'):1,('DOPE','PtdIns'):2,('CHL1','PtdIns'):3,}
-	sns_custom = ['membrane-v536','membrane-v538','membrane-v531',
-		'membrane-v533','membrane-v532','membrane-v534']
-	global pb
-	pb = PlotBonds(dims=(1,0),name=name_this,dataspec=spec_this,
-		y_axis_align=False,y_axis_label=True,sns_custom=sns_custom,
-		custom_axes=dict(fig=fig,axes_reorder=axes_reorder,axes_mapping=axes_mapping))
-	legends.append(pb.make_legend(ax=ax_legend,ncol=1,fancy=pb.style=='bars'))
-	picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,
+	if False:
+		key = 'hbonds'
+		merged = False
+		kind = ['hydrogen_bonding']
+		normed = True
+		style = 'bars'
+		symmetric = True
+		spec_this = {
+			'merged':merged,'kinds':kind,'normed':normed,'resnames_exclude':resnames_exclude,
+			'key_residues':key_residues,'symmetric':symmetric,'legend_position':legend_position,
+			'title_style':title_style,'style':style}
+		spec_this['legend_position'] = None
+		# ensure PtdIns comes first in this instance
+		spec_this['donor_acceptor'] = False
+		name_this = (key+{'violin_special':'','bars':''}[style]+{1:'.normed',0:''}[normed]+
+			{1:'.merged',0:''}[merged]+{1:'.symmetric',0:''}[symmetric])
+		sb.set_style("white")
+		axes_reorder = dict(enumerate(axes[:4]))
+		ax_legend = axes[3]
+		axes_mapping = {('PtdIns','PtdIns'):0,('DOPS','PtdIns'):1,('DOPE','PtdIns'):2,('CHL1','PtdIns'):3,}
+		sns_custom = ['membrane-v536','membrane-v538','membrane-v531',
+			'membrane-v533','membrane-v599','membrane-v532','membrane-v534']
+		#! global pb
+		pb = PlotBonds(dims=(1,0),name=name_this,dataspec=spec_this,
+			y_axis_align=False,y_axis_label=True,sns_custom=sns_custom,
+			custom_axes=dict(fig=fig,axes_reorder=axes_reorder,axes_mapping=axes_mapping))
+		legends.append(pb.make_legend(ax=ax_legend,ncol=1,fancy=pb.style=='bars'))
+	picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,form='svg',
 		backup=False,version=True,meta={},extras=legends)
 
 plotrun.routine = None
-#plotrun.routine = []
+plotrun.routine = []
 
-if __name__=='__main__' and 0:
+#!!!!!!!!! manuscript_plot() is a thing you could run to get e.g. fig.bonding_subset.layout_2d.v1.svg
+
+#! being refactored below
+#! to make the big tile plots (the refactor was for the 4-panel subset), turn this block on and manually adjust the type below. also turn off the 4-tile plot
+if __name__=='__main__' and False:
 
 	"""
 	Catalog of atoms participating in various bonds.
@@ -868,9 +926,9 @@ if __name__=='__main__' and 0:
 				raw = np.transpose(raw,(1,0,2))
 				ax.imshow(raw,interpolation='nearest',origin='lower',**imshow_kwargs)
 				ax.set_xticks(np.arange(len(atoms_all)))
-				ax.set_xticklabels(atoms_all,fontsize=fs_small,rotation=-90)
+				ax.set_xticklabels(atoms_all,fontsize=fs_small-2,rotation=-90)
 				ax.set_yticks(np.arange(len(atoms_all)))
-				ax.set_yticklabels(atoms_all,fontsize=fs_small)
+				ax.set_yticklabels(atoms_all,fontsize=fs_small-2)
 				#! mpl finally changes from 'off' to a proper boolean
 				ax.tick_params(axis='y',which='both',left=False,right=False,labelleft=True)
 				ax.tick_params(axis='x',which='both',top=False,bottom=False,labelbottom=True)
@@ -905,6 +963,386 @@ if __name__=='__main__' and 0:
 		if data_type=='salt_bridges':
 			tag = '.cutoff%.1f'%calc['salt_bridges']['calcs']['specs']['distance_cutoff']
 		else: tag = ''
-		picturesave('fig.atomwise.%s'%data_type+tag,work.plotdir,
+		picturesave('fig.atomwise.%s'%data_type+tag,work.plotdir,form='svg',
 			backup=False,version=True,meta={},extras=extras)
+		#! document the careful matching where you confirmed that these results match the 
+		#!   results on the counts. possibly described in a comment above
 		print('max score is %s'%max_score)
+
+def prep_atomwise():
+	global lipid_struct_lib
+	# getting information about the various lipids from a more central source
+	if 'lipid_struct_lib' not in globals():
+		#! note that it might make more sense to get the ITP files from the simulations but this requires work
+		#! the following connection to automacs should be formalized at some point
+		import makeface
+		try: mod = makeface.import_remote('amx/amx')
+		except: raise Exception('please clone a copy of automacs next to omni in `amx`. '
+			'you must also run `make setup all` from that directory to get force field files.')
+		struct_lib_spot = 'amx/inputs/charmm/lipid-tops/*.itp'
+		lipid_struct_lib = {}
+		for g in glob.glob(struct_lib_spot):
+			this = mod['GMXTopology'](g)
+			for key,val in this.molecules.items():
+				if key in lipid_struct_lib: raise Exception('refusing to overwrite %s'%key)
+				lipid_struct_lib[key] = val
+		# save all atom names for later filtering
+		lipid_atom_names = dict([(k,[i['atom'] for i in v['atoms']]) for k,v in lipid_struct_lib.items()])
+	# rerun this script with alternate salt bridge cutoffs in ptdins.yaml if desired
+	data_type = ['salt_bridges','hydrogen_bonding'][0]
+	post_key = 'post_%s'%data_type
+	# collect atom counts for normalization
+	nmol_counts = dict([(sn,dict(zip(*[data['hydrogen_bonding'][sn]['data'][k] 
+		for k in ['resnames','nmols']]))) for sn in sns])
+	#! note that the symmetrize function is only used for some basic review during the calculation
+	def symmetrize(pairs,vals):
+		"""Collapse pairs and values to set-pairs and values."""
+		uni = np.unique(np.sort(pairs,axis=1),axis=0)
+		toc = [(uu,[
+			pp for pp,p in enumerate(pairs)
+			if np.any([np.all(u[::i]==p) for i in [1,-1]])
+			]) for uu,u in enumerate(uni)]
+		reval = dict([(tuple(uni[tt]),
+			np.array(vals)[np.array(t)].sum()) for tt,t in toc])
+		return reval
+	# note that after completing the plot I had to trace the units back to match lipid_lipid_bonds.kind
+	#!!! THIS TASK IS STILL IN PROGRESS
+	# compute post once per bond designation i.e. salt (and cutoff) vs hydrogen bonds
+	if post_key not in globals():
+		global allscores
+		post,allscores = {},{}
+		globals()[post_key] = post
+		for snum,sn in enumerate(work.sns()):
+			status('processing %s'%sn,i=snum,looplen=len(work.sns()))
+			this = data[data_type][sn]['data']
+			bonds,obs = [this[i] for i in ['bonds','observations']]
+			# prevalence is the mean number of observed bonds of a particular type, fine-grained here
+			prev = obs.mean(axis=0)
+			ranks = np.argsort(prev)[::-1]
+			# check for stupid bonds, which need the most attention
+			inds_no_same = np.where(~np.all(bonds[:,:3]==bonds[:,3:6],axis=1))[0]
+			inds_no_intra = np.where(~np.all(bonds[:,0:2]==bonds[:,3:5],axis=1))[0]
+			if any([i for i in inds_no_intra if i not in inds_no_same]): 
+				raise Exception('intra is not inside same!')
+			# important to note that the weird self-same bonds (where one atom is bonded to itself, 
+			#   (obviously a filter error) are filtered out when filter for intermolecular bonds
+			ranked_inter = np.argsort(prev[inds_no_intra])[::-1]
+			# subset focus for bonds. note that it is irrelevant that we ranked the bonds here
+			prev_sub = prev[inds_no_intra][ranked_inter]
+			bonds_sub = bonds[inds_no_intra][ranked_inter]
+			# compute a prevalence denominator: the total number of bonds per frame
+			denom = prev_sub.sum()
+			# compute first of two filters: residue combinations
+			# get combinations, ordered
+			combos_ord = np.unique(bonds_sub[:,np.array([0,3])],axis=0)
+			scores_pair = {}
+			symmetric_residue_pairs = np.unique(np.sort(combos_ord,axis=1),axis=0)
+			for subject in symmetric_residue_pairs:
+				these = np.where(np.all(bonds_sub[:,np.array([0,3])]==subject,axis=1))[0]
+				# note some of these scores were just for comparing entire residues
+				scores_pair[tuple(subject)] = np.round(prev_sub[these].sum()/nmol_counts[sn][subject[0]],3)
+				scores_pair_sym = symmetrize(*zip(*scores_pair.items()))
+				#! for i,j in sorted(scores_pair_sym.items(),key=lambda x:x[1])[::-1]: print((i,j))
+				# now that we have the rankings pick one type of bond and drill down
+				# the following step handles symmetry in the pairs of residues
+				# note that above in the for loop we have symmetrized the combos
+				subsel = np.any([np.all(bonds_sub[:,np.array([0,3])]==np.array(subject[::i]),axis=1) 
+					for i in [1,-1]],axis=0)
+				atom_pairs = bonds_sub[subsel][:,np.array([2,5])]
+				reverse = bonds_sub[subsel][:,0]!=subject[1]
+				# since the salt bridges are symmetric, we flip the atom order
+				atom_pairs[np.where(reverse)] = atom_pairs[np.where(reverse)][:,::-1]
+				#! rank the pairs atom_pairs[] #!sub_rank = np.argsort(prev_sub[subsel])[::-1]
+				if len(atom_pairs)==0: continue
+				elif sn not in post: post[sn] = {}
+				pairs_red,remap = np.unique(atom_pairs,axis=0,return_inverse=True)
+				scores = np.zeros(len(pairs_red))
+				for rr,r in enumerate(remap): scores[r] += prev_sub[subsel][rr]
+				rerank = np.argsort(scores)[::-1]
+				# we normalize by the *first* item in the residue which will become the X-axis in our plot
+				# NO! we have to double normalize so the bars have the same meaning across all tiles
+				norm = float(nmol_counts[sn][subject[0]])*nmol_counts[sn][subject[1]]
+				scores_final = scores[rerank]/norm
+				pairs_final = pairs_red[rerank]
+				post[sn][tuple(subject)] = dict(pairs=pairs_final,scores=scores_final)
+				# debugging and tracing a single example calculation here
+				#   goal is to check the prevalence of DOPE-PtdIns bonds in v532
+				if False and sn == 'membrane-v534' and all([i in subject for i in ['DOPE','P35P']]):
+					print('DEBUG!')
+					# problem is that prev_sub[subsel].sum()/nmol_counts[sn][subject[0]] = 0.217
+					#   but this should be about 1, the average PE-PIP2 bonds for v532 in figure 6
+					# trying to get this directly
+					#! see: obs[:,np.where(np.any([np.all([bonds[:,0]==i,bonds[:,3]==j],axis=0) for i,j in [['DOPE','PI2P'],['PI2P','DOPE']]],axis=0))[0]].sum(axis=1).mean() is 43.413
+					#  which is identical to prev_sub[subsel].sum()
+					# so perhaps the hydrogen bond plot is wrong? time to debut that one
+					import ipdb;ipdb.set_trace()
+			allscores[sn] = dict(sym=scores_pair_sym,reg=scores_pair)
+	global post
+	post = globals()[post_key]
+
+	# naming schemes
+	global atoms_all,canon_names
+	atoms_all = sorted(np.unique(np.concatenate([np.unique(
+		data[data_type][sn]['data']['bonds'][:,np.array([2,5])]) for sn in work.sns()])))
+	canon_names = {}
+	resnames_all = list(set([m for n in [i for sn in work.sns() for i in post[sn]] for m in n]))
+
+	lipid_atom_names = dict([(k,[i['atom'] for i in v['atoms']]) 
+		for k,v in lipid_struct_lib.items()])
+	for r in resnames_all:
+		canon_names[r] = list(set([i for i in atoms_all if i in lipid_atom_names[r]]))
+
+class SqueezedNorm(mpl.colors.Normalize):
+	# via https://stackoverflow.com/questions/44432693
+	def __init__(self, vmin=None, vmax=None, mid=0, s1=2, s2=2, clip=False):
+		self.vmin = vmin # minimum value
+		self.mid  = mid  # middle value
+		self.vmax = vmax # maximum value
+		self.s1=s1; self.s2=s2
+		f = lambda x, zero,vmax,s: np.abs((x-zero)/(vmax-zero))**(1./s)*0.5
+		self.g = lambda x, zero,vmin,vmax, s1,s2: f(x,zero,vmax,s1)*(x>=zero) - \
+			f(x,zero,vmin,s2)*(x<zero)+0.5
+		mpl.colors.Normalize.__init__(self, vmin, vmax, clip)
+	def __call__(self, value, clip=None):
+		r = self.g(value, self.mid,self.vmin,self.vmax, self.s1,self.s2)
+		return np.ma.masked_array(r)
+
+def plot_atomwise(ax,sn,rpair,fig,do_title=False,
+	do_left_label=False,max_score=1.0,alt_bar=False,cbar_width="10%",
+	residue_labels=True,alt_bar_bpl=True,annotated_spines=False,
+	filter_names=None,annotated_atoms=False):
+
+	from matplotlib.offsetbox import AnchoredText
+
+	# aesthetics
+	fs_small = 8
+	fs_huge = 36
+	fs_med = 14
+	fs_large = 26
+	extras = []
+	figsize_factor = 4 #! should be 4
+	side_bar_mag = True
+	cmap = 'Blues'
+	atoms_all_this = [i for i in atoms_all if i not in ([] or filter_names)]
+
+	resname_label = lambda r: work.vars['names']['short'][r]
+	#! ax = axes[pnum][snum]
+	rpair_explicit = tuple([(i if i!='PtdIns' else 
+		work.meta[sn]['ptdins_resname']) for i in rpair])
+	# standard atom names ensures that all tiles are square, but leaves extra whitespace
+	raw = np.ones([len(atoms_all_this) for i in rpair]+[4])*\
+		mpl.cm.__dict__[cmap](0.0)
+	# not that if you use zeros above, you get white where there were never any 
+	#   observations. we set the background to the zero for our colormap instead, so that
+	#   zero observations is nearly seamless with nearly zero
+	names_x,names_y = [canon_names[i] for i in rpair_explicit]
+	names_x,names_y = [[i for i in j if i not in 
+		(filter_names if filter_names else [])] for j in [names_x,names_y]]
+	if rpair_explicit in post[sn]:
+		names_x_this,names_y_this = [sorted(list(set(i))) 
+			for i in np.transpose(post[sn][rpair_explicit]['pairs'])]
+	else: names_x_this,names_y_this = [],[]
+	invalid_x,invalid_y = [np.array([ii for ii,i in enumerate(atoms_all_this) 
+		if i not in n]) for n in [names_x,names_y]]
+	if rpair_explicit in post[sn]:
+		this_max = post[sn][rpair_explicit]['scores'].max()
+		for ii,(a0,a1) in enumerate(post[sn][rpair_explicit]['pairs']):
+			raw[atoms_all_this.index(a0),atoms_all_this.index(a1)] = \
+				mpl.cm.__dict__[cmap](post[sn][rpair_explicit]['scores'][ii]/this_max)
+	if not side_bar_mag: imshow_kwargs = dict(vmax=max_score,vmin=0)
+	else: imshow_kwargs = dict(vmax=1.0,vmin=0)
+	this_sum = float(post[sn][rpair_explicit]['scores'].sum())
+	#if this_sum<max_score:
+	#	imshow_kwargs['norm'] = SqueezedNorm(vmin=0.,vmax=1.,mid=this_sum/max_score,s1=1.7,s2=4)
+	# set the invalid color
+	if len(invalid_y)>0: raw[invalid_y,:] = (0.,0.,0.,0.15)
+	if len(invalid_x)>0: raw[:,invalid_x] = (0.,0.,0.,0.15)
+	raw = np.transpose(raw,(1,0,2))
+	#imshow_kwargs['extent'] = [0.,len(atoms_all_this)-1.,0.,len(atoms_all_this)-1.]
+	im = ax.imshow(raw,interpolation='nearest',origin='lower',
+		**imshow_kwargs)
+	#! highlight parts of the name
+	atoms_all_this_labels = [dict(
+		[('OP%d%d'%(n,m),r'OP$\mathbf{%d}%d$'%(n,m)) 
+			for m in [2,3,4]
+			for n in [3,4,5]]+
+		[('O1%d'%(k),r'OP$\mathbf{1}%d$'%(k)) 
+			for k in [1,2,3,4]]
+		).get(i,i) for i in atoms_all_this]
+	ax.set_xticks(np.arange(len(atoms_all_this)))
+	ax.set_xticklabels(atoms_all_this_labels,fontsize=fs_small,rotation=-90)
+	ax.set_yticks(np.arange(len(atoms_all_this)))
+	ax.set_yticklabels(atoms_all_this_labels,fontsize=fs_small)
+	#! mpl finally changes from 'off' to a proper boolean
+	ax.tick_params(axis='y',which='both',left=False,right=False,labelleft=True)
+	ax.tick_params(axis='x',which='both',top=False,bottom=False,labelbottom=True)
+	#! note that labels were backwards until thankfully I noticed a discrepancy
+	#!   because cholesterol literally never made a bond with OP3X on 3,5 hence it was missing
+	#!   and ultimately this led me to reformulate canon names
+	if residue_labels:
+		ax.set_ylabel(resname_label(rpair_explicit[0]),fontsize=fs_med)
+		ax.set_xlabel(resname_label(rpair_explicit[1]),labelpad=10,fontsize=fs_med)
+
+	if annotated_spines:
+		ax2 = ax.twiny()
+		ax2.spines["bottom"].set_position(("axes", -0.2))
+		ax2.xaxis.set_ticks_position("bottom")
+		ax2.xaxis.set_label_position("bottom")
+		# Offset the twin axis below the host
+		ax2.spines["bottom"].set_position(("axes", -0.2))
+		# Turn on the frame for the twin axis, but then hide all 
+		# but the bottom spine
+		ax2.set_frame_on(True)
+		ax2.patch.set_visible(False)
+		for sp in ax2.spines.itervalues(): sp.set_visible(False)
+		ax2.spines["bottom"].set_visible(True)
+		#ax2.set_xlim((0,len(atoms_all_this)))
+
+		ax3 = ax.twinx()
+		ax3.spines["bottom"].set_position(("axes", -0.2))
+		ax3.yaxis.set_ticks_position("left")
+		ax3.yaxis.set_label_position("left")
+		# Offset the twin axis below the host
+		ax3.spines["bottom"].set_position(("axes", -0.2))
+		# Turn on the frame for the twin axis, but then hide all 
+		# but the bottom spine
+		ax3.set_frame_on(True)
+		ax3.patch.set_visible(False)
+		for sp in ax3.spines.itervalues(): sp.set_visible(False)
+		ax3.spines["left"].set_visible(True)
+		#ax3.set_ylim((0,len(atoms_all_this)))
+
+		#! getting adjustable='datalim' is not allowed when both axes are shared.
+		#!   so probably cannot do the extra spine thing on two axes
+
+	#! abandoned, second attempt
+	#! see https://matplotlib.org/users/annotations.html
+	elif annotated_atoms:
+
+		"""
+		this very nearly works. you get a bracket for two points on the x-axis
+		but you cannot move the data off the axis or the bracket disappears
+		see https://stackoverflow.com/questions/18537879/matplotlib-how-to-write-annotation-outside-the-drawing-in-data-coords
+		possibly see https://matplotlib.org/users/transforms_tutorial.html#blended-transformations
+		"""
+
+		#ax.set_xlim((0,len(atoms_all_this)))
+		#ax.set_ylim((0,len(atoms_all_this)))
+
+		#fac = float(len(atoms_all_this))
+		#fac = 10.0
+		#x1, y1 = 0./fac,0./fac
+		#x2, y2 = 0./fac,3.0/fac
+		# if you go a little negative then it disappears
+		# if you make the 
+		x1, y1 = -0.0,0.0
+		x2, y2 = -0.0,3.0
+		connectionstyle = "bar,fraction=1.0"
+		ax.plot([x1, x2],[y1, y2], ".", clip_on=False,)
+		#! do not use text here or it screws it up a bit
+		extras.append(ax.annotate("",
+			xy=(x1, y1), xycoords='data',
+			xytext=(x2, y2), textcoords='data',
+			arrowprops=dict(arrowstyle="-", #linestyle="dashed",
+				color="0.6",
+				shrinkA=10, shrinkB=10,
+				patchA=None,
+				patchB=None,
+				connectionstyle=connectionstyle,
+				),
+			))
+		#ax.add_artist(AnchoredText('hi',loc=2,prop=dict(size=8)))
+		#ax.set_yticks([])
+		#ax.set_yticklabels([])
+
+	if side_bar_mag:
+		axins = inset_axes(ax,width=cbar_width,height="100%",loc=3,
+			bbox_to_anchor=(1.05,0.,1.,1.),bbox_transform=ax.transAxes,borderpad=0)
+		axins.tick_params(axis='y',which='both',left=False,right=False,labelleft=True)
+		axins.tick_params(axis='x',which='both',top=False,bottom=False,labelbottom=True)
+		axins.set_xlim((0,1))
+		axins.set_ylim((0,1))
+		axins.set_xticks([])
+		axins.set_yticks([])
+		if rpair_explicit in post[sn]:
+			if not alt_bar:
+				# important to take the sum and not the max when comparing tiles
+				axins.bar([0.5],[post[sn][rpair_explicit]['scores'].sum()/max_score],
+					color='red',width=1.0)
+			else:
+				if this_sum<max_score:
+					clist = [(0.,mpl.cm.__dict__['Blues'](0.0)),
+						(this_sum/max_score,mpl.cm.__dict__['Blues'](1.0)),
+						(this_sum/max_score+10**-5,"white"),(1,"white")]
+				else: clist = [(0.,mpl.cm.__dict__['Blues'](0.0)),(1.,mpl.cm.__dict__['Blues'](1.0))]
+				dummy_im = ax.imshow(raw,
+					cmap=mpl.colors.LinearSegmentedColormap.from_list("name",clist),
+					interpolation='nearest',origin='lower')
+				dummy_im.set_visible(False)
+				cbar = plt.colorbar(dummy_im,cax=axins)
+				# we can score bonds per lipid in some cases if the counts are the same for all tiles
+				#   hence we rely on the calling function to decide this
+				if alt_bar_bpl:
+					these_yticks = cbar.ax.get_yticks()
+					# note that the max score corresponds to the normalized score: the number of 
+					#   bonds divided by the nmol of both lipids hence we multiply by one here
+					if rpair_explicit[0]!=rpair_explicit[1]: raise Exception
+					cbar.ax.set_yticklabels(['%.1f'%(max_score*t*nmol_counts[sn][rpair_explicit[0]]) 
+						for t in these_yticks])
+					cbar.ax.set_title('bonds\nper\nlipid',fontsize=10)
+					cbar.ax.tick_params(axis='y',which='both',left=False,
+						right=False,labelleft=False,labelright=True)
+				else:
+					cbar.ax.tick_params(axis='y',which='both',left=False,
+						right=False,labelleft=False,labelright=False)
+		extras.append(axins)
+	if do_title: # if pnum==0 
+		ax.set_title('%s\n%s'%(work.meta[sn]['ion_label'],work.meta[sn]['ptdins_label']),
+			fontsize=fs_huge,y=1.1)
+	if do_left_label: # if snum==0
+		tagbox = dict(facecolor='w',lw=0,alpha=1.0,boxstyle="round,pad=0.35")
+		label_pair = '%s\n%s'%tuple([resname_label(r) if r!='PtdIns' else r for r in rpair])
+		extras.append(ax.text(-1.0,0.5,label_pair,fontsize=fs_large,
+			bbox=tagbox,rotation=0,ha="center",va="center",color='k',
+			transform=ax.transAxes))
+
+# pulling together atomwise
+if __name__=='__main__' and False:
+
+	plt.rcParams['text.latex.preamble']=[r"\usepackage{xcolor}"]
+	
+	targets = {
+		0:{'sn':'membrane-v599','rpair':('PtdIns','PtdIns')},
+		#! note v538 is the same pattern as v530 but the latter just has more
+		1:{'sn':'membrane-v538','rpair':('PtdIns','PtdIns')},
+		2:{'sn':'membrane-v532','rpair':('PtdIns','PtdIns')},
+		3:{'sn':'membrane-v534','rpair':('PtdIns','PtdIns')},}
+	filter_names = 'N O13A O13B'.split()
+	data_type = ['salt_bridges','hydrogen_bonding'][1]
+	prep_atomwise() #! uses globals a lot
+	post_key = 'post_%s'%data_type
+	post = globals()[post_key]
+
+	extras = []
+	if data_type=='salt_bridges':
+		tag = '.cutoff%.1f'%calc['salt_bridges']['calcs']['specs']['distance_cutoff']
+	else: tag = ''
+	#! better way to plot this?
+	max_score = max([post[t['sn']][
+		tuple([i if i!='PtdIns' else work.meta[t['sn']]['ptdins_resname'] 
+			for i in  t['rpair']])]['scores'].sum() for t in targets.values()])
+
+	axes,fig = square_tiles(ntiles=4,figsize=(8,8),wspace=0.4,hspace=0.4,favor_rows=True)
+	for anum,target in targets.items():
+		ax = axes[anum]
+		rpair = target['rpair']
+		sn = target['sn']
+		plot_atomwise(ax,sn,fig=fig,rpair=rpair,max_score=max_score,alt_bar=True,cbar_width="5%",
+			residue_labels=False,alt_bar_bpl=True,filter_names=filter_names)
+		rpair_explicit = tuple([(i if i!='PtdIns' else 
+			work.meta[sn]['ptdins_label']) for i in rpair])
+		if rpair_explicit[0]!=rpair_explicit[1]: raise Exception
+		ax.set_title(rpair_explicit[0]+
+			' with '+work.meta[target['sn']]['ion_label'])
+	picturesave('fig.atomwise.subset.%s'%data_type+tag,work.plotdir,form='svg',
+		backup=False,version=True,meta={},extras=extras)

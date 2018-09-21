@@ -5,7 +5,7 @@ import numpy as np
 from numpy import linalg
 import time
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+#from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper
 #from codes.mesh import *
 #from codes.head_tail import *

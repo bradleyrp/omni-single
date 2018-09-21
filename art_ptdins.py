@@ -72,6 +72,7 @@ def colorize(metadat,comparison='',resname='',named=False,overrides=None):
 				('K','PI2P'):'grey',
 				('MG','PI2P'):'red',
 				('Cal','PI2P'):'blue',
+				('Cal','SAPI'):'blue',
 				('MG','P35P'):'purple',
 				('Cal','P35P'):'orange',
 				('NA','PI2P'):'green',

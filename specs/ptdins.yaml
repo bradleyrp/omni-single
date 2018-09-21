@@ -183,10 +183,21 @@ variables:
         - membrane-v542
         - membrane-v531
         - membrane-v533
+        - membrane-v599
+        - membrane-v532
+        - membrane-v534
+      asymmetric_no_dilute:
+        - membrane-v538
+        - membrane-v536
+        - membrane-v530
+        - membrane-v531
+        - membrane-v533
+        - membrane-v599
         - membrane-v532
         - membrane-v534
       asymmetric_pi_first:
         - membrane-v536
+        - membrane-v599
         - membrane-v538
         - membrane-v530
         - membrane-v542
@@ -254,13 +265,13 @@ collections:
   asymmetric_all:
     - membrane-v536
     - membrane-v538
+    - membrane-v599
     - membrane-v530
     - membrane-v542
     - membrane-v531
     - membrane-v533
     - membrane-v532
     - membrane-v534
-    - membrane-v599
   asymmetric_all_no_mixed:
     - membrane-v536
     - membrane-v538
@@ -269,6 +280,7 @@ collections:
     - membrane-v533
     - membrane-v532
     - membrane-v534
+    - membrane-v599
   best:
     - membrane-v532
   best_compare:
@@ -386,7 +398,7 @@ meta:
     composition_name:    asymmetric
     cation:              "Cal"
     anion:               CL
-    ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI}}$"
     ptdins_resname:      SAPI
 
@@ -540,16 +552,6 @@ calculations:
     collections: all
     slice_name: current
     group: all
-  diffusion_lipids:
-    uptype: post
-    slice_name: current
-    collections:
-      - all
-    specs:
-      diffusion_skip: 1
-      upstream:
-        lipid_abstractor:
-          selector: lipid_chol_com
   lipid_areas3d:
     uptype: simulation
     slice_name: current
@@ -616,7 +618,21 @@ calculations:
         monolayer_cutoff: 1.4
         resnames: +selectors/resnames_lipid_chol
         type: com
+
+  diffusion_lipids:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      diffusion_skip: 1
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
+
+
 calculations_retired_or_discarded:
+
   salt_bridges_lipid_lipid:
     group: all
     uptype: simulation
@@ -893,13 +909,14 @@ plots:
           lipid_mesh:
             upstream:
               lipid_abstractor:
-                selector: lipid_com
+                selector: 
+                  lipid_com
       lipid_areas2d:
         upstream:
           lipid_mesh:
             upstream:
               lipid_abstractor:
-                selector: lipid_com
+                selector: lipid_chol_com_headless
   ptdins_snapshots2:
     collections: all
     # need a calculation to get filenames
@@ -922,7 +939,7 @@ plots:
       hydrogen_bonding: {}
       salt_bridges:
         # can be 3.4 or 4.6A
-        distance_cutoff: 4.6
+        distance_cutoff: 3.4
     specs:
       images: # previously v4, v6, v3, taken from plot-hydrogen_bonding.py
         - v4: 
@@ -985,7 +1002,7 @@ plots:
   ion_binding:
     autoplot: True
     plotload_version: 2
-    collections: asymmetric_all
+    collections: all
     script: plot-ptdins_ion_binding.py
     calculation: 
       ion_binding: {}
@@ -1006,6 +1023,26 @@ plots:
           lipid_abstractor:
             selector: lipid_com
 
+  ptdins_composition_table: 
+    #! doesn't matter which calculation
+    calculation: 
+      lipid_abstractor:
+        selector: lipid_chol_com
+    collections: all
+    #! use version 1 because no extras otherwise
+    plotload_version: 1
+    autoplot: True
   
-#! do the RDFs?
-#! extreme bug. I had data,calc = plotload and it failed because we were on plotload_version 2 and then I ran... oh wait I ran the wrong one
+  #! do the RDFs?
+  #! extreme bug. I had data,calc = plotload and it failed because we were on plotload_version 2 and then I ran... oh wait I ran the wrong one
+
+  video_maker:
+    script: video_maker.py
+    autoplot: True
+    collections: another
+    #! calculation only for slices
+    calculation:
+      lipid_abstractor:
+        selector: lipid_com
+    specs:
+      scene: video_scene_ptdins.py

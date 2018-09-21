@@ -4,7 +4,7 @@ import time
 from numpy import *
 import itertools
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+# from joblib.pool import has_shareable_memory
 from base.timer import checktime
 from base.tools import status,framelooper
 

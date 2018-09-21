@@ -14,11 +14,11 @@ def load():
 	max_by_ion = True
 	onemax = 700
 	bars = False
-	art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':14},}
+	art = {}
 
 def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 	multiplexed_cutoffs=None,charge_scaled=False,do_legend=True,extras=None,norm_leaflet=False,
-	do_tag_bridges=True):
+	do_tag_bridges=True,ion_names=None,no_vert_labels=False):
 	"""
 	Single-panel plot of the cool ion-binding waterfall visualization.
 	"""
@@ -26,6 +26,7 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 	# format count data up to the maximum number of nearest-neighbors (hardcoded to 3)
 	ncats = 3
 	ymax_all = 0.
+	global postdat_sep
 	postdat_sep = [{} for s in sns_sep] 
 	for pnum,sns in enumerate(sns_sep):
 		postdat = dict([(sn,{}) for sn in sns])
@@ -120,15 +121,17 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 		label_drop = (ymax-ymin)*0.2
 		width = out_specs['width']
 		xcenters = [np.mean(np.array(i)+out_specs['width']/2.0) for i in out_specs['xvals']]
+		#! no_vert_labels is for the toc entry, a combination plot
 		for snum,sn in enumerate(sns):
 			text = work.meta[sn]['ion_label']
-			tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*-0.02-label_drop,text,
-				bbox=tagbox_ion,ha='center',va='top',rotation=-90 if len(text)>25 else 0,
+			downdrop = -0.02 if not no_vert_labels else -0.04
+			tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop,text,
+				bbox=tagbox_ion,ha='center',va='top',rotation=-90 if not no_vert_labels and len(text)>25 else 0,
 				color='k',fontsize=art['fs']['tags'])
 			extras.append(tb)
 			text = work.meta[sn]['ptdins_label']
 			tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*0.02-label_drop,text,
-				bbox=tagbox_ptdins,rotation=-90 if len(text)>15 else 0,ha="center",va="bottom",
+				bbox=tagbox_ptdins,rotation=-90 if not no_vert_labels and len(text)>15 else 0,ha="center",va="bottom",
 				color='k',fontsize=art['fs']['tags'])
 			extras.append(tb)
 	# annotations after the last bar
@@ -167,9 +170,9 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 	# custom legend on the second plot
 	if do_legend:
 		legend_labels,legend_patches = [],[]
-		ion_names = ['K','NA','MG','Cal']	
-		marks_sns = [sn for sn in [m[0] for m in [[sn for sn in sns if work.meta[sn]['cation']==i] 
-			for i in ion_names] if m]]
+		if not ion_names: ion_names = ['K','NA','MG','Cal']
+		marks_sns = [sn for sn in [m[0] for m in [[sn for sn in sns 
+			if work.meta[sn]['cation']==i and work.meta[sn].get('cations',i)==i] for i in ion_names] if m]]
 		for nn,name in enumerate(ion_names):
 			legend_labels.append(work.meta[marks_sns[nn]]['ion_label'])
 			legend_patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,
@@ -192,137 +195,10 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 		frame.set_facecolor('w')
 	return dict(ymax=ymax_all)
 
-#! getting the symmetric one again
-if __name__=='__main__' and False:
-
-	"""
-	Combined ion binding (waterfall) plot with EDPs.
-	"""
-	#! penultimate figure. see below for ion-specific cutoffs
-
-	global extras
-	extras = []
-	mpl.rcParams['hatch.linewidth'] = 3.0
-	from plotter.extras import i2s2
-	zonecut = 2.2
-	# set multiplexed cutoffs to None for original
-	multiplexed_cutoffs = {'NA':3.0,'K':3.0,'MG':2.3,'Cal':2.6,'Na,Cal':3.0}
-	charge_scaled = True
-	print_version = 'v20180426'
-	# aesthetics
-	colors_ions = {'NA':'green','Na,Cal':'green','MG':'red','Cal':'blue','K':'gray',}
-	descriptor = 'cutoff%.1f'%zonecut if not multiplexed_cutoffs else multiplexed_cutoffs
-	picname = 'fig.ion_binding3.%s'%descriptor
-	time_pts = 16
-	ymin = 0
-	fsbase = 16
-	# selections
-	sns_sep = [work.vars['orders']['canon']['symmetric'],work.vars['orders']['canon']['asymmetric']]
-	sns = sns_sep[0]+sns_sep[1]
-	figsize = (16,10)
-	#sns_sep = [work.vars['orders']['canon']['asymmetric']]
-	#sns = sns_sep[0]
-	#figsize = (16,12)
-	# figure
-	axes,fig = panelplot(figsize=figsize,
-		layout={'out':{'grid':[1,len(sns_sep)],'wratios':[len(s) for s in sns_sep],
-		'wspace':0.3},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
-	#! sns_sep lost its meaning
-	for anum,sns_this in enumerate(sns_sep):
-		ax = axes[anum][0]
-		plot_ion_binding_waterfall(ax,sns_sep=[sns_this],zonecut=zonecut,
-			multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,do_legend=anum==1)
-	# render
-	descriptor = '.cutoff%.1f'%zonecut if not multiplexed_cutoffs else ''
-	picname = 'fig.ion_binding4%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
-	picturesave(picname,work.plotdir,backup=False,extras=extras,
-		version=True,meta={
-			'zonecut':zonecut if not multiplexed_cutoffs else multiplexed_cutoffs,
-			'charge_scaled':charge_scaled,
-			'sns':sns,'print_version':print_version,'time_pts':time_pts},
-		#---pad inches because the tagboxes get cut off, pdf because hatches must be thicker
-		pad_inches=0.5,pdf=True)
-
-# final charging with variable cutoffs
-if __name__=='__main__' and False:
-
-	"""
-	Combined ion binding (waterfall) plot with EDPs.
-	"""
-	#! penultimate figure. see below for ion-specific cutoffs
-
-	global extras
-	extras = []
-	mpl.rcParams['hatch.linewidth'] = 3.0
-	from plotter.extras import i2s2
-	zonecut = 2.2
-	# set multiplexed cutoffs to None for original
-	multiplexed_cutoffs = {'NA':3.0,'K':3.0,'MG':2.3,'Cal':2.6,'Na,Cal':3.0}
-	charge_scaled = True
-	print_version = 'v20180426'
-	# aesthetics
-	colors_ions = {'NA':'green','Na,Cal':'green','MG':'red','Cal':'blue','K':'gray',}
-	descriptor = 'cutoff%.1f'%zonecut if not multiplexed_cutoffs else multiplexed_cutoffs
-	picname = 'fig.ion_binding3.%s'%descriptor
-	time_pts = 16
-	ymin = 0
-	fsbase = 16
-	# selections
-	sns_sep = [work.vars['orders']['canon']['symmetric'],work.vars['orders']['canon']['asymmetric']]
-	sns = sns_sep[0]+sns_sep[1]
-	figsize = (16,10)
-	sns_sep = [work.vars['orders']['canon']['asymmetric']]
-	sns = sns_sep[0]
-	figsize = (16,12)
-	# figure
-	axes,fig = panelplot(figsize=figsize,
-		layout={'out':{'grid':[1,1+len(sns_sep)],'wratios':[3]+[len(s) for s in sns_sep],
-		'wspace':0.3},'ins':[{'grid':[2,1]},{'grid':[2,1],'hratios':[7,1]}]})
-	ax = axes[1][0]
-	fig.delaxes(axes[1][1])
-	plot_ion_binding_waterfall(ax,sns_sep=sns_sep,zonecut=zonecut,
-		multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled)
-
-	# add EDPs (depends strongly on ptdins_electron_density_profiles.py)
-	#! weird import
-	plotrun.routine = []
-	outgoing = dict(autoload=autoload,plotrun=plotrun,autoplot=autoplot)
-	#!!! why are there three copies of the EDPs data?
-	execfile('calcs/ptdins_electron_density_profiles.py',globals(),outgoing)
-	post_process_edps = outgoing['post_process_edps']
-	kwargs = dict(sns=sns,data=data,bilayer_width=outgoing['bilayer_width'])
-	if multiplexed_cutoffs:
-		#!!! redundant data for some reason! needs fixed in omnicalc
-		reds = [ii for ii,i in enumerate(data.names) if i[0]=='electron_density_profiles']
-		data.this = data.data[reds[0]]
-	else:
-		data.set(name='electron_density_profiles')
-	# get the post for EDP and export it to globals
-	outgoing['post'] = post = post_process_edps(**kwargs)
-	plot_interesting = outgoing['plot_interesting']
-	# if you just run plot_interesting here, you would get the original EDPs from that code
-	def get_panel(sn,ion_name): return {'membrane-v531':0,'membrane-v532':1}[sn]
-	def get_color(sn,ion_name):
-		if ion_name=='anion': return 'k'
-		else: return colorize(work.meta[sn],comparison='protonation')
-	sns_this = ['membrane-v531','membrane-v532']
-	extras.extend(plot_interesting(axes=axes[0],get_panel=get_panel,
-		do_external=True,sns_this=sns_this,layout_style='by_sn',
-		xlim=(1.5,4.5),mark_peaks=False,get_color=get_color,
-		nsegs=5,early_color='#A9A9A9',fs_labels=14,fs_legend=14,show_title=False))
-
-	# render
-	descriptor = '.cutoff%.1f'%zonecut if not multiplexed_cutoffs else ''
-	picname = 'fig.ion_binding4%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
-	picturesave(picname,work.plotdir,backup=False,extras=extras,
-		version=True,meta={
-			'zonecut':zonecut if not multiplexed_cutoffs else multiplexed_cutoffs,
-			'charge_scaled':charge_scaled,
-		'sns':sns,'print_version':print_version,'time_pts':time_pts},
-		#---pad inches because the tagboxes get cut off, pdf because hatches must be thicker
-		pad_inches=0.5,pdf=True)
-
 if __name__=='__main__':
+
+	# several layouts (iterate manually for now)
+	layout = ['comprehensive','physiological_with_EDPs','simple_snapshot'][0]
 
 	# hatching shennanigans in various matplotlib versions
 	mpl.rcParams['hatch.linewidth'] = 3.0
@@ -338,37 +214,151 @@ if __name__=='__main__':
 	colors_ions = {'NA':'green','Na,Cal':'green','MG':'red','Cal':'blue','K':'gray',}
 	descriptor = '.cutoff%.1f'%zonecut if not multiplexed_cutoffs else ''
 	picname = 'fig.ion_binding4%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
+	if layout=='simple_snapshot': picname = 'fig.ion_binding_toc'
 
 	# aesthetics
+	global art
 	time_pts = 16
 	ymin = 0
-	figsize = (18,10)
 
 	# selections
-	sns_sep = [work.vars['orders']['canon']['symmetric'],work.vars['orders']['canon']['asymmetric']]
-	titles = ['symmetric','physiological']
-	sns = sns_sep[0]+sns_sep[1]
+	if layout=='comprehensive':
+		art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':14},}
+		sns_sep = [work.vars['orders']['canon']['symmetric'],work.vars['orders']['canon']['asymmetric']]
+		titles = ['symmetric','physiological']
+		sns = sns_sep[0]+sns_sep[1]
+	elif layout=='physiological_with_EDPs':
+		art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':16},}
+		sns_sep = [work.vars['orders']['canon']['asymmetric_no_dilute']]
+		sns = sns_sep[0]
+	elif layout=='simple_snapshot':
+		art = {'fs':{'legend':14,'title':20,'tags':16,'axlabel':16},}
+		sns_sep = [['membrane-v531','membrane-v532']]
+		sns = sns_sep[0]
+	else: raise Exception
 
 	extras = []
-	axes,fig = panelplot(figsize=figsize,
-		layout={'out':{'grid':[1,len(sns_sep)],'wratios':[len(s) for s in sns_sep],
-		'wspace':0.3},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
-	axes = [i for j in axes for i in j]
-	ymax = 0.
+	if layout=='comprehensive':
+		figsize = (18,10)
+		axes,fig = panelplot(figsize=figsize,
+			layout={'out':{'grid':[1,len(sns_sep)],'wratios':[len(s) for s in sns_sep],
+			'wspace':0.3},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
+		axes = [i for j in axes for i in j]
+		ymax = 0.
+	elif layout=='physiological_with_EDPs':
+		figsize = (16,14)
+		# dial in the wratio below to balance things
+		axes,fig = panelplot(figsize=figsize,
+			layout={'out':{'grid':[1,1+len(sns_sep)],'wratios':[4]+[len(s) for s in sns_sep],
+			'wspace':0.3},'ins':[{'grid':[2,1]},{'grid':[2,1],'hratios':[7,1]}]})
+	elif layout=='simple_snapshot':
+		figsize = (16,10)
+		axes,fig = panelplot(figsize=figsize,
+			layout={'out':{'grid':[1,1+len(sns_sep)],'wratios':[3,1],'hspace':0.0,
+			'wspace':0.1},'ins':[{'grid':[1,1]},{'grid':[4,1],'hratios':[2,5,1,1]}]})
+		ymax = 0.
+	else: raise Exception
 
-	# loop over panels
-	for anum,sns_this in enumerate(sns_sep):
-		ax = axes[anum]
-		detail = plot_ion_binding_waterfall(ax,sns_sep=[sns_this],zonecut=zonecut,extras=extras,
-			multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,do_legend=anum==1,
-			norm_leaflet=norm_leaflet,do_tag_bridges=anum==1)
-		ymax = max(detail['ymax'],ymax)
-		ax.set_title(titles[anum],fontsize=art['fs']['title'])
+	# main plot loop
+	if layout=='comprehensive':
+		for anum,sns_this in enumerate(sns_sep):
+			ax = axes[anum]
+			detail = plot_ion_binding_waterfall(ax,sns_sep=[sns_this],zonecut=zonecut,extras=extras,
+				multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,do_legend=anum==1,
+				norm_leaflet=norm_leaflet,do_tag_bridges=anum==1)
+			ymax = max(detail['ymax'],ymax)
+			ax.set_title(titles[anum],fontsize=art['fs']['title'])
+			# get the average totals for comparison between compositions
+			if layout=='comprehensive':
+				for sn in ['membrane-v511','membrane-v532']:
+					if sn in postdat_sep[0]:
+						status('%s totals average: %.2f'%(sn,postdat_sep[0][sn]['total'].mean()))
+				"""
+				RESULTS
+				[STATUS] membrane-v511 totals average: 364.92
+				[STATUS] membrane-v532 totals average: 435.48
+				"""
+	elif layout=='physiological_with_EDPs':
+		ax = axes[1][0]
+		fig.delaxes(axes[1][1])
+		plot_ion_binding_waterfall(ax,sns_sep=sns_sep,zonecut=zonecut,
+			multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,extras=extras)
+
+		# add EDPs (depends strongly on ptdins_electron_density_profiles.py)
+		#! weird import
+		plotrun.routine = []
+		outgoing = dict(autoload=autoload,plotrun=plotrun,autoplot=autoplot)
+		#!!! why are there three copies of the EDPs data?
+		execfile('calcs/ptdins_electron_density_profiles.py',globals(),outgoing)
+		post_process_edps = outgoing['post_process_edps']
+		kwargs = dict(sns=sns,data=data,bilayer_width=outgoing['bilayer_width'])
+		if multiplexed_cutoffs:
+			#! redundant data for some reason! needs fixed in omnicalc
+			reds = [ii for ii,i in enumerate(data.names) if i[0]=='electron_density_profiles']
+			data.this = data.data[reds[0]]
+		else:
+			data.set(name='electron_density_profiles')
+		# get the post for EDP and export it to globals
+		outgoing['post'] = post = post_process_edps(**kwargs)
+		plot_interesting = outgoing['plot_interesting']
+		# if you just run plot_interesting here, you would get the original EDPs from that code
+		def get_panel(sn,ion_name): return {'membrane-v531':0,'membrane-v532':1}[sn]
+		def get_color(sn,ion_name):
+			if ion_name=='anion': return 'k'
+			else: return colorize(work.meta[sn],comparison='protonation')
+		sns_this = ['membrane-v531','membrane-v532']
+		extras.extend(plot_interesting(axes=axes[0],get_panel=get_panel,
+			do_external=True,sns_this=sns_this,layout_style='by_sn',
+			xlim=(1.5,4.5),mark_peaks=False,get_color=get_color,
+			nsegs=5,early_color='#A9A9A9',fs_labels=14,fs_legend=14,show_title=False))
+
+	elif layout=='simple_snapshot':
+		ax = axes[1][1]
+		for j in [0,2,3]: fig.delaxes(axes[1][j])
+		plot_ion_binding_waterfall(ax,sns_sep=sns_sep,zonecut=zonecut,
+			multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,extras=extras,
+			ion_names=['MG','Cal'],do_legend=False,no_vert_labels=True)
+		ax.tick_params(axis=u'both',which=u'both',length=0)
+		# hijacked from lipid_lipid_bonds
+		ax = axes[0][0]
+		import matplotlib.image as mpimg
+		# previously sent a single image to sidestack but the following routine makes it square
+		image = mpimg.imread(os.path.join(work.plotdir,'snap.vmd.bilayer.png'))
+		border = get_blank_border(image)
+		sizes = np.array([np.ptp(i) for i in border])
+		padding = np.array([(max(sizes)-s)/2. for s in sizes]).astype(int)
+		zooms = np.array([[border[i][0]-1*padding[i],border[i][1]+padding[i]] 
+			for i in range(2)])
+		# note that you have to reverse the order of dimensions here
+		image_zoomed = image[zooms[1][0]:zooms[1][1],zooms[0][0]:zooms[0][1]]
+		ax.imshow(image_zoomed)
+		ax.axis('off')
+
+	else: raise Exception
 	# leaflet norming also matches the axes for a direct comparison between compositions
-	if norm_leaflet:
+	if norm_leaflet and layout=='comprehensive':
 		for ax in axes: ax.set_ylim((0,ymax))
 	# PDF method previously used to make hatches thicker
 	meta = {'zonecut':zonecut if not multiplexed_cutoffs else multiplexed_cutoffs,
 		'charge_scaled':charge_scaled,'sns':sns,'print_version':print_version,'time_pts':time_pts},
-	picturesave(picname,work.plotdir,backup=False,extras=extras,
-		version=True,meta=meta,pad_inches=0.5,pdf=False)
+	fn = picturesave(picname,work.plotdir,backup=False,extras=extras,
+		version=True,meta=meta,pad_inches=0.5,pdf=False,form='svg')
+	#! abandoned
+	if False:
+		# trim white space
+		#! this function is useful. formalize it and put it somewhere
+		image = mpimg.imread(fn)
+		border = get_blank_border(image)
+		sizes = np.array([np.ptp(i) for i in border])
+		padding = np.array([(max(sizes)-s)/2. for s in sizes]).astype(int)
+		zooms = np.array([[border[i][0]-1*padding[i],border[i][1]+padding[i]] 
+			for i in range(2)])
+		# note that you have to reverse the order of dimensions here
+		image_zoomed = image[zooms[1][0]:zooms[1][1],zooms[0][0]:zooms[0][1]]
+		fig = plt.figure(figsize=figsize)
+		ax = plt.subplot(111)
+		ax.imshow(image)
+		picturesave(picname,work.plotdir,backup=False,extras=extras,
+			version=True,meta=meta,pad_inches=0.5,pdf=False)
+	conv_cmd = '-trim -bordercolor white -border 25 +repage'
+	os.system('convert %s %s %s'%(fn,conv_cmd,re.sub(r'\.png$','.trim.png',fn)))

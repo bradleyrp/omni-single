@@ -45,7 +45,7 @@ def reload():
 	global sns,scanrange,distributions,distances,data,calc,normalizers,middles
 	#---custom reload sequence goes here
 	data,calc = plotload(plotname)
-	sns = work.specs['collections']['position']+['membrane-v538']
+	sns = work.metadata.collections['position']+['membrane-v538']
 	#---compute distance distributions
 	cutoff = max([data[sn]['data']['water_distances'].max() for sn in sns])
 	#---globals for parallel functions
@@ -162,6 +162,8 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 				[0,90,-90],[0.85,0.45,0.6],
 				#---move the labels
 				[[0,0.17],[-0.85,0],[0.6,0]]):
+				#! ignore specificity
+				if name=='specificity': continue
 				extras.append(ax.annotate('',xy=(i,j),xycoords='data',xytext=(k,l),
 					textcoords='data',arrowprops=dict(arrowstyle="<->",
 						connectionstyle="bar,fraction=%.2f"%frac,ec="k",shrinkA=5,shrinkB=5)))
@@ -204,7 +206,14 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 	axins = inset_axes(ax,width="45%",height="45%",loc=1)
 	plot(axins,xlims=(1,7),ylims=None,
 		sns=['membrane-v538','membrane-v531','membrane-v532'],
-		do_peak_annotations=True,is_inset=True)
+		do_peak_annotations=True,is_inset=True,
+		#! barely any effect on the inset. if anything the peaks are sharper/higher
+		#!   this suggests that RDF for first solvation shell is totally unaffected by lipid proximity
+		#!   which seems weird, however we might just not have the statistics or something??
+		#zone_color=zone_color,zone_lw=zone_lw,
+		#zonelist=[(0.,0.22,),(0.22,0.46),(0.46,1)],
+		#zone_zorder=zone_zorder,
+		)
 	#---only save this figure if no incoming figure
 	if incoming==None:
 		picturesave('fig.hydration_distribution',work.plotdir,backup=False,version=True,
@@ -262,7 +271,8 @@ def water_distribution_sweep_plot_with_snapshots():
 		fs=dict(xlabel=20,ylabel=20,ylabel_inset=16,xlabel_inset=16,colorbar_label=12))
 	picturesave('fig.hydration_distribution.snapshots',
 		#! added revision after changing the labels
-		work.plotdir,backup=False,version=True,meta={'revision':'2018.07.13'},extras=extras)
+		work.plotdir,backup=False,version=True,meta={'revision':'2018.07.13'},extras=extras,
+		form='svg')
 
 ###---STANDARD
 

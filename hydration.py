@@ -127,7 +127,7 @@ def hydration(grofile,trajfile,**kwargs):
 		run_parallel=run_parallel,debug=None)
 	#---select valid frames
 	valid_frames_shell_counts = np.array([i for i in range(len(shell_counts)) if len(shell_counts[i])>0])
-	shell_counts = np.array(shell_counts)[valid_frames_shell_counts]
+	shell_counts = np.array(shell_counts)[valid_frames_shell_counts.astype(int)]
 	#---for each ion get the minimum distance to any lipid
 	near_lipids = basic_compute_loop(
 		compute_function=minimum_distances,
@@ -135,7 +135,7 @@ def hydration(grofile,trajfile,**kwargs):
 		run_parallel=run_parallel,debug=None)
 	#---select valid frames
 	valid_frames_near_lipids = np.array([i for i in range(len(near_lipids)) if len(near_lipids[i])>0])
-	near_lipids = np.array(near_lipids)[valid_frames_near_lipids]
+	near_lipids = np.array(near_lipids)[valid_frames_near_lipids.astype(int)]
 
 	if False:
 		#---for each ion count the waters within the shell
