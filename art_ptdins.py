@@ -593,6 +593,8 @@ residue_codes = {'ARG':'R','HIS':'H','LYS':'K','ASP':'D','GLU':'E',
 #! actinlink settings
 
 def actinlink_monolayer_indexer(sn,abstractor):
+	#!!! note that I reran the abstractor!!!
+	return 0
 	if abstractor=='lipid_chol_com':
 		#! had to add 'mdia2bilayer10' for this to get lipid_rdfs to work
 		if sn in ['mdia2bilayer10','mdia2bilayer10_2','mdia2bilayer30_2']: return 1

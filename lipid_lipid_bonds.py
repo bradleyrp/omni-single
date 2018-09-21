@@ -362,12 +362,18 @@ class PlotBonds:
 					if (self.symmetric and ii>jj) or (
 						top not in self.index and top[::-1] not in self.index):
 						continue
-					# custom axis handling
-					if self.custom_axes:
-						if (r1,r2) not in self.axes_mapping: continue
-						else: ax = self.axes[self.axes_mapping[(r1,r2)]]
-					else: ax = self.axes[ii][jj]
-					if self.y_axis_align: ax.set_ylim((0,y_max_val))
+					#! two options from a merge
+					if False:
+						# custom axis handling
+						if self.custom_axes:
+							if (r1,r2) not in self.axes_mapping: continue
+							else: ax = self.axes[self.axes_mapping[(r1,r2)]]
+						else: ax = self.axes[ii][jj]
+						if self.y_axis_align: ax.set_ylim((0,y_max_val))
+					else:
+						ax = self.axes[ii][jj]
+						ax.set_ylim((0,y_max_val))
+						if not self.normed: ax.set_ylabel('bonds')
 					if not bonds_per_lipid or not self.normed: continue
 					nmols = get_nmols(top,strict=bonds_per_lipid)
 					twin = ax.twinx()
@@ -475,7 +481,9 @@ def plot_counts():
 	# plot with acceptors first as a consistency check
 	figspec['hbonds.normed.acceptor_donor'] = dict(donor_acceptor=False,
 		**copy.deepcopy(figspec['hbonds.normed']))
-	test_key = [None,'hbonds.normed'][0]
+	#! keeping two lines from a merge here
+	#! test_key = [None,'hbonds.normed'][0]
+	test_key = ['hbonds_salt.merged.symmetric',None,'hbonds.symmetric'][-1]
 	if test_key: figspec = {test_key: figspec[test_key]}
 	for name,spec in figspec.items():
 		status('plotting %s'%name,tag='plot')

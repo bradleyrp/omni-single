@@ -61,6 +61,7 @@ collections:
     - mdia2bilayerphys2
     - mdia2bilayer30
     - mdia2bilayer30_2
+    #! removed when replotting mdia2 stuff - gelbilayerphys
 
 meta:
   mdia2bilayerphys:
@@ -195,6 +196,11 @@ slices:
     groups: {'all':'all'}
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
+  # gelbilayerphys -> /home/ryb/share/lolabu/simulations/gelbilayerphys
+  gelbilayerphys:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':201000,'skip':100}
 
 calculations:
   protein_rmsd:
@@ -211,20 +217,20 @@ calculations:
       separator:
         cluster: True 
         cluster_neighbors: 3
+        topologize_tolerance: 0.1
+        lipid_tip: "(not resname CHL1 and name P) or (resname CHL1 and name H3')"
       selector:
         loop:
           lipid_com:
             monolayer_cutoff: 1.85
             resnames: +selectors/resnames_lipid
-            lipid_tip: "name P"
             type: com
           lipid_chol_com:
             monolayer_cutoff: 1.4
             resnames: +selectors/resnames_lipid_chol
-            lipid_tip: "name P or name H3'"
             type: com
           lipid_chol_com_headless:
-            monolayer_cutoff: 1.4
+            monolayer_cutoff: 0.8
             resnames: +selectors/resnames_lipid_chol
             # custom code in python must create the MDAnalysis-compatible "selstring" text
             type: custom
@@ -236,7 +242,6 @@ calculations:
               selstring = '(not name H*) and ((%s) or ((%s) and (%s)))'%(
                 'resname CHL1',sel_lipids,sel_tail_names)
             selection: +selectors/headless_selection
-            lipid_tip: "name P or name H3'"
   contacts:
     group: all
     slice_name: current
@@ -254,8 +259,8 @@ calculations:
     specs:
       angle_cutoff: 160.0
       distance_cutoff: 3.4
-      protein: 
-        loop: [true, false]
+      protein: true
+      # turned off the loop when replotting actinlink_bonds_analysis.py loop: [true, false]
   lipid_mesh:
     uptype: post
     slice_name: current
@@ -290,7 +295,8 @@ calculations:
     specs:
       upstream:
         lipid_abstractor:
-          selector: lipid_chol_com
+          selector: 
+            loop: [lipid_chol_com, lipid_chol_com_headless]
       cutoff: 20.0
       binsize: 0.05
   salt_bridges:
@@ -366,7 +372,31 @@ plots:
   lipid_rdfs:
     autoplot: True
     collections: cursor
-    calculation: lipid_rdfs
+    calculation:
+      lipid_rdfs:
+        upstream:
+          lipid_abstractor:
+            selector:
+              loop: 
+                - lipid_chol_com 
+                - lipid_chol_com_headless
+  check_leaflets:
+    autoplot: False
+    script: check_leaflets.py
+    collections: cursor
+    calculation: 
+      lipid_abstractor:
+        selector: 
+          loop: 
+            - lipid_chol_com 
+            - lipid_chol_com_headless
+  actinlink_snapshots:
+    autoplot: True
+    script: actinlink_snapshots.py
+    collections: cursor
+    calculation:
+      lipid_abstractor:
+        selector: lipid_chol_com
 
 deprecated:
   #! this was interfering with actinlink_lipid_lipid_bonds above
@@ -398,16 +428,10 @@ deprecated:
       figsize_all: [20,8]
       sns_explicit_color_names: {}
       nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
-  actinlink_snapshots:
-    autoplot: True
-    script: actinlink_snapshots.py
-    collections: cursor
-    calculation:
-      lipid_abstractor:
-        selector: lipid_chol_com
   lipid_rdfs_dev:
     autoplot: True
     collections: cursor
     calculation:
       lipid_abstractor:
         selector: lipid_chol_com
+

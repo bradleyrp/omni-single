@@ -77,16 +77,18 @@ def make_overhead_snapshot(group_name,**kwargs):
 @autoplot(plotrun)
 def snapshots():
 	"""Make many snapshots."""
+
 	# ongoing
 	snapshot_batches = {
 		'v1':{'sns':sns_contacts,'snapshot_drop':'snapshots_overhead'},}
+
 	# render snapshots and summaries
 	if 0:
 		for key,val in snapshot_batches.items(): 
 			make_overhead_snapshot(group_name=key,**val)
 
-	###!
-	if 1:
+	# combine overhead snapshots
+	if 0:
 
 		replicate_mapping = [('pip2_20_no_chol',['mdia2bilayer_nochl2','mdia2bilayer_nochl3']),
 			('pip2_10',['mdia2bilayer10','mdia2bilayer10_2']),
@@ -100,7 +102,6 @@ def snapshots():
 		#! frame is fixed
 		frame = 500
 		snaps_drop_dn = 'snapshots_overhead'
-
 
 		# plot panels together
 		figsize = (6,12)
@@ -120,3 +121,58 @@ def snapshots():
 				ax.axis('off')
 				ax.set_title(work.meta[sn]['label'])
 		picturesave('fig.snapshots_overhead.%s'%group_name,directory=work.plotdir,meta={})
+
+	# nice side view of one simulation
+	if 1:
+
+		# one target for the nice rendering
+		sn_this = 'mdia2bilayerphys'
+		snaps_drop_dn = 'snapshots_side'
+		tempdir = get_snapshots_folder(snaps_drop_dn,overwrite_snaps=True)
+		licorice_thick = 'Licorice 0.5 12.0 12.0'
+		lipid_colors_full = dict(POPC='gray',**lipid_colors)
+		alt_views = 'transparent brushedmetal diffuse ghost glass1 glass2 glass3 glossy hardplastic metallicpastel steel translucent edgy edgyshiny edgyglass aoshiny aochalky aoedgy blownglass glassbubble rtchrome'.split()
+		# after doing the survey it looks best with edgy on the outside and maybe 
+		standard_view = ['goodsell','aochalky'][-1]
+		alt_views = ['aochalky']
+		xres,yres = 2000,1400
+		frame = 300
+		zoom = 2.0
+
+		slice_path = calc_contacts['extras'][sn_this]['slice_path']
+		if not hasattr(work,'source'): work.parse_sources()
+		gro,xtc = [os.path.join(work.postdir,'%s.%s'%(slice_path,i)) for i in ['gro','xtc']]
+		tpr = work.source.get_last(sn_this,subtype='tpr')
+		kwargs_vmdmake = {'CGBONDSPATH':'/home/share/libs/cg_bonds.tcl',
+			'GMXDUMP':'/usr/local/gromacs/bin/gmx'}
+
+		# loop over alternative view on the sides for comparison representations
+		for aa,alt_view in enumerate(alt_views):
+			view = vmdmake.VMDWrap(site=tempdir,gro=gro,xtc=xtc,tpr=tpr,
+				frames='',res=(xres,yres),**kwargs_vmdmake)
+			view.do('load_dynamic','standard','bonder')
+			extra_tag = '.rep_side_%s'%alt_views if len(alt_views)>1 else ''
+			view['snapshot_filename'] = 'snap.side.v1.%s.frame_%d%s'%(sn_this,frame,extra_tag)
+			view.set_color_cursor('black')
+			#! note that we do not plot the proteins in the images so be careful to zoom all the way
+			view.select(**{'protein':'noh and protein','style':licorice_thick,'structure_color':False,
+				'smooth':False,'ystrip':False,'goodsell':True})
+			view.set_color_cursor('black')		
+			view.select(**{'protein_cartoon':'noh and protein','style':'cartoon','structure_color':False,
+				'smooth':False,'ystrip':False,'color_specific':True,'goodsell':True})
+			for resname in lipid_colors_full.keys():
+				view.set_color_cursor(lipid_colors_full[resname])
+				view.select(**{'residue_lipid_%s'%resname:'noh and resname %s'%resname,
+					'smooth':False,'style':licorice_thick,standard_view:True,
+					'color_specific':True})
+				view.select(**{'residue_lipid_%s_glass'%resname:'noh and resname %s'%resname,
+					'style':licorice_thick,'smooth':False,alt_view:True,
+					'color_specific':True,'ystrip':True})
+			view.command("animate goto %d"%frame)
+			view.command('package require pbctools')
+			view.command('pbc box -color black')
+			view.do('reset','xview')
+			view.command('scale by %.2f'%zoom)
+			view.do('snapshot')
+			view.show(quit=True)
+			print('done %d/%d'%(aa,len(alt_views)))
