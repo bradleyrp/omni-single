@@ -106,6 +106,42 @@ slices:
     slices:
       current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
       current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  membrane-v565: # 423ns
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  # LINKING makes it easy to compare different times
+  membrane-v566: # 423ns
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':410000,'skip':500}
+      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  membrane-v564: # runs to 142ns
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  membrane-v562: # runs to 104ns
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+  membrane-v563: # runs to 206ns
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
 
 variables:
   force_field: charmm
@@ -182,9 +218,14 @@ variables:
         - membrane-v530
         - membrane-v542
         - membrane-v531
+        - membrane-v562 #
+        - membrane-v563 #
         - membrane-v533
         - membrane-v599
         - membrane-v532
+        - membrane-v564 #
+        - membrane-v565 #
+        - membrane-v566 #
         - membrane-v534
       asymmetric_no_dilute:
         - membrane-v538
@@ -216,6 +257,8 @@ variables:
 collections:
   one:
     - membrane-v530
+  long:
+    - membrane-v566
   important_two:
     - membrane-v531
     - membrane-v532
@@ -228,10 +271,20 @@ collections:
   asymmetric:
     - membrane-v530
     - membrane-v531
+    - membrane-v562 #
+    - membrane-v563 #
     - membrane-v532
+    - membrane-v564 #
+    - membrane-v565 #
+    - membrane-v566 #
   position:
     - membrane-v531
+    - membrane-v562 #
+    - membrane-v563 #
     - membrane-v532
+    - membrane-v564 #
+    - membrane-v565 #
+    - membrane-v566 #
     - membrane-v533
     - membrane-v534
   charge:
@@ -254,6 +307,11 @@ collections:
     - membrane-v542
     - membrane-v543
     - membrane-v599 # didn't work until I added here? despite adding to asymmetric all? something about dependency chain
+    - membrane-v565 
+    - membrane-v566
+    - membrane-v564
+    - membrane-v563
+    - membrane-v562
   dilute:
     - membrane-v542
   symmetric_all:
@@ -277,8 +335,13 @@ collections:
     - membrane-v538
     - membrane-v530
     - membrane-v531
+    - membrane-v562 #
+    - membrane-v563 #
     - membrane-v533
     - membrane-v532
+    - membrane-v564 #
+    - membrane-v565 #
+    - membrane-v566 #
     - membrane-v534
     - membrane-v599
   best:
@@ -339,7 +402,42 @@ meta:
     ion_label:          "$\\mathrm{{Mg}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ptdins_resname:      PI2P
+  membrane-v562:
+    composition_name:    asymmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v563:
+    composition_name:    asymmetric
+    cation:              MG
+    anion:               CL
+    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
   membrane-v532:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v564:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v565:
+    composition_name:    asymmetric
+    cation:              Cal
+    anion:               CL
+    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
+  membrane-v566:
     composition_name:    asymmetric
     cation:              Cal
     anion:               CL
@@ -565,11 +663,6 @@ calculations:
                 loop:
                   - lipid_com
                   - lipid_chol_com
-  lipid_order:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: asymmetric
   ion_binding:
     group: all
     uptype: simulation
@@ -662,6 +755,12 @@ calculations_retired_or_discarded:
         monolayer_cutoff: 1.4
         resnames: +selectors/resnames_lipid_chol
         type: com
+  lipid_order:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: asymmetric
+
 plots:
   undulations_ptdins: 
     calculation: undulations
@@ -1046,3 +1145,25 @@ plots:
         selector: lipid_com
     specs:
       scene: video_scene_ptdins.py
+
+  breakage: 
+    script: plot-ptdins_review_cluster_breakage.py
+    calculation: 
+      lipid_mesh:
+        upstream:
+          lipid_abstractor:
+            selector: lipid_com
+    collections: long
+    plotload_version: 2
+    autoplot: True
+
+  percolate: 
+    script: plot-ptdins_percolate.py
+    collections: long
+    plotload_version: 2
+    autoplot: True
+    calculation: 
+      lipid_mesh:
+        upstream:
+          lipid_abstractor:
+            selector: lipid_com
