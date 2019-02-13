@@ -1,0 +1,503 @@
+
+variables:
+  force_field: charmm
+  art_director: art_ptdins.py
+  composition_names:
+    symmetric: symmetric
+    asymmetric: asymmetric
+    position: asymmetric
+    charge: symmetric
+  selectors:
+    ions: (name NA or name CL or name MG or name Cal or name K)
+    cations: (name NA or name MG or name Cal or name K)
+    resnames_lipid: ['POPC','DOPC','DOPS','DOPE','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
+    resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
+    resnames_protein: ["GLH", "ILE", "ALAD", "GLUH", "GLN", "HISH", "ASN1", "HYP", "GLY", "HIP", "ARGN", "MSE", "CYS1", "GLU", "CYS2", "CYS", "HISE", "ASP", "SER", "HSD", "HSE", "PRO", "CYX", "ASPH", "ORN", "HSP", "HID", "HIE", "LYN", "DAB", "ASN", "CYM", "HISD", "VAL", "THR", "HISB", "HIS", "HIS1", "HIS2", "TRP", "HISA", "ACE", "ASH", "CYSH", "PGLU", "LYS", "PHE", "ALA", "QLN", "MET", "LYSH", "NME", "LEU", "ARG", "TYR"]
+  slices:
+    steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
+    current: {'pbc':'mol','groups':['all'],'start':20000,'end':100000,'skip':100}
+    current_ions: {'pbc':'mol','groups':['ions'],'start':20000,'end':100000,'skip':1}
+  names:
+    proper_residue_names_long:
+      CHL1: Cholesterol
+      DOPC: DOPC
+      DOPS: DOPS
+      DOPE: DOPE
+      POPC: POPC
+      PI2P: "PtdIns(4,5)P$_2$"
+      P35P: "PtdIns(3,5)P$_2$"
+      PIPP: "PtdIns(4,5)P$_2^{-3}$"
+      PIPU: "PtdIns(4,5)P$_2^{-5}$"
+  protein_itp_loader_hidden: 
+    module: "codes.protein_itp_loader"
+    variable: "protein_itp_loader"
+
+collections:
+  cursor_previous:
+    - mdia2bilayer_nochl2
+    - mdia2bilayer_nochl3
+    - gelbilayer_nochl
+    - nwaspbilayernochl
+    - mdia2bilayerphys
+    - gelbilayerphys
+    - nwasppeptide2
+    - nwasppeptideb
+    - nwaspbilayermut1
+  one:
+    - gelbilayerphys
+  cursor:
+    
+    - gelbilayerphys
+    - gelbilayer_nochl
+
+    - nwaspbilayernochl0
+    - nwaspbilayer_nochl
+    - nwaspbilayerphys
+    - nwasppeptide2
+  cursor: 
+    - nwasppeptide2
+    - gelbilayerphys
+
+meta:
+  #! note that this short_namer must be compatible with the spots prefixer!
+  #! removing the "v" here hence breaking compatibility with the previous slices
+  #! ... 
+  short_namer: "lambda sn,spot=None : sn"
+  #short_namer: "lambda sn,spot: sn"
+  mdia2bilayer_nochl2:
+    name:               "mdia2bilayer nochl r2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 (r1)"
+  mdia2bilayer_nochl3:
+    name:               "mdia2bilayer nochl r1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 (r2)"
+  gelbilayer_nochl:
+    name:               "gelbilayer_nochl"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin peptide"
+  gelbilayerphys:
+    name:               "gelbilayerphys"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin peptide"
+    cholesterol:         True
+  mdia2bilayerphys:
+    name:               "mdia2bilayerphys"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2"
+    cholesterol:         True
+  nwasppeptide2:
+    name:               "nwasppeptide2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide 2"
+    cholesterol:         True
+  nwaspbilayermut1:
+    name:               "nwaspbilayermut1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP mutation 1"
+    cholesterol:         True
+  nwasppeptideb:
+    name:               "nwasppeptideb"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide B"
+    cholesterol:         True
+  nwaspbilayernochl:
+    name:               "nwaspbilayernochl"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s01-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide"
+    cholesterol:         False
+    index_top_monolayer: 0
+
+meta:
+  nwasppeptide2:
+    name:               "nwasppeptide2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "N-WASP peptide 2"
+    cholesterol:         True
+  gelbilayerphys:
+    name:               "gelbilayerphys"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin peptide"
+    cholesterol:         True  
+
+slices_old:
+  mdia2bilayer_nochl2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      #!!!!! current_vN used old namer. somehow the new version is not naming the same ??? needs debugged
+      current_v2: {'pbc':'mol','groups':['all','protein'],'start':0,'end':30000,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':90000,'skip':100}
+  mdia2bilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current_v2: {'pbc':'mol','groups':['all','protein'],'start':0,'end':120000,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':160000,'skip':100}
+  gelbilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current_v2: {'pbc':'mol','groups':['all','protein'],'start':0,'end':50000,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':120000,'skip':100}
+  gelbilayer_nochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current_v2: {'pbc':'mol','groups':['all','protein'],'start':0,'end':20000,'skip':100}
+      current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':70000,'skip':100}
+  nwasppeptide2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':0,'end':180000,'skip':100}
+  nwaspbilayermut1:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':47100,'skip':100}
+  nwasppeptideb:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':66100,'skip':100}
+  nwaspbilayernochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':79100,'skip':100}
+  mdia2bilayer_nochl3:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':100,'end':79100,'skip':100}
+
+slices:
+
+  gelbilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  gelbilayer_nochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+
+  nwasppeptide2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  nwaspbilayernochl0:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  nwaspbilayer_nochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  nwaspbilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':81000,'skip':100}
+
+calculations:
+  lipid_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: cursor
+    specs:
+      separator: 
+        monolayer_cutoff: 1.4
+        topologize_tolerance: 
+          # previous default was 0.05 but 0.07 is more reliable
+          loop: [0.07]
+      selector:
+        loop:
+          lipid_com:
+            monolayer_cutoff: 1.85
+            resnames: +selectors/resnames_lipid
+            lipid_tip: "name P"
+            type: com
+          lipid_chol_com:
+            monolayer_cutoff: 1.4
+            resnames: +selectors/resnames_lipid_chol
+            lipid_tip: "name P or name H3'"
+            type: com
+  protein_abstractor:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: cursor
+  head_angle:
+    uptype: simulation
+    slice_name: current
+    group: all
+    collections: cursor
+    specs:
+      upstream: 
+        lipid_abstractor:
+          selector: lipid_com
+          separator:
+            topologize_tolerance: 0.07
+  protein_rmsd:
+    uptype: simulation
+    slice_name: current
+    group: protein
+    collections: cursor
+  hydrogen_bonding:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: cursor
+    specs:
+      angle_cutoff: 160.0
+      distance_cutoff: 3.4
+      protein: true
+  salt_bridges:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: cursor
+    specs:
+      distance_cutoff: 
+        loop: [2.2,3.4,4.6]
+  contacts:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: cursor
+    specs:
+      subject: protein
+      object: lipid
+      cutoff:
+        loop: [2.2,3.4,5.0,10.0]
+  lipid_mesh:
+    uptype: post
+    slice_name: current
+    collections:
+      - cursor
+    specs:
+      upstream:
+        lipid_abstractor:
+          separator:
+            topologize_tolerance: 0.07
+          selector:
+            loop:
+              - lipid_com
+              - lipid_chol_com
+
+off calculations:
+  protein_rmsd:
+    uptype: simulation
+    slice_name: compare_v1
+    group: protein
+    collections:
+      - model_comparenwasp
+      - model_comparemdia2
+      - model_comparegelbilayer
+      - model_comparenwaspbilayer3
+      - model_comparenwaspbilayernochl
+      - model_comparegelhelix
+      - model_comparenwaspbilayermut
+      - model_comparenwasppeptide
+      - model_comparenwaspbilayer
+      - model_comparegelhelix
+      - nwasppepbilayer2pip
+  nearby_pip2:
+    uptype: simulation
+    slice_name: compare_v1
+    group: all
+    collections:
+      - model_comparenwaspbilayernochl
+      - model_comparenwaspbilayer3
+      - model_comparenwaspbilayermut
+      - model_comparenwasppeptide
+      - model_comparenwaspbilayer
+      - model_comparegelhelix
+      - nwasppepbilayer2pip
+    specs:
+      gaps: [2.2,4.6,10.0,20.0]
+
+plots:
+  lipid_abstractor:
+    calculation: 
+      lipid_abstractor:
+        selector:
+          monolayer_cutoff: 1.85
+          resnames: +selectors/resnames_lipid
+          type: com
+    slices: current
+    collections: cursor
+  protein_rmsd:
+    calculation: protein_rmsd
+    slices: current
+    collections: cursor
+  # no plot but hydrogen_bonding uses these data via plotload to plot everything
+  salt_bridges:
+    collections: cursor
+    calculation: 
+      salt_bridges:
+        # RYAN DO NOT USE SPECS HERE THIS IS VERY COUNTERINTUITIVE
+        distance_cutoff: 2.2
+  actinlink_contacts:
+    calculation:
+      contacts:
+        cutoff: 10.0
+  actinlink_videos:
+    calculation:
+      contacts:
+        cutoff: 10.0
+  contacts:
+    calculation:
+      contacts:
+        cutoff: 3.4
+  actinlink_bonds:
+    calculation: contacts
+    routine:
+      - contact_map
+      - histograms
+      - bars
+  hydrogen_bonding:
+    calculation: hydrogen_bonding
+    collections: cursor
+    specs:
+      press_routine:
+        - summary
+      interesting: {}
+      ion_order: ['NA']
+      collection_sets: ['cursor']
+      legend_mapper:
+        cursor:
+          ion_names: ['NA']
+          ptdins_names: ['PI2P']
+      # we filter out protein resnames here
+      relevant_resnames: ['PI2P','DOPE','DOPC','DOPS','CHL1']
+      # semi-soft-coded the color scheme
+      bar_formats_style: actinlink
+      legend_maker_specs:
+        sns: []
+        ion_names: []
+        ptdins_names: []
+        # the legend maker typically shows PIP2 isomers and cation identities
+        # ...however in this case we want legends for the distinct protein simulations
+        sns_explicit: ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayerphys','gelbilayerphys',
+          'gelbilayer_nochl','nwasppeptide2','nwaspbilayermut1','nwaspbilayernochl','nwasppeptideb']
+      figsize_all: [20,8]
+      sns_explicit_color_names: {
+        'mdia2bilayer_nochl2':'green','mdia2bilayer_nochl3':'green','mdia2bilayerphys':'green',
+        'gelbilayerphys':'red','gelbilayer_nochl':'red',
+        'nwasppeptide2':'blue','nwaspbilayermut1':'bluegreen2',
+          'nwaspbilayernochl':'blue','nwasppeptideb':'blue'}
+      nmols_recount: "lambda x:dict(x,**({'CHL1':x['CHL1']/2.0} if 'CHL1' in x else {}))"
+  # a one-off plot with no script to load a single mesh object
+  load_mesh:
+    calculation:
+      lipid_mesh:
+        upstream: 
+          lipid_abstractor:
+            selector: lipid_chol_com
+            separator:
+              topologize_tolerance: 0.07
+  hydrogen_bonding_patterns:
+    collections: cursor
+    calculation:
+      lipid_abstractor:
+        selector: lipid_chol_com
+        separator:
+          topologize_tolerance: 0.07
+      hydrogen_bonding: {}
+    specs:
+      get_protein_abstractor: True
+      dot_size_small: 18
+      dot_size_med: 26
+      dot_size_large: 40
