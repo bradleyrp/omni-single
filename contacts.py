@@ -103,8 +103,8 @@ def basic_compute_loop(compute_function,looper,run_parallel=True,debug=False):
 	"""
 	start = time.time()
 	if run_parallel:
-		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
-			delayed(compute_function,has_shareable_memory)(**looper[ll]) 
+		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0,require='sharedmem')(
+			delayed(compute_function)(**looper[ll]) 
 			for ll in framelooper(len(looper),start=start))
 	else: 
 		incoming = []
@@ -207,8 +207,8 @@ def contacts(grofile,trajfile,**kwargs):
 	start = time.time()
 	out_args = {'distance_cutoff':distance_cutoff}
 	if run_parallel:
-		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
-			delayed(compute_function,has_shareable_memory)(fr,**out_args) 
+		incoming = Parallel(n_jobs=8,verbose=10 if debug else 0,require='sharedmem')(
+			delayed(compute_function)(fr,**out_args) 
 			for fr in framelooper(nframes,start=start))
 	else: 
 		incoming = []

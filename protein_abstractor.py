@@ -4,7 +4,6 @@ import time
 from numpy import *
 import MDAnalysis
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper
 from base.timer import checktime
 from codes.mesh import *

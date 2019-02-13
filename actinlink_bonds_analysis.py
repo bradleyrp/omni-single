@@ -14,11 +14,22 @@ plotrun.routine = [
 
 import time,copy,collections,glob
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper,dictsum
 from base.compute_loop import basic_compute_loop
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import brewer2mpl
+
+sns_canon = [
+	'gelbilayerphys',
+	'gelbilayerphys2',
+	'gelbilayer_nochl',
+	'gelbilayer_nochl3',
+	'nwaspbilayernochl0',
+	'nwaspbilayer_nochl',
+	'nwaspbilayerphys',
+	'nwasppeptide2',]
+
+#! previously: sns_mdia2_ordering = ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayer10','mdia2bilayer10_2','mdia2bilayerphys','mdia2bilayerphys2','mdia2bilayer30','mdia2bilayer30_2']
 
 @autoload(plotrun)
 def load():
@@ -44,6 +55,7 @@ def load():
 		('pip2_10',['mdia2bilayer10','mdia2bilayer10_2']),
 		('pip2_20',['mdia2bilayerphys','mdia2bilayerphys2']),
 		('pip2_30',['mdia2bilayer30','mdia2bilayer30_2'])]
+	replicate_mapping = [(k,[k]) for k in sns_canon] #! obviously hacked
 	# augment the metadata with better labels
 	extra_labels = {
 		'pip2_20_no_chol':r'mDia2, 20% $PIP_2$, no CHOL ($\times2$)',
@@ -112,20 +124,23 @@ def load():
 	licorice_thick = ['licorice','Licorice 0.7 12.0 12.0'][-1]
 
 	### LOAD THE DATA
-	sns_contacts,(data_contacts,calc_contacts) = work.sns(),plotload('contacts',work)
-	sns_hbonds,(data_hbonds,calc_hbonds) = work.sns(),plotload('hydrogen_bonding',work)
-	sns_mdia2_ordering = ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayer10','mdia2bilayer10_2',
-		'mdia2bilayerphys','mdia2bilayerphys2','mdia2bilayer30','mdia2bilayer30_2']
-	if sns_hbonds!=sns_contacts: 
-		raise Exception('collections for hydrogen_bonding and contacts are not equal')
-	else: sns = sns_mdia2_ordering
+	sns_contacts,(data_contacts,calc_contacts) = work.sns(),plotload('contacts')
+	sns_hbonds,(data_hbonds,calc_hbonds) = work.sns(),plotload('hydrogen_bonding')
+	if False:
+		sns_mdia2_ordering = sns_canon
+		if sns_hbonds!=sns_contacts: 
+			raise Exception('collections for hydrogen_bonding and contacts are not equal')
+		else: sns = sns_mdia2_ordering
+
+	sns = sns_mdia2_ordering = sns_canon
+
 	colors.update(**dict([(sn,brewer2mpl.get_map('Set1','qualitative',9).mpl_colors[sns.index(sn)]) 
 		for sn in sns]))
 	if 'mesh_lamplight' in plotrun.routine:
 		# load mesh 
 		#! note you will eventually get an error if they have different collections
 		data_mesh,calc_mesh = plotload('lipid_mesh',work)
-		data_protein,calc_protein = work.sns(),plotload('protein_abstractor',work)
+		data_protein,calc_protein = work.sns(),plotload('protein_abstractor')
 
 class ActinlinkPlotter:
 	"""Supervise the mapping from data to plot."""
@@ -183,10 +198,13 @@ class ActinlinkPlotter:
 						self.data_bonds[sn]['data']['valid_frames']
 				else: valid_frames = range(len(reduced['observations']))
 				for key in ['subject_residues_resnames','subject_residues_resids']:
-					if not all([np.all(self.data_bonds[sns_sub[0]]['data'][key]==
-						self.data_bonds[sn]['data'][key]) for sn in sns_sub]):
-						raise Exception('mismatch between replicates on key %s'%key)
-					else: self.data_bonds[supkey]['data'][key] = self.data_bonds[sns_sub[0]]['data'][key]
+					try:
+						if not all([np.all(self.data_bonds[sns_sub[0]]['data'][key]==
+							self.data_bonds[sn]['data'][key]) for sn in sns_sub]):
+							raise Exception('mismatch between replicates on key %s'%key)
+						else: self.data_bonds[supkey]['data'][key] = self.data_bonds[sns_sub[0]]['data'][key]
+					except:
+						import pdb;pdb.set_trace()
 			self.sns = zip(*self.replicate_mapping)[0]
 	def get_function(self,name):
 		"""Get compute funcitons from globals."""
@@ -472,8 +490,13 @@ def bond_combinator(*offs,**kwargs):
 	# for histograms and non-dynamic quantities we just concatenate the frames
 	if details==True:
 		#! only works for combining two
-		valid_frames = np.intersect1d(*[o.get('valid_frames',
-			range(o['observations'].shape[0])) for o in offs])
+		#! hacking away the replicates
+		if False:
+			valid_frames = np.intersect1d(*[o.get('valid_frames',
+				range(o['observations'].shape[0])) for o in offs])
+		else:
+			valid_frames = [o.get('valid_frames',
+				range(o['observations'].shape[0])) for o in offs][0]
 		mappings_vf = [np.concatenate([np.where(valid_frames==i)[0] for i in 
 			o.get('valid_frames',range(o['observations'].shape[0]))]) for o in offs]
 		nframes = len(valid_frames)
@@ -626,10 +649,16 @@ def plot_charging_histograms_stacked(sup,show_zero=False,total=False,
 	cutoff_this = get_cutoff(sup)
 	resnames = [sup.data_bonds[sn]['data']['subject_residues_resnames'] for sn in sns]
 	resids = [sup.data_bonds[sn]['data']['subject_residues_resids'] for sn in sns]
-	if (any([np.all(resnames[0]!=i) for i in resnames[1:]]) or 
-		any([np.all(resids[0]!=i) for i in resids[1:]])):
-		raise Exception('inconsistent residues between simulations')
-	else: resnames,resids = resnames[0],resids[0]
+	"""
+	try:
+		if (any([np.all(resnames[0]!=i) for i in resnames[1:]]) or 
+			any([np.all(resids[0]!=i) for i in resids[1:]])):
+			raise Exception('inconsistent residues between simulations')
+	except:
+		import pdb;pdb.set_trace()
+	else: 
+	""" # hacking away merged quickly
+	resnames,resids = resnames[0],resids[0]
 	chargings = sup.data['chargings']
 	residues = sup.data['residues']
 	if total: residues = np.concatenate((residues,['total']))
@@ -992,7 +1021,7 @@ def prepare_all_orders(*routine):
 		charging_base = {
 			'sns':sns_mdia2_ordering,
 			'namer':{'base':'charging','mods':[]},
-			'tags':{'analysis':'charging histograms','merged':True,'bonds':'salt bridges','explicit':True},
+			'tags':{'analysis':'charging histograms','merged':False,'bonds':'salt bridges','explicit':True},
 			'plot':{'function':'plot_charging_histograms_stacked',
 				'kwargs':{'show_zero':False,'emphasis':True,'emphasis_base':0.5,'invert':True,'total':True}},
 			'data':{'function':'compute_chargings','kwargs':{'explicit':True},
@@ -1001,7 +1030,7 @@ def prepare_all_orders(*routine):
 				'wspace':0.1,'hspace':0.1,'frame_color':'#A9A9A9'}}
 		for plot_style in ['charging timeseries','charging histograms']:
 			for bond_type in ['salt','salt_hbonds','hbonds','cut_2.2','cut_5.0']:
-			 	for merged in [False,True]:
+			 	for merged in [False,True][:1]: # hack
 			 		for explicit in [False,True]:
 						key = '%s %s'%(plot_style,bond_type)+\
 							(' explicit' if explicit else '')+(' merged' if merged else '')
@@ -1092,6 +1121,7 @@ def master_bond_distribution_plotter():
 	# overall plot styles to make
 	routine = ['contact_maps','charging'][-1:]
 	orders = prepare_all_orders(*routine)
+	#import pdb;pdb.set_trace()
 	#! to develop a single plot, skip the render function and trim the orders list
 	#! i = 'charging histograms salt explicit' ; orders = {i:orders[i]}
 	# loop over requested plots
