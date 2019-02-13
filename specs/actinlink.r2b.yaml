@@ -1,3 +1,283 @@
+meta:
+  short_namer: 'lambda top,spot=None: top'
+
+  ### mDia2
+
+  mdia2bilayerphys:
+    name:               "mdia2bilayerphys r1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 20% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\n20% $PIP_2$ (r1)"
+  mdia2bilayerphys2:
+    name:               "mdia2bilayerphys r2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 20% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\n20% $PIP_2$ (r2)"
+  mdia2bilayer_nochl2:
+    name:               "mdia2bilayer nochl r2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 20% $PIP_2$, no CHOL (r1)"
+    label_compact:      "mDia2\nno CHOL (r1)"
+  mdia2bilayer_nochl3:
+    name:               "mdia2bilayer nochl r1"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2 20% $PIP_2$, no CHOL (r2)"
+    label_compact:      "mDia2\nno CHOL (r2)"
+  mdia2bilayer10:
+    name:               "mdia2bilayer10 (r1)"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 10% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\n10% $PIP_2$ (r1)"
+  mdia2bilayer10_2:
+    name:               "mdia2bilayer10 (r2)"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 10% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\n10% $PIP_2$ (r2)"
+    index_top_monolayer: 1
+  mdia2bilayer30:
+    name:               "mdia2bilayer30 (r1)"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 30% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\n30% $PIP_2$ (r1)"
+  mdia2bilayer30_2:
+    name:               "mdia2bilayer30 (r2)"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 30% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\n30% $PIP_2$ (r2)"
+    index_top_monolayer: 1
+  mdia2bilayernopip2:
+    name:               "mdia2bilayernopip2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 0% $PIP_2$ (r1)"
+    label_compact:      "mDia2 with\nno $PIP_2$ (r1)"
+    index_top_monolayer: 1
+  mdia2bilayernopip2_2:
+    name:               "mdia2bilayernopip2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "mDia2, 0% $PIP_2$ (r2)"
+    label_compact:      "mDia2 with\nno $PIP_2$ (r2)"
+    index_top_monolayer: 1
+
+  ### gelsolin
+
+  gelbilayer10:
+    name:               "gelbilayer10"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin, 10% $PIP_2$ (r1)"
+    label_compact:      "gelsolin with\n10% $PIP_2$ (r1)"
+    index_top_monolayer: 1
+  gelbilayerphys:
+    name:               "gelbilayerphys"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin, 20% $PIP_2$ (r1)"
+    label_compact:      "gelsolin with\n20% $PIP_2$ (r1)"
+    index_top_monolayer: 1
+  gelbilayerphys2:
+    name:               "gelbilayerphys2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin, 20% $PIP_2$ (r2)"
+    label_compact:      "gelsolin with\n20% $PIP_2$ (r2)"
+    index_top_monolayer: 1
+  gelbilayer_nochl:
+    name:               "gelbilayer_nochl"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin, 20% $PIP_2$ (r1)"
+    label_compact:      "gelsolin with\n20% $PIP_2$\nno CHOL (r1)"
+    index_top_monolayer: 1
+  gelbilayer_nochl3:
+    name:               "gelbilayer_nochl3"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin, 20% $PIP_2$ (r2)"
+    label_compact:      "gelsolin with\n20% $PIP_2$\nno CHOL (r2)"
+    index_top_monolayer: 1
+  gelmutbilayer20:
+    name:               "gelmutbilayer20"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "gelsolin MUTANT?, 20% $PIP_2$ (r1)"
+    label_compact:      "gelsolin MUTANT with\n20% $PIP_2$ (r1)"
+    index_top_monolayer: 1
+
+  ### N-WASP
+
+  nwaspbilayerphys:
+    name:               "nwaspbilayerphys"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwaspbilayerphys"
+    cholesterol:         True
+  nwasppeptide2:
+    name:               "nwasppeptide2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwasppeptide2"
+    cholesterol:         True
+  nwaspbilayer_nochl:
+    name:               "nwaspbilayer_nochl"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwaspbilayer_nochl"
+    label_compact:      "nwaspbilayer_nochl"
+    cholesterol:         False  
+  nwaspbilayernochl0:
+    name:               "nwaspbilayernochl0"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwaspbilayernochl0"
+    label_compact:      "nwaspbilayernochl0"
+    cholesterol:         False  
+  nwaspbilayer_nochl2:
+    name:               "nwaspbilayer_nochl2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwaspbilayer_nochl2"
+    label_compact:      "nwaspbilayer_nochl2"
+    cholesterol:         False  
+  nwaspbilayer30:
+    name:               "nwaspbilayer30"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwaspbilayer30"
+    label_compact:      "nwaspbilayer30"
+    cholesterol:         False  
+  nwaspbilayer30_2:
+    name:               "nwaspbilayer30_2"
+    ptdins_resname:     "PI2P"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    composition_name:    physiological
+    protein_itp:         s02-adhere/protein.itp
+    cations:            ['NA']
+    cation:              NA
+    label:              "nwaspbilayer30_2"
+    label_compact:      "nwaspbilayer30_2"
+    cholesterol:         False  
+
 slices:
 
   gelbilayerphys:
