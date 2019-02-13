@@ -1,0 +1,160 @@
+slices:
+
+  gelbilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  gelbilayer_nochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  gelbilayerphys2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':61000,'skip':100}
+  gelbilayer_nochl3:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+
+  nwasppeptide2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  nwaspbilayernochl0:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  nwaspbilayer_nochl:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':121000,'skip':100}
+  nwaspbilayerphys:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':81000,'skip':100}
+
+  gelmutbilayer20:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':101000,'skip':100}
+  mdia2bilayernopip2:
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':79000,'skip':100}
+
+  # added on 7 February
+
+  # 163ns at /home/share/lolabu/simulations/mdia2bilayernopip2_2
+  mdia2bilayernopip2_2: 
+    groups: 
+      all: all
+      protein: protein
+    slices:
+      current: {'pbc':'mol','groups':['all','protein'],'start':1000,'end':163000,'skip':100}
+  # 100ns at /home/ololade/simulations/mdia2bilayer_nochl3
+  mdia2bilayer_nochl3:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':100000,'skip':100}
+  # missing /home/share/big/spot/router/nwaspbilayer10_2/s02-adhere/md.part0002.xtc
+  # missing /home/share/big/spot/router/nwaspbilayer10_2/s02-adhere/md.part0003.xtc
+  # hence we start at part 4, 53ns
+  nwaspbilayer10_2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':53000,'end':150000,'skip':100}
+  mdia2bilayerphys2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':120000,'skip':100}
+  # 156ns
+  nwaspbilayer30_2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':120000,'skip':100}
+  # 153ns
+  nwaspbilayer30:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':151000,'skip':100}
+  # 181ns
+  nwasppeptide2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':181000,'skip':100}
+  # 87ns
+  nwaspbilayerphys:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':81000,'skip':100}
+  # 166ns
+  gelbilayer_nochl:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
+  # 205ns
+  gelbilayerphys:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':201000,'skip':100}
+  # 162ns 
+  mdia2bilayernopip2_2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
+  # 154
+  nwaspbilayernochl0:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':151000,'skip':100}
+  # 154
+  nwaspbilayer_nochl:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':151000,'skip':100}
+  # 182
+  gelbilayer_nochl3:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':181000,'skip':100}
+  # 107
+  gelmutbilayer20:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':101000,'skip':100}
+  # 163
+  nwaspbilayer_nochl2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
+  # 132ns
+  gelbilayerphys2:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':121000,'skip':100}
+  # 177ns
+  gelbilayer10:
+    groups: {'all':'all'}
+    slices:
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}

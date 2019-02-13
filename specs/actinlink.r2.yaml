@@ -185,7 +185,7 @@ meta_ASIDE:
     label:              "gelbilayer_nochl3"
     cholesterol:         False  
 
-meta:
+meta_MOVED_to_r2b:
   short_namer: 'lambda top,spot=None: top'
 
   ### mDia2
@@ -512,7 +512,7 @@ slices_old:
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':201000,'skip':100}
 
-slices:
+slices_MOVED_to_r2b:
 
   gelbilayerphys:
     groups: 
@@ -673,14 +673,7 @@ slices:
     slices:
       current: {'pbc':'mol','groups':['all'],'start':1000,'end':161000,'skip':100}
 
-notes: |
-  mdia2bilayer30                0                   
-  mdia2bilayer10                0                   
-  nwaspbilayer10                38                  
-  mdia2bilayerphys2             59                  
-  gelbilayer10_2                0                   
-
-calculations:
+calculationsXXX:
   protein_rmsd:
     uptype: simulation
     slice_name: current
