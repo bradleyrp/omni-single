@@ -182,10 +182,18 @@ def load():
 			# trawl all simulations for the pairs
 			pairname_to_pair = {}
 			for sn in sns:
-				pairname_to_pair.update(**dict([(tuple(i),j) 
+				this = dict([(tuple(i),j) 
 					for i,j in zip(*[data_this[sn]['data']['%s_mn%d'%(p,
 					monolayer_indexer(sn,abstractor='lipid_chol_com'))] 
-					for p in ['pairnames','pairs']])]))
+					for p in ['pairnames','pairs']])])
+				for key,val in this.items():
+					#! hacking this in
+					if key==(u'all lipids', u'all lipids'):
+						pairname_to_pair[key] = \
+							[[u'CHL1',u'DOPE',u'DOPS',u'PI2P',u'DOPC',u'PIPU',u'PIPP',u'SAPI',u'P35P'],
+							[u'CHL1',u'DOPE',u'DOPS',u'PI2P',u'DOPC',u'PIPU',u'PIPP',u'SAPI',u'P35P']]
+					else: 
+						pairname_to_pair[key] = val
 			pair_residues = [pairname_to_pair[p] for p in pairings]
 			#! see original plot-lipid_rdfs.py for a note on some magic
 			post_this = post.data['reduced'] = dict([])
@@ -195,6 +203,7 @@ def load():
 					obs,total_areas,series = [],[],[]
 					nmols,nsegments = Same(),Same()
 					for sn in sns_this:
+						status('processing %s: %s'%(sn_group,sn))
 						mn = monolayer_indexer(sn,abstractor='lipid_chol_com')
 						dat = data_this[sn]['data']
 						key = 'counts_mn%d_%s:%s'%(mn,pairname[0],pairname[1])
@@ -218,13 +227,20 @@ def load():
 							dat['resnames'][dat['monolayer_indices']==mn],p).sum() 
 							for p in pair])
 						total_areas.append(dat['total_area'])
+					#! if sn_group=='membrane-v509' and pairname==(u'all lipids', u'all lipids'):
+					#!	break
+					#!	import ipdb;ipdb.set_trace()
 					# average replicates
 					counts = np.array(obs).mean(axis=0)
 					nmols = nmols.get()
 					# not every simulation has every pairname
 					if not nmols: continue
 					total_area = np.mean(total_areas) #! total area is averaged between simulations for norming
+					#! density = nmols[0]*nmols[1]/total_area
 					density = nmols[0]*nmols[1]/total_area
+					# use the last sn to see if symmetric and alter the density
+					#if work.meta[sn]['composition_name']=='symmetric': 
+					#	density = density/2.
 					post_this[pairname][sn_group] = dict(counts=counts,
 						total_area=total_area,density=density,
 						nmols=nmols,series=series)
@@ -321,8 +337,10 @@ if __name__=='__main__':
 	# switch to collection "all" from collection "long" to get this to work
 	if 1:
 
+		mpl.rcParams.update({'font.size': 16})
+
 		assert len(calc['extras'].keys())>2
-		assert ts_converge == 10
+		assert ts_converge < 50
 		sns_order = work.sns()
 		pairings_this = [(u'all lipids', u'all lipids')]
 		# the following plot is based on `plot_distributions`
@@ -330,7 +348,7 @@ if __name__=='__main__':
 			for ii,i in enumerate(pairings) if i in pairings_this]
 		meta = {}
 		axes,fig = square_tiles(len(pairings_this)*len(sns),
-			figsize=(20,20),hspace=0.4,wspace=0.4)
+			figsize=(20,20),hspace=0.6,wspace=0.4)
 		ax_finder = lambda pnum,snum: axes[pnum+len(pairings_this)*snum]
 		ax_cb = axes[-1]
 		for snum,sn in enumerate(sns_order):
@@ -350,23 +368,26 @@ if __name__=='__main__':
 				if len(this_series)>1: raise Exception('no replicates for series')
 				this_series = this_series[0]
 				rainbow = [mpl.cm.__dict__['RdBu'](i) 
-					for i in np.linspace(0,1,this_series.shape[0])]
+					for i in np.linspace(0,1,10)]
 				for series_num,series in enumerate(this_series):
 					ax.plot(middles[valid],(series/areas/density)[valid],
-						color=rainbow[series_num],lw=1)
-				ax.axhline(1.0,lw=1,c='k')
+						color=rainbow[series_num],lw=1.5,zorder=3+series_num)
+				ax.axhline(1.0,lw=1,c='k',zorder=1)
 				ax.set_xlim((0,xmax))
 				ax.set_ylabel('$g(r)$')
 				ax.axhline(1.0,lw=0.5,c='k')
 				ax.set_xlim((0,xmax_cumulative))
-				ax.set_title('%s %s - %s'%tuple([work.meta[sn]['ion_label']]+[
-					work.vars['names']['short'].get(p,p) 
-					for p in pairname]))
+				ax.set_title('%s, %s\n%s'%tuple([work.meta[sn]['ion_label'],
+					work.meta[sn]['ptdins_label'],
+					work.meta[sn]['composition_name']]))
+				#! ax.set_title(sn_group)
 				ax.tick_params(axis='y',which='both',left='off',
 					right='off',labelleft='on')
 				ax.tick_params(axis='x',which='both',top='off',
 					bottom='off',labelbottom='on')
 				ax.set_xlabel(r'$r\,(nm)$')
+				ax.set_ylim((0.,1.3))
+				ax.set_xlim((0.,3.))
 		cmap = mpl.cm.__dict__['RdBu']
 		from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 		#! https://stackoverflow.com/questions/14777066/matplotlib-discrete-colorbar
@@ -378,9 +399,10 @@ if __name__=='__main__':
 			cmap=cmap,norm=norm,
 		    spacing='proportional',ticks=bounds,
 		    boundaries=bounds,format='%1i')
-		axins.set_title('time (ns)')
+		axins.set_title('time (ns)',pad=30.)
+		# custom bar
 		axins.set_yticklabels(['%d '%i 
-			for i in np.linspace(0,duration,len(series_this)+1)])
+			for i in np.linspace(20.,100.,10+1)])
 		legends = [axins]
 		picturesave('fig.lipid_rdfs.convergence.all',directory=work.plotdir,
 			version=True,meta=meta,extras=legends,dpi=dpi,form=img_form)

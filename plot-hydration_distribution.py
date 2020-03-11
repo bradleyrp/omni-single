@@ -7,6 +7,7 @@ Plot hydration distributions.
 import scipy
 import scipy.interpolate
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import matplotlib.gridspec as gridspec
 
 #---settings
 binsize = 0.01
@@ -45,7 +46,12 @@ def reload():
 	global sns,scanrange,distributions,distances,data,calc,normalizers,middles
 	#---custom reload sequence goes here
 	data,calc = plotload(plotname)
-	sns = work.metadata.collections['position']+['membrane-v538']
+	#! sns = work.metadata.collections['position']+['membrane-v538']
+	#! overriding sns for the RDF plot because v562 was missing data
+	#!   which causes: ValueError: 
+	#!     zero-size array to reduction operation maximum which has no identity
+	#! these are empty for some reason! sns = ['membrane-v563','membrane-v565']
+	sns = ['membrane-v538','membrane-v531','membrane-v532']
 	#---compute distance distributions
 	cutoff = max([data[sn]['data']['water_distances'].max() for sn in sns])
 	#---globals for parallel functions
@@ -74,7 +80,7 @@ def reload():
 		water_density = (distributions[sn][slice(None,None),bulk_window]/areas[bulk_window]).mean()
 		normalizers[sn] = areas*water_density
 
-def water_distribution_sweep_plot(incoming=None,fs=None):
+def water_distribution_sweep_plot(incoming=None,fs=None,do_move_xlabel=True):
 	"""
 	Plot the RDFs for water near ions versus distance waters.
 	Note that we copied this plot script to start over and simplify the calculation of the curves.
@@ -200,7 +206,7 @@ def water_distribution_sweep_plot(incoming=None,fs=None):
 	plot(ax,xlims=xlims,ylims=ylims,lw=3,
 		zonelist=[(0.,0.22,),(0.22,0.46),(0.46,1)],
 		sns=['membrane-v531','membrane-v532'],
-		do_move_xlabel=True,do_legend=True,
+		do_move_xlabel=do_move_xlabel,do_legend=True,
 		do_annotations=True,zone_color=zone_color,zone_lw=zone_lw,
 		zone_zorder=zone_zorder)
 	axins = inset_axes(ax,width="45%",height="45%",loc=1)
@@ -274,6 +280,13 @@ def water_distribution_sweep_plot_with_snapshots():
 		work.plotdir,backup=False,version=True,meta={'revision':'2018.07.13'},extras=extras,
 		form='svg')
 
+#! @register_printer
+def hydration_snapshots_only():
+	"""
+	Hydration snapshots on a separate plot
+	"""
+	pass
+
 ###---STANDARD
 
 def printer():
@@ -289,4 +302,101 @@ def printer():
 		status('running routine %s'%key,tag='printer')
 		globals()[key]()
 
-if __name__=='__main__': printer()
+if __name__=='__main__': 
+	
+	printer()
+
+	if 1:
+
+		#---hardcoded paths for now (switched to v15 from v12)
+		snaps = {'folder':'fig.hydrogen_bonding.v15_ptdins_solvated','files':[
+			'fig.snapshot.membrane-v531.fr703.795_796_o0.png',
+			'fig.snapshot.membrane-v532.fr11.779_781_o0.png',
+			'fig.snapshot.membrane-v531.fr50.780_782_o6.png',
+			'fig.snapshot.membrane-v532.fr363.798_794_o6.png',
+			'fig.snapshot.membrane-v531.fr386.791_784_o5.png',
+			'fig.snapshot.membrane-v532.fr3.773_775_o7.png',],}
+
+		fig = plt.figure(figsize=(10,16))
+		extras = []
+		gs = gridspec.GridSpec(3,2,)
+		axes = [plt.subplot(g) for g in gs]
+
+		#---bigger fonts
+		ax = axes[0]
+		ax.tick_params(axis='both',labelsize=18)
+		ax.tick_params(axis='both',labelsize=18)
+		letter_reord = [0,3,1,4,2,5]
+		#---ensure the order matches below
+		sns_order = ['membrane-v531' for i in range(3)]+['membrane-v532' for i in range(3)]
+		sns_order = [re.findall('membrane-v\d+',i)[0] for i in snaps['files']]
+		tagbox = dict(facecolor='w',lw=1,alpha=1.0,boxstyle="round,pad=0.5")
+		for inum,snap_fn in enumerate(snaps['files']):
+			image = sidestack_images([os.path.join(work.plotdir,snaps['folder'],snap_fn)])
+			#---make the image square
+			this_shape = image.shape[:2]
+			extra_buffer = (max(this_shape)-min(this_shape))/2
+			white_buffer = np.ones((extra_buffer,max(this_shape),3))
+			if np.argmin(this_shape)==1: reorder = (0,1,2),(1,0,2),(1,0,2)
+			elif np.argmin(this_shape)==0: reorder = (0,1,2),(0,1,2),(0,1,2)
+			else: raise Exception('incorrect dimensions of image %s'%image.shape)
+			image = np.concatenate((white_buffer.transpose(reorder[0]),
+				image.transpose(reorder[1]),white_buffer.transpose(reorder[0]))).transpose(reorder[2])
+			ax = axes[inum]
+			ax.imshow(image)
+			ax.axis('off')
+			tb = ax.text(0.0,1.0,chr(ord('A')+letter_reord[inum]),fontsize=14,
+				bbox=tagbox,rotation=0,ha="center",va="top",color='k',
+				transform=ax.transAxes)
+			extras.append(tb)
+			tb = ax.text(0.2,1.0,work.meta[sns_order[inum]]['ion_label'],fontsize=14,
+				bbox=tagbox,rotation=0,ha="center",va="top",color='k',
+				transform=ax.transAxes)
+			extras.append(tb)
+		picturesave('fig.hydration_distribution.snapshots_only',
+			#! added revision after changing the labels
+			work.plotdir,backup=False,version=True,meta={'revision':'2019.08.27'},extras=extras,
+			form='pdf')
+
+	if 0:
+		fig = plt.figure(figsize=(12,12))
+		extras = []
+		axes = [fig.add_subplot(111)]
+		ax = axes[0]
+		ax.tick_params(axis='both',labelsize=18)
+		ax.tick_params(axis='both',labelsize=18)
+		#!!! include this section or else errors
+		snaps = {'folder':'fig.hydrogen_bonding.v15_ptdins_solvated','files':[
+			'fig.snapshot.membrane-v531.fr703.795_796_o0.png',
+			'fig.snapshot.membrane-v532.fr11.779_781_o0.png',
+			'fig.snapshot.membrane-v531.fr50.780_782_o6.png',
+			'fig.snapshot.membrane-v532.fr363.798_794_o6.png',
+			'fig.snapshot.membrane-v531.fr386.791_784_o5.png',
+			'fig.snapshot.membrane-v532.fr3.773_775_o7.png',],}
+		ax = axes[0]
+		ax.tick_params(axis='both',labelsize=18)
+		ax.tick_params(axis='both',labelsize=18)
+		letter_reord = [0,3,1,4,2,5]
+		#---ensure the order matches below
+		sns_order = ['membrane-v531' for i in range(3)]+['membrane-v532' for i in range(3)]
+		tagbox = dict(facecolor='w',lw=1,alpha=1.0,boxstyle="round,pad=0.5")
+		for inum,snap_fn in enumerate(snaps['files']):
+			image = sidestack_images([os.path.join(work.plotdir,snaps['folder'],snap_fn)])
+			#---make the image square
+			this_shape = image.shape[:2]
+			extra_buffer = (max(this_shape)-min(this_shape))/2
+			white_buffer = np.ones((extra_buffer,max(this_shape),3))
+			if np.argmin(this_shape)==1: reorder = (0,1,2),(1,0,2),(1,0,2)
+			elif np.argmin(this_shape)==0: reorder = (0,1,2),(0,1,2),(0,1,2)
+			else: raise Exception('incorrect dimensions of image %s'%image.shape)
+			image = np.concatenate((white_buffer.transpose(reorder[0]),
+				image.transpose(reorder[1]),white_buffer.transpose(reorder[0]))).transpose(reorder[2])
+
+		# no plots above but something it does is necessary for water_distribution_sweep_plot 
+		water_distribution_sweep_plot(incoming=dict(fig=fig,ax=axes[0]),
+			fs=dict(xlabel=20,ylabel=20,ylabel_inset=16,xlabel_inset=16,colorbar_label=12),
+			do_move_xlabel=False)
+		picturesave('fig.hydration_distribution.rdfs',
+			#! added revision after changing the labels
+			work.plotdir,backup=False,version=True,meta={'revision':'2019.08.27'},extras=extras,
+			form='pdf')

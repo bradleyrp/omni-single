@@ -111,37 +111,51 @@ slices:
       all: all
       ions: +selectors/ions
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':501000,'skip':500}
   # LINKING makes it easy to compare different times
   membrane-v566: # 423ns
     groups: 
       all: all
       ions: +selectors/ions
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':410000,'skip':500}
+      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':410000,'skip':500}
       # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':501000,'skip':500}
   membrane-v564: # runs to 142ns
     groups: 
       all: all
       ions: +selectors/ions
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      # current: {'pbc':'mol','groups':['all'],'start':1000,'end':101000,'skip':100}
+      current: +slices/current
   membrane-v562: # runs to 104ns
     groups: 
       all: all
       ions: +selectors/ions
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      # current: {'pbc':'mol','groups':['all'],'start':1000,'end':101000,'skip':100}
+      current: +slices/current
   membrane-v563: # runs to 206ns
     groups: 
       all: all
       ions: +selectors/ions
     slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
+      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
       current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':501000,'skip':500}
+  membrane-v604:
+    groups: 
+      all: all
+      ions: +selectors/ions
+    slices:
+      #! current_ions: {'pbc':'mol','groups':['ions'],'start':1000,'end':41000,'skip':1}
+      current: {'pbc':'mol','groups':['all'],'start':1000,'end':41000,'skip':500}
 
 variables:
   force_field: charmm
@@ -225,7 +239,7 @@ variables:
         - membrane-v532
         - membrane-v564 #
         - membrane-v565 #
-        - membrane-v566 #
+        #- membrane-v566 #
         - membrane-v534
       asymmetric_no_dilute:
         - membrane-v538
@@ -258,7 +272,9 @@ collections:
   one:
     - membrane-v530
   long:
-    - membrane-v566
+    #- membrane-v566
+    - membrane-v565
+    - membrane-v563
   important_two:
     - membrane-v531
     - membrane-v532
@@ -276,7 +292,7 @@ collections:
     - membrane-v532
     - membrane-v564 #
     - membrane-v565 #
-    - membrane-v566 #
+    #- membrane-v566 #
   position:
     - membrane-v531
     - membrane-v562 #
@@ -284,7 +300,7 @@ collections:
     - membrane-v532
     - membrane-v564 #
     - membrane-v565 #
-    - membrane-v566 #
+    #- membrane-v566 #
     - membrane-v533
     - membrane-v534
   charge:
@@ -308,10 +324,11 @@ collections:
     - membrane-v543
     - membrane-v599 # didn't work until I added here? despite adding to asymmetric all? something about dependency chain
     - membrane-v565 
-    - membrane-v566
+    #- membrane-v566
     - membrane-v564
     - membrane-v563
     - membrane-v562
+    - membrane-v604 # NBFIX test
   dilute:
     - membrane-v542
   symmetric_all:
@@ -341,7 +358,7 @@ collections:
     - membrane-v532
     - membrane-v564 #
     - membrane-v565 #
-    - membrane-v566 #
+    #- membrane-v566 #
     - membrane-v534
     - membrane-v599
   best:
@@ -349,6 +366,23 @@ collections:
   best_compare:
     - membrane-v531
     - membrane-v532
+  short_rdfs:
+    - membrane-v509
+    - membrane-v510
+    - membrane-v511
+    - membrane-v530
+    - membrane-v531
+    - membrane-v532
+    - membrane-v533
+    - membrane-v534
+    - membrane-v514
+    - membrane-v515
+    - membrane-v536
+    - membrane-v538
+    - membrane-v543
+    - membrane-v599
+    - membrane-v564
+    - membrane-v562
 
 meta:
   short_namer: 'lambda sn,spot=None: ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
@@ -499,6 +533,13 @@ meta:
     ion_label:          "$\\mathrm{{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI}}$"
     ptdins_resname:      SAPI
+  membrane-v604:
+    composition_name:    symmetric
+    cation:              NA
+    anion:               CL
+    ion_label:          "$\\mathrm{{Na}^{+}}$"
+    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
+    ptdins_resname:      PI2P
 
 calculations:
   lipid_abstractor:
@@ -723,6 +764,28 @@ calculations:
         lipid_abstractor:
           selector: lipid_chol_com
 
+  lipid_rdfs:
+    slice_name: current
+    collections: long
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector: 
+            loop: [lipid_chol_com, lipid_chol_com_headless]
+      cutoff: 20.0
+      binsize: 0.05
+
+  lipid_rdfs_detail:
+    slice_name: current
+    #! changed from long to all on 2020.03.08 to get rdfs
+    collections: short_rdfs
+    specs:
+      upstream:
+        lipid_abstractor:
+          selector: 
+            loop: [lipid_chol_com_headless]
+      cutoff: 20.0
+      binsize: 0.05
 
 calculations_retired_or_discarded:
 
@@ -1167,3 +1230,35 @@ plots:
         upstream:
           lipid_abstractor:
             selector: lipid_com
+  lipid_rdfs:
+    autoplot: True
+    collections: long
+    calculation:
+      lipid_rdfs:
+        upstream:
+          lipid_abstractor:
+            selector:
+              loop: 
+                - lipid_chol_com 
+                - lipid_chol_com_headless
+
+  lipid_rdfs_ptdins:
+    autoplot: True
+    #! changed from long to all on 2020.03.08 to get rdfs
+    collections: short_rdfs
+    calculation:
+      lipid_rdfs_detail:
+        upstream:
+          lipid_abstractor:
+            selector:
+              loop: 
+                - lipid_chol_com 
+                - lipid_chol_com_headless
+
+  lipid_area_converge:
+    autoplot: True
+    script: plot-lipid_area_converge.py
+    collections: all
+    calculation:
+      lipid_abstractor:
+        selector: lipid_com

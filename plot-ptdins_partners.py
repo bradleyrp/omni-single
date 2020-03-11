@@ -32,6 +32,7 @@ def get_upstream_mesh_partners(abstractor_key):
 
 def prep_postdat(nn,sns,abstractor='lipid_com',monolayer_indexer=None):
 	data = get_upstream_mesh_partners(abstractor)
+	global postdat
 	postdat = dict()
 	for sn in sns:
 		if monolayer_indexer:
@@ -59,6 +60,7 @@ def prep_postdat(nn,sns,abstractor='lipid_com',monolayer_indexer=None):
 		ratios_random = np.array([np.product([combi(comps[k],v) 
 			for k,v in zip(*np.unique(c,return_counts=True))])/combi(sum(comps.values()),nn) 
 			for c in combos[inds]])
+		import ipdb;ipdb.set_trace()
 		counts_obs = data[sn]['counts_observed_%d'%nn][top_mono].mean(axis=0)
 		counts_obs_std = data[sn]['counts_observed_%d'%nn][top_mono].std(axis=0)
 		nmols = data[sn]['monolayer_residues_%d'%top_mono].shape[0]
@@ -66,7 +68,10 @@ def prep_postdat(nn,sns,abstractor='lipid_com',monolayer_indexer=None):
 		ratios_err = counts_obs_std[inds]/(counts_obs[inds].sum())/ratios_random
 		rename_ptdins = lambda x: 'PtdIns' if x==work.meta[sn]['ptdins_resname'] else x
 		combonames_std = np.array([[rename_ptdins(i) for i in j] for j in combonames[inds]])
-		postdat[sn] = dict(ratios=ratios,ratios_err=ratios_err,combos=combonames_std)
+		postdat[sn] = dict(ratios=ratios,ratios_err=ratios_err,
+			combos=combonames_std,
+			counts_obs=counts_obs,counts_obs_std=counts_obs_std,
+			counts_raw=data[sn]['counts_observed_%d'%nn][top_mono])
 	if not all([len(postdat[sns[0]]['combos'])==len(postdat[sn]['combos']) 
 		and np.all(postdat[sns[0]]['combos']==postdat[sn]['combos']) for sn in sns]):
 		for sn in sns:
@@ -188,8 +193,22 @@ def plot_partners_ptdins():
 				3:dict(nn=2,abstractor='lipid_com'),},
 			'panelspec':dict(figsize=(12,12),
 				layout={'out':{'grid':[2,1]},'ins':[{'grid':[1,2]},{'grid':[1,2],
+				'wratios':[1,6],'wspace':0.1},]}),},
+		'summary_mesh_simple':{
+			'sns':work.metadata.collections['position'],
+			'pdf':True,
+			'extras':{'baseline':0.0,'special':False,'legend_below':True,
+				'stars':['membrane-v565','membrane-v563'],'ylim':1.7},
+			'specs':{
+				0:dict(nn=3,abstractor='lipid_com',combos=[['Ptdins','Ptdins','Ptdins']]),
+				1:dict(nn=2,abstractor='lipid_com'),},
+			'panelspec':dict(figsize=(16,12),
+				layout={'out':{'grid':[1,1]},'ins':[{'grid':[1,2],
 				'wratios':[1,6],'wspace':0.1},]}),}
 		}
+	#! 
+	specs_filter_keys = ['summary_mesh_simple']
+	if specs_filter_keys: specs = dict([(i,j) for i,j in specs.items() if i in specs_filter_keys])
 	if 'summary_mesh' in specs:
 		#! replot causes an error: `DataPack instance has no attribute 'this'`
 		#! hacking through the extra tools. there might already be a better solution to this
@@ -213,10 +232,9 @@ def plot_partners_ptdins():
 			'panelspec':dict(figsize=(18,16),
 				layout={'out':{'grid':[1,1]},
 				'ins':[{'grid':[2,1],'wspace':0.1} for i in range(1)]}),},}
-	specs_filter_keys = ['summary_mesh']
-	#specs_filter_keys = []
-	if specs_filter_keys: specs = dict([(i,j) for i,j in specs.items() if i in specs_filter_keys])
 	for figname,spec in specs.items(): 
+		print(spec)
+		print(figname)
 		plot_partners_basic(figname=figname,**spec)
 
 @autoplot(plotrun)
@@ -293,8 +311,18 @@ def plot_partners_actinlink():
 		status('plotting %s'%figname,tag='plot')
 		plot_partners_basic(figname=figname,**spec)
 
-def plot_partners_basic(sns,figname,specs,panelspec,extras):
+def half_width_custom(sn):
+	"""Custom bar widths for different-length simulations."""
+	factor = 80000. # 80 ns is unit width bars
+	duration_source = calc_collect['extras']
+	width = int(int(duration_source[sn]['end']-duration_source[sn]['start'])/factor)
+	return width/2.
+
+def plot_partners_basic(sns,figname,specs,panelspec,extras,pdf=False):
 	"""Summarize the lipid mesh partners."""
+	print('SNS:')
+	print(sns)
+	extras_plot = []
 	baseline = extras.get('baseline',1.0)
 	sns_reorder = sns
 	plotspec = ptdins_manuscript_settings()
@@ -321,6 +349,7 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		max_y,min_y = 0,10
 		combo_spacer,half_width = 0.5,0.5
 		for snum,sn in enumerate(sns_reorder):
+			#! dev half_width = half_width_custom(sn)
 			# already ensured each simulation has the same combinations
 			for cnum,combo in enumerate(combos):
 				xpos = (cnum)*len(sns)+snum+cnum*combo_spacer
@@ -340,7 +369,10 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 					alpha=1.0,lw=2.0,c='k')
 				max_y,min_y = max((max_y,ypos+baseline+y_err)),min((min_y,ypos+baseline-y_err))
 		if baseline==0.0:
-			ax.set_ylim((0.0,ax.get_ylim()[1]))
+			# only use this with a baseline of zero. set the ylim to ensure everything lines up
+			# using the same limit makes the plots even and also allows the stars to be even
+			ylim_this = extras.get('ylim',ax.get_ylim()[1]) 
+			ax.set_ylim((0.0,ylim_this))
 		ax.set_xlim(-half_width-half_width/2.,(len(sns))*len(combos)-
 			half_width+(len(combos)-1)*combo_spacer+half_width/2.)
 		ax.axhline(1.0,c='k',lw=2)
@@ -351,6 +383,19 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		ax.set_xticks(mids)
 		ax.set_xticklabels(['\n'.join(c) for c in combos],fontsize=18)
 		ax.xaxis.tick_top()
+		if extras.get('stars',False):
+			tagbox = dict(facecolor='w',lw=0,alpha=1.0,boxstyle="round,pad=0.2")
+			#! could not use twiny to do this so we use tagboxes
+			star_spots = np.array([ii for ii,i in enumerate(sns) if i in extras['stars']])
+			print(star_spots)
+			print(len(combos))
+			star_spots_all = np.concatenate([ii*len(sns)+star_spots+half_width*(ii)
+				for ii in range(len(combos))])
+			for spot in star_spots_all:
+				tb = ax.text(spot,-0.02,'*',fontsize=20,
+					bbox=tagbox,rotation=0,ha="center",va="top",color='k',
+					transform=ax.transData)
+				extras_plot.append(tb)
 		labelsize = 14
 		if extras.get('small_labels_ax3',False) and axnum==3: labelsize = 10
 		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on',labelsize=14)
@@ -399,7 +444,8 @@ def plot_partners_basic(sns,figname,specs,panelspec,extras):
 		#! hacking extremely quickly here
 		for i,j in vals.items(): getattr(axes[key],i)(**j)
 	picturesave('fig.lipid_mesh_partners.%s'%figname,work.plotdir,
-		backup=False,version=True,meta={},extras=[legend],form='svg')
+		backup=False,version=True,meta={'version':'2018.12.02'},
+		extras=[legend]+extras_plot,form='pdf' if pdf else 'svg')
 
 @autoload(plotrun)
 def load():
@@ -409,3 +455,15 @@ def load():
 
 # one plot script for multiple projects
 plotrun.routine = ['plot_partners_%s'%os.path.basename(os.getcwd())]
+
+if __name__=='__main__':
+	pass
+	#sn = 'membrane-v565'
+	#dat = data_collect[('lipid_mesh_partners',2)][sn]['data']
+	#print('12312')
+
+	fig = plt.figure()
+	ax = fig.add_subplot(111)
+	counts = postdat['membrane-v565']['counts_raw'].sum(axis=1)
+	ax.plot(counts)
+	plt.savefig('/home/rpb/debug.png')

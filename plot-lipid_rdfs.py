@@ -108,7 +108,9 @@ def load():
 			name = delve(calc[key],*path)
 			post.new(name,data=data[key],calc=calc[key])
 	# generics dumped to globals
-	color_by_simulation = actinlink_color_by_simulation
+	#! port to ptdins color_by_simulation = actinlink_color_by_simulation
+	#! all of this is coming from ptdins
+	color_by_simulation = lambda sn: ptdins_color_by_simulation(meta=work.meta[sn])
 	xmax_cumulative = 2.0
 	# loop over upstream calculations
 	for upstream_name in post.dataset:
@@ -126,8 +128,10 @@ def load():
 		pairname_to_pair = dict([(tuple(i),j) for i,j in zip(*[data_this[sn]['data']['%s_mn%d'%(p,
 			actinlink_monolayer_indexer(sn,abstractor='lipid_chol_com'))] for p in ['pairnames','pairs']])])
 		pair_residues = [pairname_to_pair[p] for p in pairings]
-		replicate_mapping = actinlink_replicate_mapping
-		extra_labels = actinlink_extra_labels
+		#! porting to ptdins replicate_mapping = actinlink_replicate_mapping
+		replicate_mapping = [(i,[i,]) for i in sns]
+		#! extra_labels = actinlink_extra_labels
+		extra_labels = ptdins_extra_labels
 		#! it would be nice to have this calculation in a separate function but then it will not have globals.
 		#! ... this issue needs documenting along with the load magic
 		post_this = post.data['reduced'] = dict([])
@@ -147,7 +151,10 @@ def load():
 					nmols.add([np.in1d(dat['resnames'][dat['monolayer_indices']==mn],p).sum() 
 						for p in pair])
 					total_areas.append(dat['total_area'])
-				if len(obs) not in [0,2]: raise Exception('something has gone wrong')
+				if len(obs)==1:
+					print('[WARNING] if this is supposed to be actinlink we only have one replicate!')
+				elif len(obs) not in [0,2]: raise Exception('something has gone wrong')
+				# porting to ptdins
 				elif len(obs)==0: continue
 				# average replicates
 				counts = np.array(obs).mean(axis=0)
@@ -191,7 +198,7 @@ def plot_radial_distributions(figname,mode='summary',**kwargs):
 					for i in range(2,len(counts))])[valid]
 				ax.plot(middles[valid],vals[valid],color=color_by_simulation(sns_this[0]),lw=2)
 				ax.set_xlim((0,xmax_cumulative))
-				ax.set_ylabel('$\int{g(r)}$')
+				ax.set_ylabel(r'$\int{g(r)}$')
 			elif mode=='summary': 
 				valid = middles<xmax
 				ax.plot(middles[valid],(counts/areas/density)[valid],
@@ -205,7 +212,7 @@ def plot_radial_distributions(figname,mode='summary',**kwargs):
 			ax.set_title('%s-%s'%tuple([work.vars['names']['short'].get(p,p) for p in pairname]))
 			ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
 			ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
-			ax.set_xlabel('$r\,(nm)$')
+			ax.set_xlabel(r'$r\,(nm)$')
 	legend = make_legend(axes[-1],fig=fig,keys=[i for i,j in replicate_mapping_this],**legend_spec)
 	meta = {}
 	attach_selector_key(meta)
@@ -266,5 +273,20 @@ def plot_cumulative_compare():
 	picturesave('fig.lipid_rdfs.%s'%figname,directory=work.plotdir,meta=meta,
 		version=True,extras=[legend],dpi=dpi,form=img_form)
 
+@autoplot(plotrun)
+def plot_ptdins_convergence(): pass
+ 
 plotrun.routine = ['plot_distributions'] # None
-if __name__=='__main__': pass
+plotrun.routine = [] # see development below
+if __name__=='__main__': 
+
+	# customized to ptdins. has no replicate mapping
+	sns_this = ['membrane-v565']
+	this_dataset = 'lipid_chol_com_headless'
+	pairname = [[u'DOPE', u'DOPS', u'PI2P'], [u'DOPE', u'DOPS', u'PI2P']]
+	for sn in sns_this:
+		#!!! is the indexer correct?
+		mn = actinlink_monolayer_indexer(sn,abstractor='lipid_chol_com')
+		dat = data_this[sn]['data']
+		key = 'counts_mn%d_%s:%s'%(mn,pairname[0],pairname[1])
+		print(dat[key])

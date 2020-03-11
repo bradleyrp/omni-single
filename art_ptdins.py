@@ -18,6 +18,8 @@ _art_words += ['uniquify','catalog','delve','delveset','delveset_list',
 #! extras for actinlink
 _art_words += ['actinlink_monolayer_indexer','actinlink_replicate_mapping','actinlink_color_by_simulation',
 	'actinlink_extra_labels','color_by_simulation','actinlink_sns_mdia2','actinlink_color_by_simulation']
+#! hacking on ptinds
+_art_words += ['ptdins_color_by_simulation','ptdins_extra_labels']
 
 #---canonical colors for this project from brewer2mpl
 import brewer2mpl
@@ -615,6 +617,8 @@ actinlink_extra_labels = {
 	'pip2_30':r'mDia2, 30% $PIP_2$ ($\times2$)',
 	'pip2_10':r'mDia2, 10% $PIP_2$ ($\times2$)',}
 
+ptdins_extra_labels = {'membrane-v565':'500 ns 4,5-Ca2+','membrane-v563':'500 ns 4,5-Mg2+'}
+
 def actinlink_color_by_simulation(sn):
 	"""
 	Choose colors for each simulation across many plots.
@@ -635,6 +639,10 @@ def actinlink_color_by_simulation(sn):
 		#! color order must match the replicate mapping order
 		return dict(zip(zip(*replicate_mapping)[0],colors))[sn]
 	else: return matches[0]
+
+def ptdins_color_by_simulation(meta):
+	# hacked in with: color_by_simulation = lambda sn: ptdins_color_by_simulation(meta=work.meta[sn])
+	return colorize(meta,comparison='protonation')
 
 actinlink_sns_mdia2 = ['mdia2bilayer_nochl2','mdia2bilayer_nochl3','mdia2bilayer10','mdia2bilayer10_2',
 	'mdia2bilayerphys','mdia2bilayerphys2','mdia2bilayer30','mdia2bilayer30_2']

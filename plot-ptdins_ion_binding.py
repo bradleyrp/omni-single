@@ -18,10 +18,20 @@ def load():
 
 def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 	multiplexed_cutoffs=None,charge_scaled=False,do_legend=True,extras=None,norm_leaflet=False,
-	do_tag_bridges=True,ion_names=None,no_vert_labels=False):
+	do_tag_bridges=True,ion_names=None,no_vert_labels=False,ymax_adjust=True,
+	labeler=None,do_time_ticks=False,ptdins_name='PtdIns'):
 	"""
 	Single-panel plot of the cool ion-binding waterfall visualization.
 	"""
+	def set_time_pts(sn):
+		global time_pts
+		# handle variable number of timepoints here
+		if time_pts_abs!=-1: time_pts = time_pts_abs
+		else: 
+			#! no: time_pts = int(len(data.this[sn]['0.wcs'])/time_pts_interval)
+			duration = data.extras[sn]['end']-data.extras[sn]['start']
+			time_pts = int(int(data.extras[sn]['end']-data.extras[sn]['start'])/time_pts_interval)
+		return time_pts
 	if extras is None: extras = []
 	# format count data up to the maximum number of nearest-neighbors (hardcoded to 3)
 	ncats = 3
@@ -40,6 +50,7 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 					# from the draft: $3.0, 3.0, 2.3, 2.6 \,\AA$ for K+, Na+, Mg2+, and Ca2+,
 					zc = multiplexed_cutoffs[work.meta[sn]['cation']]
 					data.set(name='ion_binding_combinator',select={('zonecut',):zc})
+			set_time_pts(sn)
 			if charge_scaled: factor = {'NA':1.,'Na,Cal':1.,'MG':2.,'K':1.,'Cal':2.}[work.meta[sn]['cation']]
 			else: factor = 1.0
 			if norm_leaflet and work.meta[sn]['composition_name'] == 'symmetric': factor = factor/2.0
@@ -60,6 +71,7 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 				postdat[sn]['nn_count_few'][j][i]-postdat[sn]['nn_count_few_ptdins'][j][i] 
 				for i in range(ncats)] for j in range(len(sel_frames))]
 		postdat_sep[pnum] = postdat
+	global postdat # debugging
 	postdat = postdat_sep[pnum]
 	for pnum,sns in enumerate(sns_sep):
 		# plot the total ions at a few time points
@@ -71,6 +83,7 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 		# specify by pip2 representation in the nearest neighbors
 		yvals = []
 		for ss,sn in enumerate(sns):
+			set_time_pts(sn)
 			ysn = []
 			for t in range(time_pts):
 				ysnt = []
@@ -83,7 +96,7 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 		barspecs_base = [{'color':colors_ions[work.meta[sn]['cation']]} for sn in sns]
 		alpha_sweep = dict([(ii,i) for ii,i in enumerate(np.linspace(0.35,1,3))])
 		# apply different patterns to each of the time_pts by adding e.g. alpha_sweep to the dict below
-		barspecs = [[dict(**barspecs_base[ss]) for j in range(time_pts)] 
+		barspecs = [[dict(**barspecs_base[ss]) for j in range(set_time_pts(sn))] 
 			for ss,sn in enumerate(sns)]
 		color_blender = lambda c,alpha : tuple(list(mpl.colors.ColorConverter().to_rgb(c))+[alpha]) 
 		# add additional granular settings for stacked bar plots
@@ -105,35 +118,74 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 			hatch='///' if k%2==0 else None,
 			**barspecs_base[ss]) 
 			for k in range(ncats*2)] 
-			for j in range(time_pts)] for ss,sn in enumerate(sns)]
+			for j in range(set_time_pts(sn))] for ss,sn in enumerate(sns)]
+		global out_specs
 		out_specs = barmaker(ax,yvals,gap=1.0,
 			barspecs_all=barspecs_all,barspecs=barspecs,barspecs_stack=barspecs_stack)
 		ymax = out_specs['ymax']
 		ymax_all = max([ymax,ymax_all])
 		# if we are making a batch we fix the ymin and ymax
 		if not do_single: ymax = [400,250][pnum]
-		ax.set_ylim(ymin,ymax*1.1)
+		if ymax_adjust: ax.set_ylim(ymin,ymax*1.5) # changed 1.2 to 1.3 for BPS 
 		# copied from elsewhere
 		tagbox_ion = dict(facecolor='w',alpha=1.0,boxstyle="round,pad=0.3")
 		tagbox_ptdins = dict(facecolor='w',lw=0,alpha=0.0,boxstyle="round,pad=0.4")
 		tagbox_ptdins = tagbox_ion
-		ax.set_xticks([])
+		if do_time_ticks==None: ax.set_xticks([])
+		elif do_time_ticks=='physiological_long':
+			ax.set_xticks([0,50,100,151,201])
+			ax.set_xticklabels([0,250,500,250,500])
+
 		label_drop = (ymax-ymin)*0.2
 		width = out_specs['width']
 		xcenters = [np.mean(np.array(i)+out_specs['width']/2.0) for i in out_specs['xvals']]
 		#! no_vert_labels is for the toc entry, a combination plot
 		for snum,sn in enumerate(sns):
 			text = work.meta[sn]['ion_label']
-			downdrop = -0.02 if not no_vert_labels else -0.04
-			tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop,text,
-				bbox=tagbox_ion,ha='center',va='top',rotation=-90 if not no_vert_labels and len(text)>25 else 0,
-				color='k',fontsize=art['fs']['tags'])
-			extras.append(tb)
-			text = work.meta[sn]['ptdins_label']
-			tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*0.02-label_drop,text,
-				bbox=tagbox_ptdins,rotation=-90 if not no_vert_labels and len(text)>15 else 0,ha="center",va="bottom",
-				color='k',fontsize=art['fs']['tags'])
-			extras.append(tb)
+			#downdrop = -0.02 if not no_vert_labels else -0.04
+			#tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop,text,
+			#	bbox=tagbox_ion,ha='center',va='top',rotation=-90 if not no_vert_labels and len(text)>25 else 0,
+			#	color='k',fontsize=art['fs']['tags'])
+			#extras.append(tb)
+			#text = work.meta[sn]['ptdins_label']
+			#tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*0.02-label_drop,text,
+			#	bbox=tagbox_ptdins,rotation=-90 if not no_vert_labels and len(text)>15 else 0,ha="center",va="bottom",
+			#	color='k',fontsize=art['fs']['tags'])
+			#extras.append(tb)
+			if labeler==None:
+				#! hacking to move labels on the symmetric. tuned it manually
+				if 'membrane-v509' in sns: extra_drop = 20.0
+				else: extra_drop = 0.0
+				print('extra drop is %s'%str(extra_drop))
+				## HACKING FOR BPS
+				# downdrop = -0.02 if not no_vert_labels else -0.04
+				downdrop = 0.
+				tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop-extra_drop,text,
+					bbox=tagbox_ion,ha='center',va='top',rotation=-90,
+					color='k',fontsize=art['fs']['tags'])
+				extras.append(tb)
+				text = work.meta[sn]['ptdins_label']
+				tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop/4.,text,
+					bbox=tagbox_ptdins,rotation=-90,ha='center',va='top',
+					color='k',fontsize=art['fs']['tags'])
+				extras.append(tb)
+				if do_time_ticks!=None: ax.set_xlabel('time',fontsize=16)
+			# added extra label handling here. acquiring technical debt but things are too urgent!
+			elif labeler=='physiological_long':
+				label_drop = (ymax-ymin)*0.2
+				downdrop = 0.
+				tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop,text,
+					bbox=tagbox_ion,ha='center',va='top',rotation=0,
+					color='k',fontsize=art['fs']['tags']+4)
+				extras.append(tb)
+				text = work.meta[sn]['ptdins_label']
+				tb = ax.text(width*(xcenters[snum]),(ymax-ymin)*downdrop-label_drop/2.,text,
+					bbox=tagbox_ptdins,rotation=-0,ha='center',va='top',
+					color='k',fontsize=art['fs']['tags']+4)
+				extras.append(tb)
+				ax.set_xlabel('time',fontsize=16)
+			else: raise Exception	
+
 	# annotations after the last bar
 	rtx = out_specs['xvals'][-1][-1]+out_specs['width']
 	cat_tops = np.array([0]+list(np.cumsum(yvals[-1][-1])[1::2]))
@@ -177,9 +229,9 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 			legend_labels.append(work.meta[marks_sns[nn]]['ion_label'])
 			legend_patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,
 				facecolor=colors_ions[name],edgecolor=colors_ions[name],lw=2))
-		legend_labels.append('bound to\nat least\n1 PtdIns')
+		legend_labels.append('bound to\nat least\n1 %s'%ptdins_name)
 		legend_patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,color='gray'))
-		legend_labels.append('not bound\nto PtdIns')
+		legend_labels.append('not bound\nto %s'%ptdins_name)
 		legend_patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,fc='w',edgecolor='gray',hatch='///'))
 		if multiplexed_cutoffs:
 			# mild offset for the legend so it clears the tops
@@ -198,7 +250,8 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 if __name__=='__main__':
 
 	# several layouts (iterate manually for now)
-	layout = ['comprehensive','physiological_with_EDPs','simple_snapshot'][0]
+	layout = ['comprehensive','physiological_with_EDPs','simple_snapshot',
+		'physiological_long'][-1]
 
 	# hatching shennanigans in various matplotlib versions
 	mpl.rcParams['hatch.linewidth'] = 3.0
@@ -213,12 +266,17 @@ if __name__=='__main__':
 	print_version = 'v20180426'
 	colors_ions = {'NA':'green','Na,Cal':'green','MG':'red','Cal':'blue','K':'gray',}
 	descriptor = '.cutoff%.1f'%zonecut if not multiplexed_cutoffs else ''
-	picname = 'fig.ion_binding4%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
+	# binding5 was the latest "comprehensive" plot
+	picname = 'fig.ion_binding5%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
+	# binding6 below is the new physiological-only plot
+	picname = 'fig.ion_binding6%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
 	if layout=='simple_snapshot': picname = 'fig.ion_binding_toc'
+	if layout=='comprehensive': picname = 'fig.ion_binding7'
 
 	# aesthetics
 	global art
-	time_pts = 16
+	time_pts_abs = -1 # previously called time_pts, set to 16, now variable
+	time_pts_interval = 5000. # 5 ns per bar
 	ymin = 0
 
 	# selections
@@ -227,6 +285,7 @@ if __name__=='__main__':
 		sns_sep = [work.vars['orders']['canon']['symmetric'],work.vars['orders']['canon']['asymmetric']]
 		titles = ['symmetric','physiological']
 		sns = sns_sep[0]+sns_sep[1]
+		do_time_ticks = None
 	elif layout=='physiological_with_EDPs':
 		art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':16},}
 		sns_sep = [work.vars['orders']['canon']['asymmetric_no_dilute']]
@@ -235,14 +294,19 @@ if __name__=='__main__':
 		art = {'fs':{'legend':14,'title':20,'tags':16,'axlabel':16},}
 		sns_sep = [['membrane-v531','membrane-v532']]
 		sns = sns_sep[0]
+	elif layout=='physiological_long':
+		art = {'fs':{'legend':14,'title':20,'tags':16,'axlabel':16},}
+		sns_sep = [['membrane-v563','membrane-v565']]
+		sns = sns_sep[0]
+		do_time_ticks = 'physiological_long'
 	else: raise Exception
 
 	extras = []
 	if layout=='comprehensive':
-		figsize = (18,10)
+		figsize = (20,10)
 		axes,fig = panelplot(figsize=figsize,
 			layout={'out':{'grid':[1,len(sns_sep)],'wratios':[len(s) for s in sns_sep],
-			'wspace':0.3},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
+			'wspace':0.1},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
 		axes = [i for j in axes for i in j]
 		ymax = 0.
 	elif layout=='physiological_with_EDPs':
@@ -257,6 +321,12 @@ if __name__=='__main__':
 			layout={'out':{'grid':[1,1+len(sns_sep)],'wratios':[3,1],'hspace':0.0,
 			'wspace':0.1},'ins':[{'grid':[1,1]},{'grid':[4,1],'hratios':[2,5,1,1]}]})
 		ymax = 0.
+	elif layout=='physiological_long':
+		figsize = (12,10)
+		axes,fig = panelplot(figsize=figsize,
+			layout={'out':{'grid':[1,1],'hspace':0.0,
+			'wspace':0.1},'ins':[{'grid':[1,1]}]})
+		ymax = 0.
 	else: raise Exception
 
 	# main plot loop
@@ -265,7 +335,8 @@ if __name__=='__main__':
 			ax = axes[anum]
 			detail = plot_ion_binding_waterfall(ax,sns_sep=[sns_this],zonecut=zonecut,extras=extras,
 				multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,do_legend=anum==1,
-				norm_leaflet=norm_leaflet,do_tag_bridges=anum==1)
+				norm_leaflet=norm_leaflet,do_tag_bridges=anum==1,labeler=None,do_time_ticks=do_time_ticks)
+			print([len(i) for i in out_specs['xvals']])
 			ymax = max(detail['ymax'],ymax)
 			ax.set_title(titles[anum],fontsize=art['fs']['title'])
 			# get the average totals for comparison between compositions
@@ -278,6 +349,14 @@ if __name__=='__main__':
 				[STATUS] membrane-v511 totals average: 364.92
 				[STATUS] membrane-v532 totals average: 435.48
 				"""
+	elif layout=='physiological_long':
+		ax = axes[0]
+		plot_ion_binding_waterfall(ax,sns_sep=sns_sep,zonecut=zonecut,
+			multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,extras=extras,
+			ion_names=['MG','Cal'],do_legend=True,no_vert_labels=True,ymax_adjust=False,
+			labeler='physiological_long',do_time_ticks=do_time_ticks,
+			ptdins_name=r"$\mathrm{{PIP}_2}$")
+		ax.tick_params(axis=u'both',which=u'both',length=0)
 	elif layout=='physiological_with_EDPs':
 		ax = axes[1][0]
 		fig.delaxes(axes[1][1])
@@ -317,7 +396,8 @@ if __name__=='__main__':
 		for j in [0,2,3]: fig.delaxes(axes[1][j])
 		plot_ion_binding_waterfall(ax,sns_sep=sns_sep,zonecut=zonecut,
 			multiplexed_cutoffs=multiplexed_cutoffs,charge_scaled=charge_scaled,extras=extras,
-			ion_names=['MG','Cal'],do_legend=False,no_vert_labels=True)
+			ion_names=['MG','Cal'],do_legend=False,no_vert_labels=True,
+			ptdins_name=r"$\mathrm{{PIP}_2}$")
 		ax.tick_params(axis=u'both',which=u'both',length=0)
 		# hijacked from lipid_lipid_bonds
 		ax = axes[0][0]
@@ -335,14 +415,15 @@ if __name__=='__main__':
 		ax.axis('off')
 
 	else: raise Exception
+	# note that the weird plateau is legitimate; the plot is not cut off for v565
 	# leaflet norming also matches the axes for a direct comparison between compositions
 	if norm_leaflet and layout=='comprehensive':
 		for ax in axes: ax.set_ylim((0,ymax))
 	# PDF method previously used to make hatches thicker
 	meta = {'zonecut':zonecut if not multiplexed_cutoffs else multiplexed_cutoffs,
-		'charge_scaled':charge_scaled,'sns':sns,'print_version':print_version,'time_pts':time_pts},
-	fn = picturesave(picname,work.plotdir,backup=False,extras=extras,
-		version=True,meta=meta,pad_inches=0.5,pdf=False,form='svg')
+		'charge_scaled':charge_scaled,'sns':sns,'print_version':print_version,'time_pts':time_pts_abs},
+	fn = picturesave(picname,work.plotdir,backup=False,extras=extras,dpi=500,
+		version=True,meta=meta,pad_inches=0.5,pdf=False,form='pdf')
 	#! abandoned
 	if False:
 		# trim white space
@@ -361,4 +442,19 @@ if __name__=='__main__':
 		picturesave(picname,work.plotdir,backup=False,extras=extras,
 			version=True,meta=meta,pad_inches=0.5,pdf=False)
 	conv_cmd = '-trim -bordercolor white -border 25 +repage'
-	os.system('convert %s %s %s'%(fn,conv_cmd,re.sub(r'\.png$','.trim.png',fn)))
+	os.system('convert %s %s %s'%(fn,conv_cmd,re.sub(r'\.pdf$','.trim.pdf',fn)))
+
+"""
+# checking the number of bars
+# [len(i) for i in out_specs['xvals']]
+[16, 16, 16, 9, 16, 16]
+[STATUS] membrane-v511 totals average: 364.92
+[16, 16, 16, 9, 16, 16, 100, 16, 16, 16, 16, 100, 16]
+[STATUS] membrane-v532 totals average: 435.48
+[STORE] searching pictures
+[STORE] saving picture to fig.ion_binding7.v1.pdf
+[WARNING] you are saving as pdf and only png allows metadata-versioned pictures
+
+NOTE THAT hatching looked different in firefox vs a rendered latex document even for the same file! no idea why!
+"""
+

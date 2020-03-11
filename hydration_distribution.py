@@ -86,6 +86,7 @@ def hydration_distribution(grofile,trajfile,**kwargs):
 	knn = calc['specs'].get('k_nearest_waters',200)
 
 	#---prepare universe	
+	print((grofile,trajfile))
 	uni = MDAnalysis.Universe(grofile,trajfile)
 	nframes = len(uni.trajectory)
 	lenscale = 10.
