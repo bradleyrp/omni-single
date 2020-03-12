@@ -99,64 +99,6 @@ slices:
     slices:
       current: {'pbc':'mol','groups':['all'],'start':0,'end':48000,'skip':100}
       current_ions: {'pbc':'mol','groups':['ions'],'start':0,'end':48000,'skip':1}
-  membrane-v599:
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
-  membrane-v565: # 423ns
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
-      current: {'pbc':'mol','groups':['all'],'start':1000,'end':501000,'skip':500}
-  # LINKING makes it easy to compare different times
-  membrane-v566: # 423ns
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':410000,'skip':500}
-      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
-      current: {'pbc':'mol','groups':['all'],'start':1000,'end':501000,'skip':500}
-  membrane-v564: # runs to 142ns
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
-      # current: {'pbc':'mol','groups':['all'],'start':1000,'end':101000,'skip':100}
-      current: +slices/current
-  membrane-v562: # runs to 104ns
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      # current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
-      # current: {'pbc':'mol','groups':['all'],'start':1000,'end':101000,'skip':100}
-      current: +slices/current
-  membrane-v563: # runs to 206ns
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      # current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':100}
-      current_ions: {'pbc':'mol','groups':['ions'],'start':10000,'end':90000,'skip':1}
-      current: {'pbc':'mol','groups':['all'],'start':1000,'end':501000,'skip':500}
-  membrane-v604:
-    groups: 
-      all: all
-      ions: +selectors/ions
-    slices:
-      #! current_ions: {'pbc':'mol','groups':['ions'],'start':1000,'end':41000,'skip':1}
-      #! current: {'pbc':'mol','groups':['all'],'start':1000,'end':41000,'skip':500}
-      current: {'pbc':'mol','groups':['all'],'start':0,'end':50000,'skip':500}
 
 variables:
   force_field: charmm
@@ -173,7 +115,6 @@ variables:
     resnames_lipid_chol: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI']
     resnames_lipid_chol_ions: ['POPC','DOPC','DOPS','DOPE','CHL1','PI2P','P35P','PIPU','PIPP','SAPI','Na','Cl','MG','Cal','K']
     resnames_PIP2: ['PI2P','P35P','PIPU','PIPP','SAPI']
-    headless_selection: 'not hydrogen and (resname CHL1 or ((resname DOPE or resname DOPS or resname POPC or resname PI2P) and (name "C2.+" or name "C3.+")))'
   head_atoms: 'N  C12  C13  C14  C15 H12A H12B H13A H13B H13C H14A H14B H14C H15A H15B H15C  C11 H11A H11B  P  O13  O14  O12  O11   C1   HA   HB   C2   HS N   HN1   HN2   HN3   C12  H12A   C13  O13A  O13B   C11  H11A  H11B     P   O13   O14   O12 O11    C1    HA    HB    C2    HS C12   H2   O2  HO2  C13   H3   O3  HO3  C14   H4   O4   P4 OP42 OP43 OP44  C15   H5   O5   P5  OP52 OP53 OP54  H52  C16   H6   O6  HO6  C11   H1    P  O13  O14  O12  O11   C1   HA   HB   C2   HS'
   slices:
     steady: {'pbc':'mol','groups':['all'],'start':50000,'end':100000,'skip':100}
@@ -185,18 +126,6 @@ variables:
     Cal: 2.6
     K: 3.0
   names:
-    # short is only used in lipid_lipid_bonds_analysis
-    short:
-      CHL1: Cholesterol
-      DOPC: DOPC
-      DOPS: DOPS
-      DOPE: DOPE
-      POPC: POPC
-      PI2P: "PI(4,5)P$_2$"
-      P35P: "PI(3,5)P$_2$"
-      PIPP: "PI(4,5)P$_2^{-3}$"
-      PIPU: "PI(4,5)P$_2^{-5}$"
-      SAPI: "PI"
     proper_residue_names_long:
       CHL1: Cholesterol
       DOPC: DOPC
@@ -233,27 +162,11 @@ variables:
         - membrane-v530
         - membrane-v542
         - membrane-v531
-        - membrane-v562 #
-        - membrane-v563 #
         - membrane-v533
-        - membrane-v599
-        - membrane-v532
-        - membrane-v564 #
-        - membrane-v565 #
-        #- membrane-v566 #
-        - membrane-v534
-      asymmetric_no_dilute:
-        - membrane-v538
-        - membrane-v536
-        - membrane-v530
-        - membrane-v531
-        - membrane-v533
-        - membrane-v599
         - membrane-v532
         - membrane-v534
       asymmetric_pi_first:
         - membrane-v536
-        - membrane-v599
         - membrane-v538
         - membrane-v530
         - membrane-v542
@@ -272,10 +185,6 @@ variables:
 collections:
   one:
     - membrane-v530
-  long:
-    #- membrane-v566
-    - membrane-v565
-    - membrane-v563
   important_two:
     - membrane-v531
     - membrane-v532
@@ -288,20 +197,10 @@ collections:
   asymmetric:
     - membrane-v530
     - membrane-v531
-    - membrane-v562 #
-    - membrane-v563 #
     - membrane-v532
-    - membrane-v564 #
-    - membrane-v565 #
-    #- membrane-v566 #
   position:
     - membrane-v531
-    - membrane-v562 #
-    - membrane-v563 #
     - membrane-v532
-    - membrane-v564 #
-    - membrane-v565 #
-    #- membrane-v566 #
     - membrane-v533
     - membrane-v534
   charge:
@@ -323,13 +222,6 @@ collections:
     - membrane-v538
     - membrane-v542
     - membrane-v543
-    - membrane-v599 # didn't work until I added here? despite adding to asymmetric all? something about dependency chain
-    - membrane-v565 
-    #- membrane-v566
-    - membrane-v564
-    - membrane-v563
-    - membrane-v562
-    - membrane-v604 # NBFIX test
   dilute:
     - membrane-v542
   symmetric_all:
@@ -341,7 +233,6 @@ collections:
   asymmetric_all:
     - membrane-v536
     - membrane-v538
-    - membrane-v599
     - membrane-v530
     - membrane-v542
     - membrane-v531
@@ -353,37 +244,9 @@ collections:
     - membrane-v538
     - membrane-v530
     - membrane-v531
-    - membrane-v562 #
-    - membrane-v563 #
     - membrane-v533
     - membrane-v532
-    - membrane-v564 #
-    - membrane-v565 #
-    #- membrane-v566 #
     - membrane-v534
-    - membrane-v599
-  best:
-    - membrane-v532
-  best_compare:
-    - membrane-v531
-    - membrane-v532
-  short_rdfs:
-    - membrane-v509
-    - membrane-v510
-    - membrane-v511
-    - membrane-v530
-    - membrane-v531
-    - membrane-v532
-    - membrane-v533
-    - membrane-v534
-    - membrane-v514
-    - membrane-v515
-    - membrane-v536
-    - membrane-v538
-    - membrane-v543
-    - membrane-v599
-    - membrane-v564
-    - membrane-v562
 
 meta:
   short_namer: 'lambda sn,spot=None: ''v''+re.findall(''membrane-v([0-9]+)'',sn)[0]'
@@ -437,42 +300,7 @@ meta:
     ion_label:          "$\\mathrm{{Mg}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ptdins_resname:      PI2P
-  membrane-v562:
-    composition_name:    asymmetric
-    cation:              MG
-    anion:               CL
-    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
-    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
-    ptdins_resname:      PI2P
-  membrane-v563:
-    composition_name:    asymmetric
-    cation:              MG
-    anion:               CL
-    ion_label:          "$\\mathrm{{Mg}^{2+}}$"
-    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
-    ptdins_resname:      PI2P
   membrane-v532:
-    composition_name:    asymmetric
-    cation:              Cal
-    anion:               CL
-    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
-    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
-    ptdins_resname:      PI2P
-  membrane-v564:
-    composition_name:    asymmetric
-    cation:              Cal
-    anion:               CL
-    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
-    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
-    ptdins_resname:      PI2P
-  membrane-v565:
-    composition_name:    asymmetric
-    cation:              Cal
-    anion:               CL
-    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
-    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
-    ptdins_resname:      PI2P
-  membrane-v566:
     composition_name:    asymmetric
     cation:              Cal
     anion:               CL
@@ -527,20 +355,6 @@ meta:
     ion_label:          "$\\mathrm{{Na}^{+},{Ca}^{2+}}$"
     ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
     ptdins_resname:      PI2P
-  membrane-v599:
-    composition_name:    asymmetric
-    cation:              "Cal"
-    anion:               CL
-    ion_label:          "$\\mathrm{{Ca}^{2+}}$"
-    ptdins_label:       "$\\mathrm{{PI}}$"
-    ptdins_resname:      SAPI
-  membrane-v604:
-    composition_name:    symmetric
-    cation:              NA
-    anion:               CL
-    ion_label:          "$\\mathrm{{Na}^{+}}$"
-    ptdins_label:       "$\\mathrm{{PI(4,5)P}_{2}}$"
-    ptdins_resname:      PI2P
 
 calculations:
   lipid_abstractor:
@@ -555,38 +369,10 @@ calculations:
             monolayer_cutoff: 1.85
             resnames: +selectors/resnames_lipid
             type: com
-            separator:
-              cluster: True 
-              cluster_neighbors: 3
-              topologize_tolerance: 0.1
-              lipid_tip: "(not resname CHL1 and name P)"
           lipid_chol_com:
             monolayer_cutoff: 1.4
             resnames: +selectors/resnames_lipid_chol
             type: com
-            separator:
-              cluster: True 
-              cluster_neighbors: 3
-              topologize_tolerance: 0.1
-              lipid_tip: "(not resname CHL1 and name P) or (resname CHL1 and name H3')"
-          lipid_chol_com_headless:
-            monolayer_cutoff: 0.8
-            resnames: +selectors/resnames_lipid_chol
-            # custom code in python must create the MDAnalysis-compatible "selstring" text
-            type: custom
-            custom: |
-              sel_all = uni.select_atoms('all')
-              sel_lipids = ' or '.join(['resname %s'%i for i in selector['resnames']])
-              sel_tail_names = ' or '.join(['name %s'%j for j in [
-                i for i in np.unique(sel_all.names) if re.match('^C(2|3)\d{2,}',i)]])
-              selstring = '(not name H*) and ((%s) or ((%s) and (%s)))'%(
-                'resname CHL1',sel_lipids,sel_tail_names)
-            selection: +selectors/headless_selection
-            separator:
-              cluster: True 
-              cluster_neighbors: 3
-              topologize_tolerance: 0.1
-              lipid_tip: "(not resname CHL1 and name P) or (resname CHL1 and name H3')"
   undulations:
     uptype: post
     slice_name: current
@@ -601,6 +387,7 @@ calculations:
       upstream:
         lipid_abstractor:
           selector: lipid_com
+aside:
   lipid_mesh:
     uptype: post
     slice_name: current
@@ -613,7 +400,6 @@ calculations:
             loop:
               - lipid_com
               - lipid_chol_com
-              - lipid_chol_com_headless
   hydrogen_bonding:
     group: all
     uptype: simulation
@@ -643,7 +429,6 @@ calculations:
                 loop:
                   - lipid_com
                   - lipid_chol_com
-                  - lipid_chol_com_headless
   lipid_mesh_partners:
     uptype: simulation
     slice_name: current
@@ -657,7 +442,6 @@ calculations:
                 loop:
                   - lipid_com
                   - lipid_chol_com
-                  - lipid_chol_com_headless
   head_angle:
     uptype: simulation
     slice_name: current
@@ -692,6 +476,16 @@ calculations:
     collections: all
     slice_name: current
     group: all
+  diffusion_lipids:
+    uptype: post
+    slice_name: current
+    collections:
+      - all
+    specs:
+      diffusion_skip: 1
+      upstream:
+        lipid_abstractor:
+          selector: lipid_chol_com
   lipid_areas3d:
     uptype: simulation
     slice_name: current
@@ -705,6 +499,31 @@ calculations:
                 loop:
                   - lipid_com
                   - lipid_chol_com
+  electron_density_profile:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      bin_size: 0.1
+      selector:
+        monolayer_cutoff: 1.4
+        resnames: +selectors/resnames_lipid_chol
+        type: com
+  lipid_order:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: asymmetric
+calculations_aside:
+  salt_bridges_lipid_lipid:
+    group: all
+    uptype: simulation
+    slice_name: current
+    collections: all
+    specs:
+      distance_cutoff: 3.4
+calculations_aside:
   ion_binding:
     group: all
     uptype: simulation
@@ -723,7 +542,7 @@ calculations:
       upstream:
         ion_binding: {}
       zonecut:
-        loop: [1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.6,5.0,3.05]
+        loop: [1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.6,5.0]
   ion_binding_norms:
     uptype: post
     slice_name: current
@@ -740,63 +559,6 @@ calculations:
           upstream:
             lipid_abstractor:
               selector: lipid_com
-  electron_density_profiles:
-    group: all
-    slice_name: current
-    collections: all
-    specs:
-      upstream:
-        lipid_abstractor:
-          selector: lipid_chol_com
-      bin_size: 0.05
-      selector:
-        monolayer_cutoff: 1.4
-        resnames: +selectors/resnames_lipid_chol
-        type: com
-
-  diffusion_lipids:
-    uptype: post
-    slice_name: current
-    collections:
-      - all
-    specs:
-      diffusion_skip: 1
-      upstream:
-        lipid_abstractor:
-          selector: lipid_chol_com
-
-  lipid_rdfs:
-    slice_name: current
-    collections: long
-    specs:
-      upstream:
-        lipid_abstractor:
-          selector: 
-            loop: [lipid_chol_com, lipid_chol_com_headless]
-      cutoff: 20.0
-      binsize: 0.05
-
-  lipid_rdfs_detail:
-    slice_name: current
-    #! changed from long to all on 2020.03.08 to get rdfs
-    collections: short_rdfs
-    specs:
-      upstream:
-        lipid_abstractor:
-          selector: 
-            loop: [lipid_chol_com_headless]
-      cutoff: 20.0
-      binsize: 0.05
-
-calculations_retired_or_discarded:
-
-  salt_bridges_lipid_lipid:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      distance_cutoff: 3.4
   #! too many combinations! hits memory
   contacts:
     group: all
@@ -807,47 +569,25 @@ calculations_retired_or_discarded:
       object: lipid
       cutoff:
         loop: [3.4]
-  # deprecated
-  electron_density_profile:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: all
-    specs:
-      bin_size: 0.1
-      selector:
-        monolayer_cutoff: 1.4
-        resnames: +selectors/resnames_lipid_chol
-        type: com
-  lipid_order:
-    group: all
-    uptype: simulation
-    slice_name: current
-    collections: asymmetric
 
 plots:
   undulations_ptdins: 
     calculation: undulations
   undulations:
     calculation: undulations
-  ion_binding_original:
-    collections: asymmetric_all
-    script: plot-ptdins_ion_binding_original.py
+  ion_binding:
     calculation: 
       ion_binding: {}
       ion_binding_combinator:
         zonecut: 2.2
-      #!? ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
-  hydrogen_bonding_standard:
-    #! rename was necessary for lipid_lipid_bonds_analysis, which was otherwise redirecting here!
-    script: plot-hydrogen_bonding.py
-    plotload_version: 1
+      # ion_binding_norms: {'upstream':{'ion_binding_combinator':{'zonecut':2.2},'lipid_mesh':{'upstream':{'lipid_abstractor':{'selector':'lipid_com'}}},'ion_binding':None}}
+  hydrogen_bonding:
     calculation: hydrogen_bonding
     collections: all
     specs:
       press_routine:
-        #- summary
-        #- interesting
+        # - summary
+        # - interesting
         - snapshot_examples
       # a set of interesting comparisons we can single-out from the large summary data
       interesting:
@@ -863,14 +603,6 @@ plots:
           'pairs':[['DOPE','DOPE'],['DOPS','DOPE'],['PtdIns','DOPE']],'bond_type':'both'}
         v6: {'comparison':'position','cation':'Cal','pairname':'dope','symmetric':1,
           'pairs':[['DOPE','DOPE'],['DOPS','DOPE'],['PtdIns','DOPE']],'bond_type':'hbonds'}
-        # added magnesium for lipid_lipid_bonds
-        v3m: {'comparison':'asymmetric_all','cation':'Mg','pairname':'chl1','symmetric':1,
-          'pairs':[['DOPE','CHL1'],['DOPS','CHL1'],['PtdIns','CHL1']],'bond_type':'hbonds'}
-        v4m: {'comparison':'position','cation':'Mg','pairname':'pip2','symmetric':1,
-          'pairs':[['DOPE','PtdIns'],['DOPS','PtdIns'],['PtdIns','PtdIns']],'bond_type':'hbonds'}
-        v6m: {'comparison':'position','cation':'Mg','pairname':'dope','symmetric':1,
-          'pairs':[['DOPE','DOPE'],['DOPS','DOPE'],['PtdIns','DOPE']],'bond_type':'hbonds'}
-
       # matching up snapshots 
       snapshot_examples:
         # loop over groupings
@@ -943,17 +675,9 @@ plots:
         distance_cutoff: 2.2
     collections: all
   lipid_areas2d:
-    collections: all
     calculation:
       lipid_areas2d:
-        upstream:
-          lipid_mesh:
-            upstream:
-              lipid_abstractor:
-                selector: 
-                  loop:
-                    - lipid_com
-                    - lipid_chol_com
+        selector: lipid_com
   hydration:
     calculation: 
       hydration:
@@ -1030,7 +754,6 @@ plots:
         selector: lipid_chol_com
   load_mesh:
     # a one-off plot with no script to load a single mesh object
-    collections: asymmetric_all
     calculation:
       lipid_mesh:
         upstream: 
@@ -1063,8 +786,6 @@ plots:
     calculation:
       diffusion_lipids: {}
   ptdins_lipid_areas:
-    #! previously omitted collections but now we must be explicit
-    collections: all
     autoplot: True
     calculation:
       lipid_areas3d:
@@ -1072,194 +793,16 @@ plots:
           lipid_mesh:
             upstream:
               lipid_abstractor:
-                selector: 
-                  lipid_com
+                selector: lipid_com
       lipid_areas2d:
         upstream:
           lipid_mesh:
             upstream:
               lipid_abstractor:
-                selector: lipid_chol_com_headless
+                selector: lipid_com
   ptdins_snapshots2:
     collections: all
     # need a calculation to get filenames
     calculation: 
-      lipid_abstractor:
-        selector: lipid_com
-  lipid_lipid_bonds_analysis:
-    autoplot: True
-    script: lipid_lipid_bonds_analysis.py
-    collections: asymmetric_all_no_mixed
-    calculation:
-      hydrogen_bonding: {}
-      salt_bridges:
-        distance_cutoff: 2.2
-  lipid_lipid_bonds: # newest!
-    autoplot: True
-    script: lipid_lipid_bonds.py
-    collections: asymmetric_all_no_mixed
-    calculation:
-      hydrogen_bonding: {}
-      salt_bridges:
-        # can be 3.4 or 4.6A
-        distance_cutoff: 3.4
-    specs:
-      images: # previously v4, v6, v3, taken from plot-hydrogen_bonding.py
-        - v4: 
-          - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v532.fr363.798_794_o6.png
-          - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v532.fr3.773_775_o7.png
-          #- fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v534.fr23.793_790_o0.png
-        - v6:
-          - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr16.536_770_o5.png
-          - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v532.fr0.790_644_o6.png
-          #- fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v534.fr89.647_791_o4.png
-        - v3:
-          - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v532.fr63.378_791_o1.png
-          - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v532.fr487.322_774_o4.png
-          #- fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v534.fr1.472_790_o8.png
-        - v4m: 
-          - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v531.fr4.773_776_o1.png
-          - fig.hydrogen_bonding.v14_ptdins_with_chl1/fig.snapshot.membrane-v531.fr11.778_772_o2.png
-        - v6m:
-          - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v531.fr5.774_562_o5.png
-          - fig.hydrogen_bonding.v14_ptdins_dope_with_chl1/fig.snapshot.membrane-v531.fr19.607_780_o6.png
-        - v3m:
-          - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v531.fr0.353_777_o5.png
-          - fig.hydrogen_bonding.v14_ptdins_chl1_with_dope_chl1/fig.snapshot.membrane-v531.fr23.381_792_o8.png
-
-  lipid_area_analysis:
-    autoplot: True
-    plotload_version: 2
-    script: lipid_area_analysis.py
-    collections: asymmetric_all
-    calculation:
-      lipid_areas2d:
-        upstream:
-          lipid_mesh:
-            upstream:
-              lipid_abstractor:
-                selector: 
-                  loop:
-                    - lipid_com
-                    - lipid_chol_com
-                    - lipid_chol_com_headless
-  ptdins_electron_density_profiles:
-    autoplot: True
-    plotload_version: 2
-    calculations: electron_density_profiles
-    collections: all
-    slice_name: current
-    group: all
-    script: ptdins_electron_density_profiles.py
-  ion_binding_ASIDE:
-    autoplot: True
-    plotload_version: 2
-    collections: asymmetric_all
-    script: plot-ptdins_ion_binding.py
-    calculation: 
-      ion_binding: {}
-      ion_binding_combinator:
-        zonecut: 2.2
-      electron_density_profiles: {}
-  # special for per-ion cutoffs
-  ion_binding:
-    autoplot: True
-    plotload_version: 2
-    collections: all
-    script: plot-ptdins_ion_binding.py
-    calculation: 
-      ion_binding: {}
-      ion_binding_combinator:
-        # cannot multiplex the bonds here
-        zonecut: 
-          loop:
-            [3.0,3.05,2.3,2.6]
-      electron_density_profiles: {}
-  ptdins_celltest:
-    autoplot: True
-    plotload_version: 2
-    script: ptdins_voronoi_snapshots.py
-    collections: best_compare
-    calculations:
-      lipid_mesh:
-        upstream:
-          lipid_abstractor:
-            selector: lipid_com
-
-  ptdins_composition_table: 
-    #! doesn't matter which calculation
-    calculation: 
-      lipid_abstractor:
-        selector: lipid_chol_com
-    collections: all
-    #! use version 1 because no extras otherwise
-    plotload_version: 1
-    autoplot: True
-  
-  #! do the RDFs?
-  #! extreme bug. I had data,calc = plotload and it failed because we were on plotload_version 2 and then I ran... oh wait I ran the wrong one
-
-  video_maker:
-    script: video_maker.py
-    autoplot: True
-    collections: another
-    #! calculation only for slices
-    calculation:
-      lipid_abstractor:
-        selector: lipid_com
-    specs:
-      scene: video_scene_ptdins.py
-
-  breakage: 
-    script: plot-ptdins_review_cluster_breakage.py
-    calculation: 
-      lipid_mesh:
-        upstream:
-          lipid_abstractor:
-            selector: lipid_com
-    collections: long
-    plotload_version: 2
-    autoplot: True
-
-  percolate: 
-    script: plot-ptdins_percolate.py
-    collections: long
-    plotload_version: 2
-    autoplot: True
-    calculation: 
-      lipid_mesh:
-        upstream:
-          lipid_abstractor:
-            selector: lipid_com
-  lipid_rdfs:
-    autoplot: True
-    collections: long
-    calculation:
-      lipid_rdfs:
-        upstream:
-          lipid_abstractor:
-            selector:
-              loop: 
-                - lipid_chol_com 
-                - lipid_chol_com_headless
-
-  lipid_rdfs_ptdins:
-    autoplot: True
-    #! changed from long to all on 2020.03.08 to get rdfs
-    collections: short_rdfs
-    calculation:
-      lipid_rdfs_detail:
-        upstream:
-          lipid_abstractor:
-            selector:
-              loop: 
-                - lipid_chol_com 
-                - lipid_chol_com_headless
-
-  lipid_area_converge:
-    autoplot: True
-    script: plot-lipid_area_converge.py
-    collections: all
-    calculation:
       lipid_abstractor:
         selector: lipid_com

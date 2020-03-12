@@ -251,7 +251,7 @@ if __name__=='__main__':
 
 	# several layouts (iterate manually for now)
 	layout = ['comprehensive','physiological_with_EDPs','simple_snapshot',
-		'physiological_long'][-1]
+		'physiological_long'][0]
 
 	# hatching shennanigans in various matplotlib versions
 	mpl.rcParams['hatch.linewidth'] = 3.0
@@ -271,7 +271,8 @@ if __name__=='__main__':
 	# binding6 below is the new physiological-only plot
 	picname = 'fig.ion_binding6%s%s'%(descriptor,'' if not multiplexed_cutoffs else '.special')
 	if layout=='simple_snapshot': picname = 'fig.ion_binding_toc'
-	if layout=='comprehensive': picname = 'fig.ion_binding7'
+	# rolled 7 to 8 when I added v604
+	if layout=='comprehensive': picname = 'fig.ion_binding8'
 
 	# aesthetics
 	global art
@@ -282,7 +283,9 @@ if __name__=='__main__':
 	# selections
 	if layout=='comprehensive':
 		art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':14},}
-		sns_sep = [work.vars['orders']['canon']['symmetric'],work.vars['orders']['canon']['asymmetric']]
+		#! added v604
+		sns_sep = [work.vars['orders']['canon']['symmetric'],['membrane-v604']
+			+work.vars['orders']['canon']['asymmetric']]
 		titles = ['symmetric','physiological']
 		sns = sns_sep[0]+sns_sep[1]
 		do_time_ticks = None

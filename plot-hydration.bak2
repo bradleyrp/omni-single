@@ -1,0 +1,203 @@
+#!/usr/bin/env python
+
+"""
+Plot hydration shell statistics.
+Requires standard plots.
+"""
+
+#---block: what to plot
+do_strict = False
+routine = ['basic','heatmap'][:1]
+sns = work.sns()
+sns = [sn for sn in work.sns() if sn in 
+	work.vars['collections']['asymmetric']+work.vars['collections']['position']
+	and work.meta[sn]['cation'] in ['Cal','MG']]
+#---choosing a scanning range
+roundlev = 4  
+plotspecs = [
+	{'errorbar_style':'confidence','interval':0.1,'xmin':1.2,'xmax':4.0},
+	{'errorbar_style':'confidence','interval':0.05,'xmin':1.2,'xmax':4.0},
+	{'errorbar_style':'confidence','interval':0.2,'xmin':1.2,'xmax':4.0},]
+hydration_scan = np.unique(np.concatenate([
+	np.arange(plotspec['xmin'],plotspec['xmax']+plotspec['interval'],plotspec['interval']).round(roundlev)
+	for plotspec in plotspecs]))
+
+#---block: load the calculation data
+if 'data' not in globals(): 
+	data,calc = plotload(plotname,work)
+
+#---block: remote work!
+if True:
+	pass	
+
+#---block: organize the data by cutoffs
+if 'postdat' not in globals():
+
+	#---warnings are errors
+	if do_strict:
+		import warnings
+		warnings.filterwarnings('error')
+
+	postdat = {}
+	for sn in sns:
+		dat = data[sn]['data']
+		nframes = dat['nframes']
+		near_lipids = dat['near_lipids']
+		shell_counts = dat['shell_counts']
+		frames_inds = np.arange(dat['nframes'])
+
+		valid_frames = np.intersect1d(dat['valid_frames_shell_counts'],dat['valid_frames_near_lipids'])
+		ind_map_shell_counts = np.in1d(dat['valid_frames_shell_counts'],valid_frames)
+		ind_map_near_lipids = np.in1d(dat['valid_frames_near_lipids'],valid_frames)
+		nframes_eff = len(valid_frames)
+
+		nears = near_lipids[ind_map_near_lipids]
+		counts = shell_counts[ind_map_shell_counts]
+
+		#---cutoff sweep in angstroms
+		lenscale = 10.0
+		#---loop over pairs (wrote this hasty)
+		pair_inds = (np.arange(0,2*len(hydration_scan))/2)[1:-1].reshape((-1,2))
+		dat = {}
+		for ii,i in enumerate(pair_inds):
+			status('correlating hydration by distance for %s'%sn,i=ii,looplen=len(pair_inds),tag='compute')
+			lims = tuple([hydration_scan[j]/lenscale for j in i])
+			#---loop over frames
+			counts_by_frame = []
+			#---! cannot vectorize this quickly. worth revisiting
+			for fr in range(nframes_eff):
+				counts_this = counts[fr][np.where(np.all((nears[fr]>=lims[0],nears[fr]<lims[1]),axis=0))[0]]
+				counts_by_frame.extend(counts_this)
+			dat[lims] = np.array(counts_by_frame)
+		postdat[sn] = dat
+
+	#---make a copy for transmission
+	reform = dict([('%s_%.4f_%.4f'%(sn,i[0],i[1]),j) 
+		for sn in postdat for i,j in postdat[sn].items()])
+	attrs = dict(sns=sns,meta=work.meta,vars=work.vars)
+	work.store(reform,'hydration.dat','~',attrs=attrs)
+	
+#---block: plot the hydration versus distance
+if 'basic' in routine:
+	
+	#---plot schemes
+	for spec in plotspecs: 
+		symbols = {}
+		for sn in sns:
+			if work.meta[sn]['ptdins_resname']=='P35P': symbols[sn] = 's'
+			elif work.meta[sn]['cation']=="Na,Cal": symbols[sn] = 'x'
+			else: symbols[sn] = 'o'
+		figsize=(5,5)
+		layout = {'out':{'grid':[1,1]},'ins':[{'grid':[1,1]}]}
+		axes,fig = panelplot(layout,figsize=figsize)
+		ax = axes[0]
+		x_collects = []
+		for sn in sns:
+			dat = postdat[sn]
+			hydration_scan_plot = np.arange(plotspec['xmin'],plotspec['xmax']+
+				plotspec['interval'],plotspec['interval']).round(roundlev)
+			#---reference x values in angstroms
+			x = hydration_scan_plot[1:]
+			x_pairs = np.array([(hydration_scan_plot[i:i+2]/lenscale) 
+				for i in range(len(hydration_scan_plot)-1)]).round(roundlev)
+			y = np.array([dat[tuple([np.round(i,roundlev) for i in xp])].mean() 
+				if len(dat[tuple([np.round(i,roundlev) for i in xp])])>0 
+				else -1 for xp in x_pairs])
+			y_err = np.array([dat[tuple([np.round(i,roundlev) for i in xp])].std() 
+				if len(dat[tuple([np.round(i,roundlev) for i in xp])])>0 
+				else -1 for xp in x_pairs])
+			valid = np.where(y!=-1.0)
+			color = colorize(work.meta[sn],comparison='protonation')
+			kwargs = dict(ms=5,color=color,
+				label='%s, %s'%(work.meta[sn]['ptdins_label'],work.meta[sn]['ion_label']))
+			ax.plot(x[valid],y[valid],'.',**kwargs)
+			kwargs.pop('ms')
+			kwargs.update(alpha=0.2,lw=0)
+			ax.fill_between(x[valid],y[valid]-y_err[valid],y[valid]+y_err[valid],**kwargs)
+			x_collects.extend(x[valid])
+		ax.set_xticks(x)
+		ax.set_xticklabels(['%.1f'%i for i in x],rotation=90)
+		ax.set_xlim(np.array(x_collects).min()-distance_interval,np.array(x_collects).max())
+		error_bar_tag = {None:'.no_error_bars','basic':'.error_bars','confidence':'.interval'}[
+			spec['errorbar_style']]
+		fn_fig = 'fig.hydration.interval_%s'%plotspec['interval']
+		ax.set_ylabel('waters in the hydration shell')
+		ax.set_xlabel('cation-lipid distance ($\mathrm{\AA}$)')
+		if False: legend = ax.legend()
+		picturesave(fn_fig,work.plotdir,backup=False,version=True,meta=spec)
+
+#---block: plot heat maps of the hydration versus distance
+if 'heatmap' in routine:
+
+	#---reformulate the counts by zone
+	reform = {}
+	for sn in sns:
+		dat = postdat[sn]
+		keys = np.array([key for key,val in dat.items()])
+		keys = keys[np.argsort(keys[:,0])]
+		max_hydration = 10.0
+		xvals = keys[:,1]
+		yvals = np.arange(0,max_hydration)
+		heat = np.zeros((len(keys),len(yvals)-1))
+		for keynum,key in enumerate(keys):
+			counts,bins = np.histogram(dat[tuple(key)],bins=yvals)
+			heat[keynum] = counts#/counts.sum().astype(float)
+		heat[np.isnan(heat)] = 0
+		reform[sn] = {'heat':heat,'r':xvals}
+	maxz = max([r['heat'].max() for r in reform.values()])
+	maxz = None
+
+	#---filter distances
+	if not all([np.all(reform[sn]['r']==reform[sns[0]]['r']) for sn in sns]):
+		raise Exception('inconsistent cutoffs from hydration data')
+
+	xvals_filter = np.array([0.14,0.16,0.18,0.2,0.22,0.24,0.26,0.28,
+		0.3,0.32,0.34,0.36,0.38,0.4,1.,1.4,1.8,2.2,2.6,2.8])
+	distance_inds = np.where(np.in1d(xvals,xvals_filter))
+	vlines = [0.4]
+
+	figsize=(5,5)
+	colormap = 'plasma'
+	layout_name = 'summary2'
+	aspect_equal = False
+	layout = figlayout[layout_name]
+	for ii,i in enumerate(layout['ins']): 
+		layout['ins'][ii]['wspace'] = None
+		layout['ins'][ii]['hspace'] = None
+
+	axes,fig = panelplot(layout=layout,figsize=(12,16))
+	for snum,sn in enumerate(sns):
+
+		axrow,axcol = figplacer(sn,figplace[layout_name])
+		ax = axes[axrow][axcol]
+		heat,xvals = [reform[sn][i] for i in ['heat','r']]
+		#---filter the distances
+		heat = heat[distance_inds]
+		xvals = xvals[distance_inds]
+		kwargs = dict(extent=[0,len(xvals),0,yvals.max()+1],cmap=mpl.cm.__dict__[colormap])
+		if maxz: kwargs.update(vmin=0,vmax=maxz)
+		ax.imshow(heat.T,origin='lower',interpolation='nearest',**kwargs)
+		ax.set_xticks(np.arange(len(xvals))+1)
+		ax.set_xticklabels(xvals,rotation=90,fontsize=6)
+		ax.set_yticks(yvals+0.5)
+		ax.set_yticklabels(['%d'%i for i in yvals+1])
+		if aspect_equal:
+			x0,x1 = ax.get_xlim()
+			y0,y1 = ax.get_ylim()
+			ax.set_aspect((x1-x0)/(y1-y0))
+		#---add vertical lines to denote changes in the step
+		if not vlines:
+			gaps = (xvals[1:]-xvals[:-1]).round(3)
+			for xval in xvals[np.where((gaps[1:]-gaps[:-1])!=0.0)]: 
+				x = np.where(xvals==xvals[np.where((gaps[1:]-gaps[:-1])!=0.0)])[0]+2
+				ax.axvline(x,c='k',lw=1.5)
+		else:
+			for vline in vlines: ax.axvline(np.where(xvals==vline)[0]+1,c='k',lw=1.5)
+		#---dislike tick marks
+		ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='on')
+		ax.tick_params(axis='x',which='both',top='off',bottom='off',labelbottom='on')
+		ax.set_title('%s and %s%s'%(work.meta[sn]['ion_label'],work.meta[sn]['ptdins_label'],
+			' (phys)' if work.meta[sn]['composition_name']=='asymmetric' else ''))
+	blank_unused_axes(axes,fig,figplace[layout_name])
+	fn_fig = 'fig.hydration_review'
+	picturesave(fn_fig,work.plotdir,backup=False,version=True,meta={})
