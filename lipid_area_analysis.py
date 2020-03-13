@@ -99,6 +99,11 @@ if __name__=='__main__':
 					if custom_hatches:
 						vp = sb.violinplot(ax=ax,data=dists,palette=palette,
 							labels=labels,linewidth=0,hatches=hatches)
+						ii = 0
+						for i in vp.get_children():
+							if isinstance(i, mpl.collections.PolyCollection):
+								i.set_hatch(hatches[ii])
+								ii += 1
 					else:
 						#! check the distributions more carefully with a standard violin plot with whiskers
 						vp = sb.violinplot(ax=ax,data=dists,palette=palette,
@@ -124,4 +129,4 @@ if __name__=='__main__':
 			frame.set_facecolor('w')
 			extras = [legend]
 			meta = {'lipid_abstractor_selector':abstractor_name,'averaging_method':average_method}
-			picturesave('fig.lipid_areas2d',work.plotdir,backup=False,version=True,meta=meta,extras=extras,form='svg')
+			picturesave('fig.lipid_areas2d',work.plotdir,backup=False,version=True,meta=meta,extras=extras,form='pdf')

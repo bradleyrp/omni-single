@@ -1160,7 +1160,7 @@ plots:
     autoplot: True
     plotload_version: 2
     script: lipid_area_analysis.py
-    collections: asymmetric_all
+    collections: asymmetric_all_no_mixed_no_na_short_only
     calculation:
       lipid_areas2d:
         upstream:
