@@ -290,7 +290,7 @@ if __name__=='__main__':
 	if layout=='comprehensive':
 		art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':14},}
 		#! added v604
-		sns_sep = [work.vars['orders']['canon']['symmetric'],#! new ['membrane-v604']+
+		sns_sep = [work.vars['orders']['canon']['symmetric'],
 			work.vars['orders']['canon']['asymmetric']]
 		titles = ['symmetric','physiological']
 		sns = sns_sep[0]+sns_sep[1]
