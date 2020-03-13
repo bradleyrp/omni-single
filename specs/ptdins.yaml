@@ -384,6 +384,13 @@ collections:
     - membrane-v533
     - membrane-v534
     - membrane-v599
+  asymmetric_all_no_mixed_no_na_short_only:
+    - membrane-v538
+    - membrane-v531 #
+    - membrane-v532 #
+    - membrane-v533
+    - membrane-v534
+    - membrane-v599
   best:
     - membrane-v532
   best_compare:
@@ -1119,7 +1126,7 @@ plots:
   lipid_lipid_bonds: # newest!
     autoplot: True
     script: lipid_lipid_bonds.py
-    collections: asymmetric_all_no_mixed_no_na
+    collections: asymmetric_all_no_mixed_no_na_short_only
     calculation:
       hydrogen_bonding: {}
       salt_bridges:

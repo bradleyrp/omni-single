@@ -363,7 +363,7 @@ class PlotBonds:
 						top not in self.index and top[::-1] not in self.index):
 						continue
 					#! two options from a merge
-					if False:
+					if 1:
 						# custom axis handling
 						if self.custom_axes:
 							if (r1,r2) not in self.axes_mapping: continue
@@ -512,7 +512,7 @@ def manuscript_plot():
 	2c: fixed the hatching
 	2d: added salt bridge bar plots
 	"""
-	rows_extras = ['hbonds','salt'][:]
+	rows_extras = ['hbonds','salt'][:1]
 	layout_name = 'layout_2d' # went from layout_2b to layout_2c to correct hatching problem on the former
 	#! actually we wstill need "interesting" from earlier
 	interesting = work.metadata.plots['hydrogen_bonding_standard']['specs']['interesting']
@@ -538,7 +538,6 @@ def manuscript_plot():
 		axes_counts = [axes[0],axes[1]]
 		axes_snapshots = [m for n in [axes[i] for i in [2,3,4]] for m in n]
 	else: raise Exception
-
 
 	legends = []
 	matches = work.metadata.plots['lipid_lipid_bonds']['specs']['images']
@@ -630,7 +629,9 @@ def manuscript_plot():
 			{1:'.merged',0:''}[merged]+{1:'.symmetric',0:''}[symmetric])
 		sb.set_style("white")
 		axes_mapping = {('PtdIns','PtdIns'):0,('DOPS','PtdIns'):1,('DOPE','PtdIns'):2,('CHL1','PtdIns'):3,}
-		sns_custom = ['membrane-v536','membrane-v538','membrane-v531',
+		if 0: sns_custom = ['membrane-v536','membrane-v538','membrane-v531',
+			'membrane-v533','membrane-v599','membrane-v532','membrane-v534']
+		sns_custom = ['membrane-v538','membrane-v531',
 			'membrane-v533','membrane-v599','membrane-v532','membrane-v534']
 		#! global pb
 		pb = PlotBonds(dims=(1,0),name=name_this,dataspec=spec_this,
@@ -668,11 +669,11 @@ def manuscript_plot():
 			y_axis_align=False,y_axis_label=True,sns_custom=sns_custom,
 			custom_axes=dict(fig=fig,axes_reorder=axes_reorder,axes_mapping=axes_mapping))
 		legends.append(pb.make_legend(ax=ax_legend,ncol=1,fancy=pb.style=='bars'))
-	picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,form='svg',
+	picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,form='pdf',
 		backup=False,version=True,meta={},extras=legends)
 
-#! plotrun.routine = None
-plotrun.routine = []
+plotrun.routine = None
+#! plotrun.routine = []
 
 #!!!!!!!!! manuscript_plot() is a thing you could run to get e.g. fig.bonding_subset.layout_2d.v1.svg
 
