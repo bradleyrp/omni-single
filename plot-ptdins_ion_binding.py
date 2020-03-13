@@ -154,7 +154,7 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 			#extras.append(tb)
 			if labeler==None:
 				#! hacking to move labels on the symmetric. tuned it manually
-				if 'membrane-v509' in sns: extra_drop = 20.0
+				if 'membrane-v511' in sns: extra_drop = 20.0
 				else: extra_drop = 0.0
 				print('extra drop is %s'%str(extra_drop))
 				## HACKING FOR BPS
@@ -222,10 +222,13 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 	# custom legend on the second plot
 	if do_legend:
 		legend_labels,legend_patches = [],[]
-		if not ion_names: ion_names = ['K','NA','MG','Cal']
+		if not ion_names: 
+			#! ion_names = ['K','NA','MG','Cal']
+			ion_names = ['MG','Cal']
 		marks_sns = [sn for sn in [m[0] for m in [[sn for sn in sns 
 			if work.meta[sn]['cation']==i and work.meta[sn].get('cations',i)==i] for i in ion_names] if m]]
 		for nn,name in enumerate(ion_names):
+			print((ion_names,nn,marks_sns))
 			legend_labels.append(work.meta[marks_sns[nn]]['ion_label'])
 			legend_patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,
 				facecolor=colors_ions[name],edgecolor=colors_ions[name],lw=2))
@@ -235,11 +238,13 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 		legend_patches.append(mpl.patches.Rectangle((0,0),1.0,1.0,fc='w',edgecolor='gray',hatch='///'))
 		if multiplexed_cutoffs:
 			# mild offset for the legend so it clears the tops
-			legend = ax.legend(legend_patches,legend_labels,loc='upper left',fontsize=art['fs']['legend'],
-			ncol=3,labelspacing=1.2,handleheight=2.0,markerscale=0.5,
+			legend = ax.legend(legend_patches,legend_labels,loc='upper left',
+				fontsize=art['fs']['legend'],ncol=art.get('legend_cols',3),
+				labelspacing=1.2,handleheight=2.0,markerscale=0.5,
 			bbox_to_anchor=(0.0,1.15 if not charge_scaled else 0.95))
 		else:
-			legend = ax.legend(legend_patches,legend_labels,loc='upper left',fontsize=art['fs']['legend'],
+			legend = ax.legend(legend_patches,legend_labels,loc='upper left',
+				fontsize=art['fs']['legend'],
 				ncol=2,labelspacing=1.2,handleheight=2.0,markerscale=0.5) 
 				#! shadow=True,fancybox=True)
 		frame = legend.get_frame()
@@ -251,7 +256,7 @@ if __name__=='__main__':
 
 	# several layouts (iterate manually for now)
 	layout = ['comprehensive','physiological_with_EDPs','simple_snapshot',
-		'physiological_long'][0]
+		'physiological_long','comprehensive_nbfix'][-1]
 
 	# hatching shennanigans in various matplotlib versions
 	mpl.rcParams['hatch.linewidth'] = 3.0
@@ -273,6 +278,7 @@ if __name__=='__main__':
 	if layout=='simple_snapshot': picname = 'fig.ion_binding_toc'
 	# rolled 7 to 8 when I added v604
 	if layout=='comprehensive': picname = 'fig.ion_binding8'
+	if layout=='comprehensive_nbfix': picname = 'fig.ion_binding9'
 
 	# aesthetics
 	global art
@@ -284,8 +290,16 @@ if __name__=='__main__':
 	if layout=='comprehensive':
 		art = {'fs':{'legend':14,'title':20,'tags':14,'axlabel':14},}
 		#! added v604
-		sns_sep = [work.vars['orders']['canon']['symmetric'],['membrane-v604']
-			+work.vars['orders']['canon']['asymmetric']]
+		sns_sep = [work.vars['orders']['canon']['symmetric'],#! new ['membrane-v604']+
+			work.vars['orders']['canon']['asymmetric']]
+		titles = ['symmetric','physiological']
+		sns = sns_sep[0]+sns_sep[1]
+		do_time_ticks = None
+	elif layout=='comprehensive_nbfix':
+		art = {'fs':{'legend':16,'title':20,'tags':14,'axlabel':14},'legend_cols':2,}
+		#! added v604
+		sns_sep = [work.vars['orders']['canon']['symmetric_nbfix'],
+			['membrane-v604']+work.vars['orders']['canon']['asymmetric_nbfix']]
 		titles = ['symmetric','physiological']
 		sns = sns_sep[0]+sns_sep[1]
 		do_time_ticks = None
@@ -312,6 +326,13 @@ if __name__=='__main__':
 			'wspace':0.1},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
 		axes = [i for j in axes for i in j]
 		ymax = 0.
+	elif layout=='comprehensive_nbfix':
+		figsize = (14,10)
+		axes,fig = panelplot(figsize=figsize,
+			layout={'out':{'grid':[1,len(sns_sep)],'wratios':[len(s) for s in sns_sep],
+			'wspace':0.2},'ins':[{'grid':[1,1]},{'grid':[1,1]}]})
+		axes = [i for j in axes for i in j]
+		ymax = 0.
 	elif layout=='physiological_with_EDPs':
 		figsize = (16,14)
 		# dial in the wratio below to balance things
@@ -333,7 +354,7 @@ if __name__=='__main__':
 	else: raise Exception
 
 	# main plot loop
-	if layout=='comprehensive':
+	if layout in ['comprehensive','comprehensive_nbfix']:
 		for anum,sns_this in enumerate(sns_sep):
 			ax = axes[anum]
 			detail = plot_ion_binding_waterfall(ax,sns_sep=[sns_this],zonecut=zonecut,extras=extras,
@@ -420,7 +441,7 @@ if __name__=='__main__':
 	else: raise Exception
 	# note that the weird plateau is legitimate; the plot is not cut off for v565
 	# leaflet norming also matches the axes for a direct comparison between compositions
-	if norm_leaflet and layout=='comprehensive':
+	if norm_leaflet and layout in ['comprehensive','comprehensive_nbfix']:
 		for ax in axes: ax.set_ylim((0,ymax))
 	# PDF method previously used to make hatches thicker
 	meta = {'zonecut':zonecut if not multiplexed_cutoffs else multiplexed_cutoffs,

@@ -30,12 +30,12 @@ def msd_fit(time,displacement,cuts=None,dims=3,factor=None):
 def diffusion_plots():
 	"""Plot different versions of the diffusion plot."""
 	#---simple version for main text
-	sns_this = ['membrane-v%3d'%i for i in [536,538,530,531,533,599,532,534]]
+	sns_this = ['membrane-v%3d'%i for i in [538,531,533,599,532,534]]
 	diffusion_plot(out_fn='diffusion_lipids',hatch_lw=2,
 		sns_this=sns_this)
 	#---comprehensive version for supplement with a space between groups
-	sns_l = ['membrane-v%3d'%i for i in [509,514,515,543,510,511]]
-	sns_r = ['membrane-v%3d'%i for i in [542,536,538,530,531,533,599,532,534]]
+	sns_l = ['membrane-v%3d'%i for i in [510,511]]
+	sns_r = ['membrane-v%3d'%i for i in [538,531,533,599,532,534]]
 	xtick_details = dict(xticks=np.cumsum([np.arange(len(i)).mean()+o 
 		for i,o in zip([sns_l,sns_r],[0,len(sns_l)-1.0])]),
 		xtick_labels=['symmetric','asymmetric'],
@@ -94,7 +94,7 @@ def diffusion_plot(sns_this,out_fn,spacer=None,hatch_lw=1.0,xtick_details=None):
 		sns_this=sns_this,bar_formats=bar_formats,comparison_spec=comparison_spec,fancy=False,
 		**kwargs)
 	picturesave('fig.%s'%out_fn,
-		work.plotdir,backup=False,version=True,meta={},extras=[legend],form='svg')
+		work.plotdir,backup=False,version=True,meta={},extras=[legend],form='pdf')
 
 @autoload(plotrun)
 def reload():

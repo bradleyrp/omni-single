@@ -157,6 +157,7 @@ slices:
       #! current_ions: {'pbc':'mol','groups':['ions'],'start':1000,'end':41000,'skip':1}
       #! current: {'pbc':'mol','groups':['all'],'start':1000,'end':41000,'skip':500}
       current: {'pbc':'mol','groups':['all'],'start':0,'end':50000,'skip':500}
+      current: {'pbc':'mol','groups':['all'],'start':10000,'end':70000,'skip':500}
 
 variables:
   force_field: charmm
@@ -268,6 +269,20 @@ variables:
         - membrane-v543
         - membrane-v510
         - membrane-v511
+      asymmetric_nbfix:
+        - membrane-v538
+        - membrane-v531
+        - membrane-v562 #
+        - membrane-v563 #
+        - membrane-v533
+        - membrane-v599
+        - membrane-v532
+        - membrane-v564 #
+        - membrane-v565 #
+        - membrane-v534
+      symmetric_nbfix: 
+        - membrane-v510
+        - membrane-v511
 
 collections:
   one:
@@ -360,6 +375,13 @@ collections:
     - membrane-v564 #
     - membrane-v565 #
     #- membrane-v566 #
+    - membrane-v534
+    - membrane-v599
+  asymmetric_all_no_mixed_no_na:
+    - membrane-v538
+    - membrane-v563 #
+    - membrane-v565 #
+    - membrane-v533
     - membrane-v534
     - membrane-v599
   best:
@@ -1097,7 +1119,7 @@ plots:
   lipid_lipid_bonds: # newest!
     autoplot: True
     script: lipid_lipid_bonds.py
-    collections: asymmetric_all_no_mixed
+    collections: asymmetric_all_no_mixed_no_na
     calculation:
       hydrogen_bonding: {}
       salt_bridges:

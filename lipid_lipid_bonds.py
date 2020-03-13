@@ -671,14 +671,14 @@ def manuscript_plot():
 	picturesave('fig.bonding_subset.%s'%layout_name,work.plotdir,form='svg',
 		backup=False,version=True,meta={},extras=legends)
 
-plotrun.routine = None
+#! plotrun.routine = None
 plotrun.routine = []
 
 #!!!!!!!!! manuscript_plot() is a thing you could run to get e.g. fig.bonding_subset.layout_2d.v1.svg
 
 #! being refactored below
 #! to make the big tile plots (the refactor was for the 4-panel subset), turn this block on and manually adjust the type below. also turn off the 4-tile plot
-if __name__=='__main__' and False:
+if __name__=='__main__':
 
 	"""
 	Catalog of atoms participating in various bonds.
@@ -703,7 +703,7 @@ if __name__=='__main__' and False:
 		lipid_atom_names = dict([(k,[i['atom'] for i in v['atoms']]) for k,v in lipid_struct_lib.items()])
 
 	# rerun this script with alternate salt bridge cutoffs in ptdins.yaml if desired
-	data_type = ['salt_bridges','hydrogen_bonding'][0]
+	data_type = ['salt_bridges','hydrogen_bonding'][1]
 	post_key = 'post_%s'%data_type
 	# collect atom counts for normalization
 	nmol_counts = dict([(sn,dict(zip(*[data['hydrogen_bonding'][sn]['data'][k] 
@@ -971,7 +971,7 @@ if __name__=='__main__' and False:
 		if data_type=='salt_bridges':
 			tag = '.cutoff%.1f'%calc['salt_bridges']['calcs']['specs']['distance_cutoff']
 		else: tag = ''
-		picturesave('fig.atomwise.%s'%data_type+tag,work.plotdir,form='svg',
+		picturesave('fig.atomwise.%s'%data_type+tag,work.plotdir,form='pdf',
 			backup=False,version=True,meta={},extras=extras)
 		#! document the careful matching where you confirmed that these results match the 
 		#!   results on the counts. possibly described in a comment above
@@ -997,7 +997,7 @@ def prep_atomwise():
 		# save all atom names for later filtering
 		lipid_atom_names = dict([(k,[i['atom'] for i in v['atoms']]) for k,v in lipid_struct_lib.items()])
 	# rerun this script with alternate salt bridge cutoffs in ptdins.yaml if desired
-	data_type = ['salt_bridges','hydrogen_bonding'][0]
+	data_type = ['salt_bridges','hydrogen_bonding'][1]
 	post_key = 'post_%s'%data_type
 	# collect atom counts for normalization
 	nmol_counts = dict([(sn,dict(zip(*[data['hydrogen_bonding'][sn]['data'][k] 
