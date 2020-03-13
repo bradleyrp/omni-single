@@ -342,7 +342,7 @@ plotrun.routine = None
 
 if __name__=='__main__':
 
-	if 0:
+	if 1:
 
 		art = {'fs':{'label':16,'title':20}}
 		mpl.rcParams['hatch.linewidth'] = 1.5
@@ -401,9 +401,12 @@ if __name__=='__main__':
 				area_compressibility[sn]['std'] = \
 					(factor*x.std(axis=0)/area2d.std(axis=0)**2/N_lipids*unit_factor).mean()
 
-		sns_collect = [['membrane-v%d'%i for i in j] for j in [
+		if 0: sns_collect = [['membrane-v%d'%i for i in j] for j in [
 			[509,514,515,510,511],
 			[538,536,530,531,533,599,532,534],]]
+		sns_collect = [['membrane-v%d'%i for i in j] for j in [
+			[510,511],
+			[538,531,533,599,532,534],]]
 		axes,fig = panelplot(figsize=(12,10),
 			layout={'out':{'grid':[1,1]},
 			'ins':[{'grid':[1,2],'wratios':[len(i) for i in sns_collect],'wspace':0.3}]})
@@ -442,4 +445,4 @@ if __name__=='__main__':
 					sns_this=sns_all,bar_formats=bar_formats,
 					comparison_spec=comparison_spec,fancy=False,**kwargs)
 		picturesave('fig.area_compressibility',
-			work.plotdir,backup=False,version=True,meta={},extras=[legend],form='svg')
+			work.plotdir,backup=False,version=True,meta={},extras=[legend],form='pdf')
