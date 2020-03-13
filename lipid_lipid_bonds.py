@@ -169,7 +169,7 @@ class PlotBonds:
 		if 'salt_bridges' in self.dataspec['kinds']:
 			meta['salt_bridge_cutoff'] = calc['salt_bridges']['calcs']['specs']['distance_cutoff']
 		if self.custom_axes: return
-		else: picturesave('fig.lipid_lipid_bonds.%s'%self.name,work.plotdir,form='svg',
+		else: picturesave('fig.lipid_lipid_bonds.%s'%self.name,work.plotdir,form='pdf',
 			backup=False,version=True,meta=meta,extras=self.extras)
 
 	def count_bonds(self,kinds,merged=False):
@@ -479,12 +479,12 @@ def plot_counts():
 			for merged in merged_opts
 			for key,kind in kind_map.items()}
 	# plot with acceptors first as a consistency check
-	figspec['hbonds.normed.acceptor_donor'] = dict(donor_acceptor=False,
-		**copy.deepcopy(figspec['hbonds.normed']))
+	#! figspec['hbonds.normed.acceptor_donor'] = dict(donor_acceptor=False,
+	#! 	**copy.deepcopy(figspec['hbonds.normed']))
 	#! keeping two lines from a merge here
 	#! test_key = [None,'hbonds.normed'][0]
-	test_key = ['hbonds_salt.merged.symmetric',None,'hbonds.symmetric'][-1]
-	if test_key: figspec = {test_key: figspec[test_key]}
+	#! test_key = ['hbonds_salt.merged.symmetric',None,'hbonds.symmetric'][-1]
+	#! if test_key: figspec = {test_key: figspec[test_key]}
 	for name,spec in figspec.items():
 		status('plotting %s'%name,tag='plot')
 		pb = PlotBonds(dims=(1,0),name=name,dataspec=spec)
@@ -679,7 +679,7 @@ plotrun.routine = None
 
 #! being refactored below
 #! to make the big tile plots (the refactor was for the 4-panel subset), turn this block on and manually adjust the type below. also turn off the 4-tile plot
-if __name__=='__main__':
+if __name__=='__main__' and False:
 
 	"""
 	Catalog of atoms participating in various bonds.
