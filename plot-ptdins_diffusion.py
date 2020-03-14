@@ -34,7 +34,7 @@ def diffusion_plots():
 	diffusion_plot(out_fn='diffusion_lipids',hatch_lw=2,
 		sns_this=sns_this)
 	#---comprehensive version for supplement with a space between groups
-	sns_l = ['membrane-v%3d'%i for i in [510,511]]
+	sns_l = ['membrane-v%3d'%i for i in [604,510,511]]
 	sns_r = ['membrane-v%3d'%i for i in [538,531,533,599,532,534]]
 	xtick_details = dict(xticks=np.cumsum([np.arange(len(i)).mean()+o 
 		for i,o in zip([sns_l,sns_r],[0,len(sns_l)-1.0])]),
