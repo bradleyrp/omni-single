@@ -7,7 +7,7 @@ see lab notebook for details
 
 import time
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
+#from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper,dictsum
 from base.compute_loop import basic_compute_loop
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
