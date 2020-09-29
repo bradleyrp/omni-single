@@ -158,7 +158,9 @@ slices:
       #! current: {'pbc':'mol','groups':['all'],'start':1000,'end':41000,'skip':500}
       #current: {'pbc':'mol','groups':['all'],'start':0,'end':50000,'skip':500}
       #current: {'pbc':'mol','groups':['all'],'start':10000,'end':70000,'skip':500}
-      current: {'pbc':'mol','groups':['all'],'start':5000,'end':85000,'skip':500}
+      #! current: {'pbc':'mol','groups':['all'],'start':25000,'end':85000,'skip':500}
+      #! current: {'pbc':'mol','groups':['all'],'start':10000,'end':90000,'skip':500}
+      current: {'pbc':'mol','groups':['all'],'start':20000,'end':120000,'skip':500}
 
 variables:
   force_field: charmm

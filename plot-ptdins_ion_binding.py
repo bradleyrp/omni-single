@@ -225,7 +225,9 @@ def plot_ion_binding_waterfall(ax,zonecut,sns_sep,do_single=True,
 		if not ion_names: 
 			#! ion_names = ['K','NA','MG','Cal']
 			ion_names = ['MG','Cal']
-		marks_sns = [sn for sn in [m[0] for m in [[sn for sn in sns 
+		#! override
+		ion_names = ['NA','K','MG','Cal']
+		marks_sns = [sn for sn in [m[0] for m in [[sn for sn in work.sns() 
 			if work.meta[sn]['cation']==i and work.meta[sn].get('cations',i)==i] for i in ion_names] if m]]
 		for nn,name in enumerate(ion_names):
 			print((ion_names,nn,marks_sns))
@@ -292,15 +294,15 @@ if __name__=='__main__':
 		#! added v604
 		sns_sep = [work.vars['orders']['canon']['symmetric'],
 			work.vars['orders']['canon']['asymmetric']]
-		titles = ['symmetric','physiological']
+		titles = ['symmetric','asymmetric'] #! 'physiological']
 		sns = sns_sep[0]+sns_sep[1]
 		do_time_ticks = None
 	elif layout=='comprehensive_nbfix':
 		art = {'fs':{'legend':16,'title':20,'tags':14,'axlabel':14},'legend_cols':2,}
 		#! added v604
-		sns_sep = [work.vars['orders']['canon']['symmetric_nbfix'],
-			['membrane-v604']+work.vars['orders']['canon']['asymmetric_nbfix']]
-		titles = ['symmetric','physiological']
+		sns_sep = [['membrane-v604']+work.vars['orders']['canon']['symmetric_nbfix'],
+			work.vars['orders']['canon']['asymmetric_nbfix']]
+		titles = ['symmetric','asymmetric'] #!'physiological']
 		sns = sns_sep[0]+sns_sep[1]
 		do_time_ticks = None
 	elif layout=='physiological_with_EDPs':

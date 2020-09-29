@@ -405,7 +405,7 @@ if __name__=='__main__':
 			[509,514,515,510,511],
 			[538,536,530,531,533,599,532,534],]]
 		sns_collect = [['membrane-v%d'%i for i in j] for j in [
-			[510,511],
+			[604,510,511],
 			[538,531,533,599,532,534],]]
 		axes,fig = panelplot(figsize=(12,10),
 			layout={'out':{'grid':[1,1]},
@@ -424,7 +424,7 @@ if __name__=='__main__':
 			ax.tick_params(axis='y',which='both',left='off',right='off',
 				labelleft='on',labelsize=art['fs']['label'])	
 			if pnum==0: ax.set_title('symmetric',fontsize=art['fs']['title'])
-			elif pnum==1: ax.set_title('physiological',fontsize=art['fs']['title'])
+			elif pnum==1: ax.set_title('asymmetric',fontsize=art['fs']['title'])
 			else: raise Exception
 			if pnum==0:
 				sns_all = list(set([i for j in sns_collect for i in j]))
