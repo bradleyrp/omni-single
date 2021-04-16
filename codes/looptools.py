@@ -23,7 +23,8 @@ def basic_compute_loop(compute_function,looper,run_parallel=True,debug=None):
 	if run_parallel:
 		import joblib
 		from joblib import Parallel,delayed
-		if joblib.__version__<0.12:
+		#! your joblib is probably fine
+		if 0 and joblib.__version__<0.12:
 			from joblib.pool import has_shareable_memory
 			incoming = Parallel(n_jobs=8,verbose=10 if debug else 0)(
 				delayed(compute_function,has_shareable_memory)(**looper[ll]) 

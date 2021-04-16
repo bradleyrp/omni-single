@@ -207,7 +207,7 @@ def identify_lipid_leaflets_legacy(pts,vec,monolayer_cutoff,
 		with time_limit(topologize_time_limit): 
 			wrapper = topologize(pts,vec,
 				**({'tol':topologize_tolerance} if topologize_tolerance else {}))
-	except TimeoutException, msg: 
+	except TimeoutException: 
 		status('topologize failed to join the bilayer. '
 			'if it is broken over PBCs e.g. a saddle, this is a serious error which may go undetected. '
 			'make sure you always inspect the topology later.',tag='error')
@@ -376,7 +376,7 @@ class LeafletFinder:
 			with time_limit(topologize_time_limit): 
 				wrapper = topologize(pts,vec,
 					**({'tol':self.topologize_tolerance} if self.topologize_tolerance else {}))
-		except TimeoutException, msg: 
+		except TimeoutException: 
 			status('topologize failed to join the bilayer. '
 				'if it is broken over PBCs e.g. a saddle, this is a serious error which may go undetected. '
 				'make sure you always inspect the topology later.',tag='error')

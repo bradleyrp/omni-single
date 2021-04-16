@@ -1,0 +1,179 @@
+director:
+  # global flags
+  autoplot: True
+  unregistered_plots: True
+
+variables:
+  selectors:
+    resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2 or resname POPC or resname POP2 or resname DOPE)
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+  slices_intermediate:
+    steady16: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+  slices:
+    steady16:
+      - steady12
+      - steady23
+      - steady34
+      - steady45
+      - steady56
+    steady16collectcombo: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+    steady16collect:
+      steady12: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':200000,'skip':160}
+      steady23: {'pbc':'mol','groups':['lipids','proteins'],'start':200000,'end':300000,'skip':160}
+      steady34: {'pbc':'mol','groups':['lipids','proteins'],'start':300000,'end':400000,'skip':160}
+      steady45: {'pbc':'mol','groups':['lipids','proteins'],'start':400000,'end':500000,'skip':160}
+      steady56: {'pbc':'mol','groups':['lipids','proteins'],'start':500000,'end':600000,'skip':160}
+
+meta:
+  membrane-v653-free:
+    label: free bilayer
+    nprots:  0
+  membrane-v651-enthx8:
+    label: '$\mathrm{{ENTH}{\times}8}$'
+    nprots: 8
+  membrane-v652-enthx1:
+    label: '$\mathrm{{ENTH}{\times}1}$'
+    nprots: 1
+  membrane-v650-enthx4-dev:
+    label: '$\mathrm{{ENTH}{\times}4}$'
+    nprots: 4
+  membrane-v1005:
+    label: 'helix0x23'
+    nprots: 23
+  meso-test:
+    mesoscale: True
+    label: some description
+    path: ~/omicron/dataset-project-meso/blen-1.27
+  membrane-v841:
+    label: Exo70 dimer (anti-parallel) WT
+    nprots: 2
+  membrane-v842:
+    label: Exo70 dimer (anti-parallel) ULK mutant
+    nprots: 2
+  membrane-v843:
+    label: Exo70 dimer (parallel) WT 
+    nprots: 2
+  membrane-v844:
+    label: Exo70 dimer (parallel) ULK mutant
+    nprots: 2
+  reflectin-v08:
+    nprots: 36
+  membrane-rv07: 
+    nprots: 0
+
+collections:
+  batch-rockfish-2020.12:
+    - v1021
+
+slices:
+  v1021: 
+    groups: 
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      # this work uses a subsampled trajectory so we set the skip to 1
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':2000000,'end':12000000,'skip':1}
+
+calculations:
+  lipid_abstractor:
+    ignore: False
+    slice_name: current
+    group: lipids
+    collections: 
+      - batch-rockfish-2020.12
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        # set cluster: False if scikit-learn has trouble separating the leaflets
+        cluster: False
+        lipid_tip: "name PO4"
+  undulations:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: 
+      - batch-rockfish-2020.12
+    specs:
+      upstream:
+        # choose the upstream by (1) a loop key and (2) specific specs
+        lipid_abstractor:
+          selector: lipid_com
+          separator:
+            cluster: True
+      # specs can be looped
+      grid_spacing:
+        loop: [0.5]
+  protein_abstractor:
+    slice_name: current
+    group: proteins
+    collections: 
+      - batch-rockfish-2020.12
+
+later1:
+  lipid_mesh:
+    slice_name: current
+    collections: 
+      - batch-rockfish-2020.12
+    specs:
+      curvilinear: False
+      upstream:
+        lipid_abstractor:
+          selector: lipid_com
+
+plots:
+  undulations:
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections:
+      - batch-rockfish-2020.12
+  undulations_videos:
+    script: undulations_videos.py
+    calculation: undulations
+    autoplot: False
+later2:
+  lipid_mesh:
+    autoplot: True
+    collections: one
+    specs:
+      curvature_map_spacing: 2.0
+      curvature_map_blur: 4.0
+  # incoming
+  ucc:
+    autoplot: True
+    collections: ucc
+  ucc_meso:
+    autoplot: True
+    collections: ucc-meso
+    specs: 
+      # alternate names to match the calculation inputs above
+      calcname: curvature_undulation_coupling_dex
+      protein_abstractor_name: import_readymade_meso_v1_nanogel
+      undulations_name: import_readymade_meso_v1_membrane
+      # alternate loaders for interpreting the nanogel positions
+      loader: 
+        module: codes.curvature_coupling_loader_dex
+        function: prepare_mesoscale_postdat
+  demo_autoplot:
+    script: demonstrate_autoplot.py
+    autoplot: True
+    collections: focus
+    calculation: undulations
+  debug_dependencies:
+    autoplot: False
+    script: debug_dependencies.py
+    collections: focus
+    calculation: lipid_abstractor

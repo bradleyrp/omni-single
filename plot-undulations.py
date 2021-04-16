@@ -15,11 +15,14 @@ import scipy.spatial
 @autoload(plotrun)
 def load():
 	"""Load the data."""
-	if False:
+	# swapped if false below while recovering  this code
+	if 1:
 		data,calc = plotload('undulations')
 		try: data_prot,_ = plotload('protein_abstractor')
 		# not all bilayers have proteins
-		except: data_prot = {}
+		except Exception as e: 
+			raise 
+			data_prot = {}
 		sns = work.sns()
 	else:
 		collections = ['focus','enth']
@@ -202,7 +205,10 @@ def plot_height_proximity_correlation(**kwargs):
 		for sn in sns:
 			# points_all for the dimer simulations has dimensions frames, monomer, points, xyz
 			protein_pts = data_prot[sn]['data']['points_all']
-			vecs = data[sn]['data']['vecs']
+			try:
+				vecs = data[sn]['data']['vecs']
+			except:
+				import ipdb;ipdb.set_trace()
 			nframes = len(vecs)
 			mesh = data[sn]['data']['mesh'].mean(axis=0)
 			ngrid = mesh.shape[-2:]
@@ -257,7 +263,7 @@ def plot_height_proximity_correlation(**kwargs):
 	plt.legend()
 	plt.savefig(os.path.join(work.plotdir,'fig.debug.png'))
 
-plotrun.routine = []
+plotrun.routine = ['undulation_spectra','plot_height_profiles']
 if __name__=='__main__': 
 
 	plot_height_proximity_correlation()

@@ -50,8 +50,10 @@ def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
 			ax.plot([0,mvecs[ni][0],mvecs[ni][0],0,0],[0,0,mvecs[ni][1],mvecs[ni][1],0],'-',lw=2,c='k')
 		if type(protpts)!=type(None):
 			plothull(ax,protpts[ni],vecs=None,griddims=griddims,fill=False,lw=2)
-		ax.set_xlabel(r'$\mathrm{x\,(nm)}$',fontsize=fs['axlabel'])
-		ax.set_ylabel(r'$\mathrm{y\,(nm)}$',fontsize=fs['axlabel'])
+		# removed dollars here. escaping does not really work
+		#! ax.set_xlabel(r'\mathrm{x\,(nm)}',fontsize=fs['axlabel'])
+		ax.set_xlabel('x (nm)',fontsize=fs['axlabel'])
+		ax.set_ylabel('y (nm)',fontsize=fs['axlabel'])
 		ax.tick_params(axis='x',which='both',bottom='off',top='off',
 			labelbottom='on',labelsize=fs['axlabel'])
 		ax.tick_params(axis='y',which='both',left='off',right='off',
@@ -74,7 +76,7 @@ def print_birdseye_snapshot_render(surfs,protpts,mvecs,nprots,handle='',
 		cbar_kwargs['ticks'] = ins_ticks
 	cbar = plt.colorbar(im,cax=axins,orientation="vertical",**cbar_kwargs)
 	cbar.ax.tick_params(axis='y',which='both',left='off',right='off',labelleft='off')
-	zlabel = kwargs.get('zlabel',r'$\mathrm{z\,(nm)}$')
+	zlabel = kwargs.get('zlabel','z (nm)')
 	cbar_label_specs = kwargs.get('cbar_label_specs',dict(rotation=270,labelpad=20))
 	cbar.ax.set_ylabel(zlabel,**cbar_label_specs)
 	#---print

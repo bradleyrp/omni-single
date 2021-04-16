@@ -23,8 +23,8 @@ the folders if you want to repeat it. Use print_review to check the aesthetics b
 """
 
 # use undulations
-data,calc = plotload('undulations',work)
-data_protein,calc = plotload('protein_abstractor',work)
+data,calc = plotload('undulations')
+data_protein,calc = plotload('protein_abstractor')
 sns = work.sns()
 # prepare average surfaces
 surfs = [data[sn]['data']['mesh'].mean(axis=0) - 
@@ -84,10 +84,9 @@ if print_review:
 		extrema=extrema,fs=fs,titles=titles,cmap_mpl_name=cmap_mpl_name)
 	raise Exception('exiting so you can review the figure at %s. '%tmpdir+
 		'if it looks good set print_review to False and run replot() or reexecute from the terminal')
-
 # render in parallel to save time
-joblib.Parallel(n_jobs=ppn,verbose=10)(
-	joblib.delayed(print_birdseye_snapshot_render,joblib.pool.has_shareable_memory)(
+joblib.Parallel(n_jobs=ppn,verbose=10,require='sharedmem')(
+	joblib.delayed(print_birdseye_snapshot_render)(
 		[s[fr] for s in surfs],protein_pts[fr],mvecs[:,fr],nprots_list,
 		handle=handle,outdir=tmpdir,fi=fi,fn=handle+'.fr.%04d'%fi,
 		pbc_expand=1.0,smooth=1.,panelspecs=panelspecs,square=square_layout,
