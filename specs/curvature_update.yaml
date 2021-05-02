@@ -120,6 +120,42 @@ calculations:
     group: proteins
     collections: 
       - batch-rockfish-2020.12
+  curvature_undulation_coupling:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: 
+      - batch-rockfish-2020.12
+    specs:
+      upstream:
+        protein_abstractor: {}
+        undulations: {}
+      design:
+        loop:
+          v1_fixed_extent_1:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+          v9_fixed_extent_10:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
 
 later1:
   lipid_mesh:
@@ -144,17 +180,149 @@ plots:
     script: undulations_videos.py
     calculation: undulations
     autoplot: False
+  curvature_undulation_coupling:
+    autoplot: True
+    script: plot-curvature_undulation_coupling_drilldown.py
+    collections:
+      - batch-rockfish-2020.12
+    calculation: 
+      - curvature_undulation_coupling
+  ucc:
+    autoplot: True
+    collections:
+      - batch-rockfish-2020.12
+    calculation:
+      undulations: {}
+      protein_abstractor: {}
+    
+later10:
+  curvature_undulation_coupling_drilldown:
+    script: plot-curvature_undulation_coupling_drilldown.py
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections:
+      - batch-rockfish-2020.12
+    calculation: 
+      - curvature_undulation_coupling
+      - protein_abstractor
+      - undulations
+    specs:
+      loader_membrane:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_membrane
+      loader_protein:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_protein
+      upstream:
+        protein_abstractor: {}
+        undulations:
+          grid_spacing: 0.5
+      fitting: 
+        initial_kappa: 20
+      # notes: >
+      #  validated optimize_method options: SLSQP, Nelder-Mead
+      #  use "optimize_method: wait" to skip optimization for later
+      #  set frequency or nframes in curvature_positions if wait to ensure quick
+      design:
+        loop:
+          v9_fixed_extent_10:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+  #! possibly mixing old and new so this does not work
+  #! curvature_undulation_coupling_redev:
+  #!   autoplot: True
+  #!   collections: focus
+  #!   calculation: 
+  #!     - curvature_undulation_coupling
+
+later4:
+  curvature_undulation_coupling:
+    calculation: 
+      - curvature_undulation_coupling
+      - protein_abstractor
+      - undulations
+    collections:
+      - batch-rockfish-2020.12
+    specs: 
+      # alternate names to match alternate inputs above, or the control case
+      calcname: curvature_undulation_coupling
+      routine:
+        # - curvature_field_review
+        - individual_reviews
+later3:
+  XXXcurvature_undulation_coupling:
+    autoplot: True
+    collections: ucc-meso
+    specs:
+      # alternate names to match the calculation inputs above
+      calcname: curvature_undulation_coupling
+      protein_abstractor_name: import_readymade_meso_v1_nanogel
+      undulations_name: import_readymade_meso_v1_membrane
+      # alternate loaders for interpreting the nanogel positions
+      loader:
+        module: codes.curvature_coupling_loader_dex
+        function: prepare_mesoscale_postdat
+  ucc:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections:
+      - batch-rockfish-2020.12
+    specs:
+      loader_membrane:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_membrane
+      loader_protein:
+        module: codes.curvature_coupling_loader
+        function: curvature_coupling_loader_protein
+      upstream:
+        protein_abstractor: {}
+        undulations:
+          grid_spacing: 0.5
+      fitting: 
+        initial_kappa: 20
+      # notes: >
+      #  validated optimize_method options: SLSQP, Nelder-Mead
+      #  use "optimize_method: wait" to skip optimization for later
+      #  set frequency or nframes in curvature_positions if wait to ensure quick
+      design:
+        loop:
+          v1_fixed_extent_1:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+
 later2:
   lipid_mesh:
     autoplot: True
-    collections: one
+    collections:
+      - batch-rockfish-2020.12
     specs:
       curvature_map_spacing: 2.0
       curvature_map_blur: 4.0
   # incoming
   ucc:
     autoplot: True
-    collections: ucc
+    collections:
+      - batch-rockfish-2020.12
   ucc_meso:
     autoplot: True
     collections: ucc-meso

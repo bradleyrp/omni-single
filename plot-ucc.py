@@ -90,11 +90,12 @@ def loader():
 	#! later add separate undulations names maybe?
 	seepspace = 'plotspecs,data,calc'.split(',')
 	if any([s not in globals() for s in seepspace]):
-		plotspecs = work.plots[plotname].get('specs',{})
+		#! deprecated: plotspecs = work.meta['plots'][plotname].get('specs',{})
+		plotspecs = work.plotspec.specs
 		#! propagate these names to the class for collection
 		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
 		undulations_name = plotspecs.get('undulations_name','undulations')
-		data,calc = plotload('ucc',work)
+		data,calc = plotload('ucc')
 		# export to globals after loading
 		for key in seepspace: globals()[key] = locals()[key]
 
@@ -579,10 +580,12 @@ halfsweep = np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.0
 curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
 
 # iterative development
-if __name__=='__replotting__':
+# circa 2021.05.01 I have no idea where __replotting__ appears? not in omnicalc
+#   so I added the main as an option
+if __name__ in ['__replotting__','__main__']:
 
 	do_demo,do_survey = 0,1
-	do_spectra_survey_debug,do_spectra_survey_debug2 = 0,0
+	do_spectra_survey_debug,do_spectra_survey_debug2 = 0,1
 	do_compute_landscape = 1
 
 	if do_demo:
@@ -610,7 +613,8 @@ if __name__=='__replotting__':
 		from codes.hypothesizer import hypothesizer
 		# various curvature sweeps
 		curvatures = [
-			np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05]),
+			np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,
+				0.1,0.2,0.3,0.5,1.,5,10.]),
 			curvatures_extreme,
 			curvatures_legacy_symmetric,
 			][curvature_sweep_number]

@@ -8,7 +8,7 @@ This function is alone so it can be swapped out with other importers.
 
 import numpy as np
 from base.tools import status
-from curvature_coupling.tools import fft_field
+from codes.curvature_coupling.tools import fft_field
 from base.store import plotload
 
 def curvature_coupling_loader_membrane(data,**kwargs): 

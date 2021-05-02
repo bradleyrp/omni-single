@@ -3,7 +3,6 @@
 import os,sys,time
 import numpy as np
 from joblib import Parallel,delayed
-from joblib.pool import has_shareable_memory
 from base.tools import status,framelooper
 import multiprocessing as mp
 machine_eps = eps = np.finfo(float).eps
@@ -411,7 +410,7 @@ def manyjob(function,queue,objects,session_classes,kwargs=None,single=False):
 				time.sleep(1)
 			pool.join()
 		except KeyboardInterrupt:
-			print "[STATUS] interrupted!"
+			print("[STATUS] interrupted!")
 			pool.terminate()
 			pool.join()
 			interrupted = True
