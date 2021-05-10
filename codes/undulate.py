@@ -109,7 +109,7 @@ def undulation_fitter(q_raw,hqs,area,initial_conditions=(20.0,0.0),residual_form
 		global Nfeval
 		name_groups = ['kappa','gamma']
 		text = ' step = %d '%Nfeval+' '.join([name+' = '+dotplace(val)
-			for name,val in zip(name_groups,args)+[('error',objective(args))]])
+			for name,val in list(zip(name_groups,args))+[('error',objective(args))]])
 		status('searching! '+text,tag='optimize')
 		Nfeval += 1
 
@@ -167,8 +167,14 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 
 	packed = {}
 	#---choose a binning method, range method, and fitting method
-	if fit_style in ['band,perfect,simple','band,perfect,basic',
-		'band,perfect,fit','band,perfect,curvefit','band,blurry,curvefit','band,perfect,curvefit-crossover']:
+	if fit_style in [
+		'band,perfect,simple',
+		'band,perfect,basic',
+		'band,perfect,fit',
+		'band,perfect,curvefit',
+		'band,blurry,curvefit',
+		'band,perfect,curvefit-crossover',
+		]:
 
 		if lims==None: raise Exception('fit_style %s requires lims'%fit_style)
 		#---collapse, perfectly
@@ -182,14 +188,15 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 		if fit_style=='band,blurry,curvefit':
 			x3,y3 = blurry_binner(x3,y3)
 
-
+		# guide added on 2021.05.08 says: see band,perfect,curvefit for the standard method
+		#   and note that all other methods were just for comparison purposes only
 		#---perform the fit
 		if fit_style=='band,perfect,simple': 
 			#---the simple method is a crude way to do the fit, by fixing the exponent and then using the fact
 			#---...that the y-axis centroid of the positions must determine the 
 			#---we recommend against using this method for further calculaiton. useful as a comparison only.
 			if fit_tension: raise Exception('cannot do simple with fit_tension')
-			kappa,gamma = 2.0*np.mean(1/((y3*x3**4)*Lx*Ly/lenscale**2)),0.0
+			kappa,gamma = 1.0*np.mean(1/((y3*x3**4)*Lx*Ly/lenscale**2)),0.0
 		elif fit_style=='band,perfect,basic': 
 			if fit_tension: raise Exception('cannot do basic with fit_tension')
 			#---in this method we use polyfit to do a linear fit in the log space
@@ -197,9 +204,11 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 			c0,c1 = np.polyfit(np.log10(x3),np.log10(y3),1)
 			#---fit would be: 10**c1*x3**(c0)
 			#---! just spitballing here
-			kappa,gamma = 1./(10**c1*area)*2.0,0.0
+			kappa,gamma = 1./(10**c1*area)*1.0,0.0
 			#---save for debugging
 			packed['linear_fit_in_log'] = dict(c0=c0,c1=c1)
+
+		# STANDARD METHOD FOR COMPUTING UNDULATIONS 
 		elif fit_style in ['band,perfect,curvefit','band,blurry,curvefit']:
 			#---in this method we use the scipy curve_fit function
 			exponent = 4.0
@@ -209,23 +218,14 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 			if residual_form=='linear':
 				def hqhq(q_raw,kappa,sigma):	
 					if not fit_tension: sigma = 0.0
-					return 1.0/(area/2.0*(kappa*q_raw**(exponent)+sigma*q_raw**2))
+					return 1.0/(area/1.0*(kappa*q_raw**(exponent)+sigma*q_raw**2))
 				fit = scipy.optimize.curve_fit(hqhq,x3,y3,**kwargs)
 				kappa,gamma = fit[0][0],fit[0][1]
-				print(gamma)
 			elif residual_form=='log':
-				#---! deprecated but works
-				if False:
-					def hqhq(q_raw,kappa,sigma):	
-						sigma = 0.0
-						return np.log10(2.0/area/kappa)+-4.0*q_raw
-					fit = scipy.optimize.curve_fit(hqhq,np.log10(x3),np.log10(y3),**kwargs)
-				#---new method has the full expression fit in the log space
-				else:
-					def hqhq(q_raw,kappa,sigma):	
-						if not fit_tension: sigma = 0.0
-						return np.log10(1.0/(area/2.0*(kappa*q_raw**(exponent)+sigma*q_raw**2)))
-					fit = scipy.optimize.curve_fit(hqhq,x3,np.log10(y3),**kwargs)
+				def hqhq(q_raw,kappa,sigma):	
+					if not fit_tension: sigma = 0.0
+					return np.log10(1.0/(area/1.0*(kappa*q_raw**(exponent)+sigma*q_raw**2)))
+				fit = scipy.optimize.curve_fit(hqhq,x3,np.log10(y3),**kwargs)
 				kappa,gamma = fit[0][0],fit[0][1]
 			else: raise Exception('invalid residual_form %s'%residual_form)
 
@@ -241,16 +241,16 @@ def calculate_undulations(surf,vecs,fit_style=None,chop_last=False,lims=(0,1.0),
 				if sigma==0.0: sigma = eps
 				regime_tension = q_raw<=crossover
 				regime_bending = ~regime_tension
-				heights_tension = np.log10(1.0/(area/2.0*(sigma*q_raw[regime_tension]**2.0)))
-				heights_bending = np.log10(1.0/(area/2.0*(kappa*q_raw[regime_bending]**4.0)))
+				heights_tension = np.log10(1.0/(area/1.0*(sigma*q_raw[regime_tension]**2.0)))
+				heights_bending = np.log10(1.0/(area/1.0*(kappa*q_raw[regime_bending]**4.0)))
 				return np.concatenate((heights_tension,heights_bending))
-			fit = scipy.optimize.curve_fit(hqhq,x3,np.log10(y3),(20.0,0.001,0.02),**kwargs)
+			fit = scipy.optimize.curve_fit(hqhq,x3,np.log10(y3),(5.0,0.001,0.02),**kwargs)
 			kappa,gamma,crossover = fit[0][0],fit[0][1],fit[0][2]
 			packed.update(crossover=crossover)
 		elif fit_style=='band,perfect,fit':
-			#---the most advanced method uses scipy.optimmize in a separate function
+			#---the most advanced method uses scipy.optimize in a separate function
 			fit = undulation_fitter(x3,y3,area,residual_form=residual_form,
-				initial_conditions=(20.0,0.0))
+				initial_conditions=(5.0,0.0))
 			kappa,gamma = fit['kappa'],fit['gamma']
 		else: raise Exception('invalid fit_style %s'%fit_style)
 		#---return the data
