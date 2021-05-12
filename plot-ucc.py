@@ -53,6 +53,7 @@ def basic_undulation_fitter(qs,hqs,area,**kwargs):
 		else: osc = 1.0
 		return pure * osc
 	def residual(a,b): return ((np.log10(a/b))**2).mean()
+	print('2 binner')
 	binner = Binner(wavevectors=qs[band],mode=binner_method,bin_width=bin_width)
 	def objective(args,protrusion=fit_protrusion,correct=fit_correction,tension=fit_tension):
 		(sigma,kappa,gamma_p,vibe) = args
@@ -103,7 +104,6 @@ def loader():
 ### Utility Functions
 ###
 
-#! necessary?s
 def logdiff(x,y): return 10.**(np.log10(x)-np.log10(y))
 def logsum(x,y): return 10.**(np.log10(x)+np.log10(y))
 
@@ -138,6 +138,7 @@ class Binner:
 		self.blurry_focus = kwargs.pop('blurry_focus','average')
 		if kwargs: raise Exception
 		self.wavevectors = self.qs = wavevectors
+		print('[STATUS] binner is mode: %s'%mode)
 		# trivial case where all bins are unique
 		if mode=='explicit': 
 			self.indexer = np.transpose([np.arange(len(self.qs))])
@@ -164,7 +165,12 @@ class Binner:
 		"""Fast binner method."""
 		# note the speed and usability of bincount over manually vectorizing things
 		if self.mode=='explicit': return values[self.indexer].mean(axis=1)
-		else: return np.bincount(self.indexer,weights=values)/self.counts
+		else: 
+			try: 
+				out = np.bincount(self.indexer,weights=values)/self.counts
+			except: 
+				import ipdb;ipdb.set_trace()
+			return out
 
 def fft_field(dat):
 	"""
@@ -383,6 +389,7 @@ class UndulationCurvatureCoupling:
 		# get the residual function with a prefixed name from globals
 		self.residual = globals()['residual_%s'%self.residual_name]
 		# prepare the binner
+		print('3 binner')
 		self.binner = Binner(wavevectors=self.qs_raw,mode=self.binner_method,bin_width=self.bin_width)
 		self.qs = self.binner.binned_independent
 		# prepare the band according to the reduced wavevectors from the binner
@@ -393,7 +400,7 @@ class UndulationCurvatureCoupling:
 			#! fitter is old-school and needs to be updated or at least cleaned up a bit
 			result = basic_undulation_fitter(self.qs_raw,self.zs.fields_q,
 				self.area,q_cut=10.0,fit_tension=False,fit_correction=True,
-				binner_method='blurry')
+				binner_method=self.binner_method,fit_protrusion=self.subtract_protrusions)
 			# microscopic i.e. surface tension must be positive and is enforced in the fitter above
 			self.gamma = np.abs(result['gamma'])
 			self.kappa = np.abs(result['kappa'])
@@ -572,21 +579,24 @@ class UndulationCurvatureCoupling:
 		init = self.build_initial_conditions()
 		self.opt = QuickOpt(self.objective,init=init)
 
-# constants
-halfsweep = np.concatenate((np.arange(0.01,0.1+0.01,0.01),np.arange(0.2,1.0+0.1,0.1),
-	np.arange(2.,10.+1.,1.)))
-curvatures_extreme = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
-halfsweep = np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05])
-curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
+if __name__=='__main__':
 
-# iterative development
-# circa 2021.05.01 I have no idea where __replotting__ appears? not in omnicalc
-#   so I added the main as an option
-if __name__ in ['__replotting__','__main__']:
+	# use replot() to rerun the main block
+	#! note that __replotting__ was removed here because absent from omnicalc.py 
 
+	# switches
 	do_demo,do_survey = 0,1
-	do_spectra_survey_debug,do_spectra_survey_debug2 = 0,1
-	do_compute_landscape = 1
+	do_spectra_survey_debug_dep,do_spectra_survey_debug = 0,1
+	do_compute_landscape = 0
+
+	# constants
+	halfsweep = np.concatenate((np.arange(0.01,0.1+0.01,0.01),np.arange(0.2,1.0+0.1,0.1),
+		np.arange(2.,10.+1.,1.)))
+	curvatures_extreme = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
+	halfsweep = np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05])
+	halfsweep_bigger = np.array([0.0,0.005,0.01,0.02,0.04,0.05,0.1,0.2,0.3,0.5,1.,5,10.])
+	curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
+	curvatures_legacy_symmetric_bigger = np.concatenate((halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
 
 	if do_demo:
 		# settings
@@ -603,20 +613,20 @@ if __name__ in ['__replotting__','__main__']:
 	if do_survey:
 
 		# settings
-		positive_vibe = True
-		oscillator_reverse = False
+		positive_vibe = False
+		oscillator_reverse = True
 		curvature_sweep_number = 2
+		#! cannot change the following or you get an array size mismatch
 		binner_method = ['explicit','perfect','blurry'][0]
-		subtract_protrusions = True
+		subtract_protrusions = False
 
 		sn = work.sns()[0]
 		from codes.hypothesizer import hypothesizer
 		# various curvature sweeps
 		curvatures = [
-			np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05,
-				0.1,0.2,0.3,0.5,1.,5,10.]),
 			curvatures_extreme,
 			curvatures_legacy_symmetric,
+			curvatures_legacy_symmetric_bigger,
 			][curvature_sweep_number]
 		binners = ['explicit','perfect','blurry']
 		extents = np.array([0.25,0.5,1.0,2.0,3.0,4.0,8.0])
@@ -625,9 +635,7 @@ if __name__ in ['__replotting__','__main__']:
 			{'route':['curvature'],'values':curvatures}))
 
 		# spectra figure for one result 
-		if do_spectra_survey_debug:
-			### DEPRECATED!
-			### DEPRECATED!
+		if do_spectra_survey_debug_dep:
 			### DEPRECATED!
 			extent,curvature = 1.0,0.0
 			self = ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,
@@ -693,7 +701,7 @@ if __name__ in ['__replotting__','__main__']:
 					# this is a line that bends up at 10**0: mmp = np.abs(self.termlist[0]-logdiff(m2,m))
 					# looks good
 					ax.plot(self.qs,mmp*self.qs**4,'.',c='k',lw=0)
-					#ax.plot(self.qs,self.termlist[0]-m3,'.',c='k',lw=0)
+					# ax.plot(self.qs,self.termlist[0]-m3,'.',c='k',lw=0)
 				# did subtract protrusion work?
 				if 0:
 					ax.plot(self.qs,self.termlist[0],'.',c='k',lw=0)
@@ -701,10 +709,10 @@ if __name__ in ['__replotting__','__main__']:
 				ax.set_xscale('log')
 				ax.set_yscale('log')
 				ax.axvline(ucc.q_cut,c='k',lw=1)
-				picturesave('debug12',work.plotdir)
+				picturesave('fig.debug.v12',work.plotdir)
 
-		# new spectra
-		if do_spectra_survey_debug2:
+		# new spectra figure for debugging
+		if do_spectra_survey_debug:
 
 			extent,curvature = 1.0,0.0
 			if 'ucc' not in globals():
@@ -718,19 +726,21 @@ if __name__ in ['__replotting__','__main__']:
 				ucc.build_objective()
 				ucc.optimize()
 
-			fig = plt.figure(figsize=(8,8))
+			fig = plt.figure(figsize=(12,8))
 			axes = [fig.add_subplot(121),fig.add_subplot(122)]
 			ax = axes[0]
-			binner = Binner(wavevectors=self.qs,mode='perfect')
+			print('1 binner')
+			binner = Binner(wavevectors=self.qs,mode=binner_method)
 			fitted = ucc.opt.fit.x
 			hel = ucc.hel(*fitted[:1])
 			hosc = ucc.equipartition(*fitted[1:])
-			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0)
-			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0)
+			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,label='observed')
+			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,label='harmonic oscillator')
+
 			ax = axes[1]
 			model_q4 = 1./(self.area*self.kappa/2.*self.qs**4)
 			# plot the first coupled term (i.e. hqhq) in equation 23
-			ax.plot(binner.bin(self.qs),binner.bin(self.hqhq),'.-',c='b',lw=1)
+			ax.plot(binner.bin(self.qs),binner.bin(self.hqhq),'.-',c='b',lw=1,label='???')
 			# plot the standard model
 			kappa,gamma_p,vibe = self.kappa,self.gamma,self.vibe
 			sigma = 0.0
@@ -739,16 +749,20 @@ if __name__ in ['__replotting__','__main__']:
 			model_basic = (
 				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+(1.)/(gamma_p*q_raw**2+machine_eps))*
 				((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))))
-			ax.plot(binner.bin(self.qs),binner.bin(model_basic),'.-',c='k',lw=1)
-			ax.plot(binner.bin(self.qs),binner.bin(model_q4),'.-',c='r',lw=1,zorder=5)
-			ax.plot(binner.bin(self.qs),binner.bin(logsum(model_q4,logdiff(self.hqhq,model_basic))),'-',c='m',lw=1,zorder=10)
+			ax.plot(binner.bin(self.qs),binner.bin(model_basic),'.-',c='k',lw=1,label='basic')
+			ax.plot(binner.bin(self.qs),binner.bin(model_q4),'.-',c='r',lw=1,zorder=5,label='q4')
+			ax.plot(binner.bin(self.qs),binner.bin(
+				logsum(model_q4,logdiff(self.hqhq,model_basic))),'-',c='m',lw=1,zorder=10,label='corrected')
 			ax = axes[0]
-			ax.plot(binner.bin(self.qs),binner.bin(logsum(1.0,logdiff(self.hqhq,model_basic))),'-',c='m',lw=1,zorder=10)
+			ax.plot(binner.bin(self.qs),binner.bin(
+				logsum(1.0,logdiff(self.hqhq,model_basic))),'-',c='m',lw=1,zorder=10,label='corrected')
 			for ax in axes:
 				ax.set_xscale('log')
 				ax.set_yscale('log')
 				ax.axvline(ucc.q_cut,c='k',lw=1)
-			picturesave('debug13',work.plotdir)
+			axes[0].legend()
+			axes[1].legend()
+			picturesave('fig.debug.v13',work.plotdir)
 
 			"""
 			investigating differences:
@@ -765,7 +779,6 @@ if __name__ in ['__replotting__','__main__']:
 			for now I think they are different because of a subsequent fit
 			so proceding with the plan to subtract the noise
 			"""
-
 
 		# compute the landscape
 		if do_compute_landscape:
@@ -807,10 +820,8 @@ if __name__ in ['__replotting__','__main__']:
 			axes,fig = square_tiles(2,figsize,favor_rows=True)
 			ax = axes[0]
 			raw = np.array([[jobs[(e,c)] for e in extents] for c in curvatures])
-			#---literal
 			kwargs = dict(extent=[min(curvatures),max(curvatures),
 				min(extents),max(extents)],aspect=(curvatures.ptp()/extents.ptp()))
-			#---figurative
 			kwargs = dict(extent=[0,len(curvatures),0,len(extents)],
 				aspect=(float(len(curvatures))/len(extents)))
 			ax.imshow(raw.T,origin='lower',interpolation='nearest',**kwargs)
@@ -818,7 +829,6 @@ if __name__ in ['__replotting__','__main__']:
 			ax.set_yticks(np.arange(len(extents))+0.5)
 			ax.set_xticklabels(['%.3f'%i for i in curvatures],rotation=90)
 			ax.set_yticklabels(['%.1f'%i for i in extents])
-			#---contour
 			ax = axes[1]
 			error_min = raw.min()
 			error_max = raw.ptp()/2.+raw.min()
