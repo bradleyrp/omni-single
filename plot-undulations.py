@@ -15,7 +15,7 @@ import scipy.spatial
 @autoload(plotrun)
 def load():
 	"""Load the data."""
-	# swapped if false below while recovering  this code
+	# swapped if false below while reproducing this code on existing data
 	if 1:
 		data,calc = plotload('undulations')
 		try: data_prot,_ = plotload('protein_abstractor')
@@ -76,17 +76,49 @@ def plot_height_profiles():
 def undulation_spectra(style='all_on_one'):
 	"""
 	Manage different plot combinations.
-	This is currently under development, and needs to be resolved with plot-analyze_dextran_undulations.py.
+	This plot covers the method used in Bradley-2016 and the same content in the thesis.
+	Later, undulation spectra were generated for the dextran project at  
+	plot-analyze_dextran_undulations.py. It would be useful to compare these to be
+	sure the method is exactly the same.
 	"""
 	# external settings
 	plotspecs = work.plots[plotname].get('specs',{})
 	wavevector_limits = plotspecs.get('wavevector_limits',[1.0])
+	fit_styles = [
+		'band,perfect,simple',
+		'band,perfect,basic',
+		'band,perfect,curvefit',
+		'band,blurry,curvefit',
+		'band,perfect,curvefit-crossover',
+		'band,perfect,fit',][:-2]
 	# top level sweep over plot settings and styles
+	# see below for an override that just runs the standard spectra
+	# the following sweep is overwritten below and retained here only so you
+	#   could look at the alternative fitting methods later. note that almost all
+	#   of the fitting methods that do not cause an optimizer malfunction almost 
+	#   almost always produce nearly identical kappa values. the ones that do not 
+	#   (namely the band,perfect,curvefit-crossover) are probably not working because
+	#   they try to incorporate surface tension or protrusion without enough
+	#   constraints on the optimizer 
 	sweep_specs = {
 		'wavevector_limit':wavevector_limits,
 		'style':['all_on_one'],
-		# ! need custom heights for average_normal
-		'midplane_method':['flat','average','average_normal'][:-1],}
+		# if you use average_normal you must run an additional calculation
+		#   to compute the normal vectors at each grid point. this method
+		#   is really only necessary if you are way outside of Monge gauge
+		# the standard method is "flat" and the average method is not 
+		#   strictly within the Monge gauge. the average method subtracts the
+		#   average structure, and was used for comparison purposes only
+		'midplane_method':['flat','average','average_normal'][:2],
+		'fit_style':fit_styles,
+		'residual_form':['log'],}
+	# override the excessively large parameter sweep with the standard method
+	sweep_specs = {
+		'wavevector_limit':wavevector_limits,
+		'style':['all_on_one'],
+		'midplane_method':['flat'],
+		'fit_style':['band,perfect,curvefit'],
+		'residual_form':['log'],}
 	# get colors first from art which always
 	colors_reqs = ['binned','fitted','line']
 	if colors!=None: 
@@ -115,11 +147,20 @@ def undulation_spectra(style='all_on_one'):
 			axes,fig = panelplot(layout,figsize=figsize)
 			ax = axes[0]
 			for snum,sn in enumerate(work.sns()):
+				# the crossover requires tension
+				if plotspec['fit_style']=='band,perfect,curvefit-crossover':
+					plotspec['fit_tension'] = True
+				# log residuals with the more complicated fits causes weird results
+				# note that these fits are not recommended so we raise
+				if plotspec['fit_style'] in [
+					'band,perfect,curvefit-crossover','band,perfect,fit']:
+					plotspec['residual_form'] = 'linear'
+					raise Exception('these fits are not tested')
 				plot_undulation_spectrum(ax,sn,**plotspec)
 			decorate_undulation_plot(ax=ax,art=art)
 		else: raise Exception('invalid plot style %s'%style)
 		# save the plot, with relevant keys
-		meta_reqs = ['midplane_method','wavevector_limit','style']
+		meta_reqs = ['midplane_method','wavevector_limit','style','fit_style','residual_form']
 		meta = dict([(key,plotspec[key]) for key in meta_reqs])
 		picturesave('fig.undulations',work.plotdir,backup=False,version=True,meta=meta)
 
@@ -129,11 +170,18 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 	"""
 	mesh = data[sn]['data']['mesh']
 	surf = mesh.mean(axis=0)
-	#! somewhat amazing that the following is necessary, but it is
 	surf = (surf - np.tile(surf.reshape(len(surf),-1).mean(axis=1),
 		(surf.shape[1],surf.shape[2],1)).transpose(2,0,1))
 	vecs = data[sn]['data']['vecs']
-	fit_style = kwargs.get('fit_style','band,perfect,curvefit')
+	# the standard fitting method is band,perfect,curvefit however
+	#   the code has many different now-discarded options for performing 
+	#   the fit. these methods were for reference only and the approved 
+	#   method uses "perfect" binning which averages all q_x,q_y with the same
+	#   magnitude onto a single point. the blurry version takes finite wavevector
+	#   windows and produces similar results. the remaining fitting parameters
+	#   refer only to the way the program performs the fit
+	fit_style_default = 'band,perfect,curvefit'
+	fit_style = kwargs.get('fit_style',fit_style_default)
 	lims = kwargs.get('lims',[0.,kwargs.get('wavevector_limit',1.0)])
 	colors = kwargs.get('color','k')
 	midplane_method = kwargs.get('midplane_method','flat')
@@ -153,7 +201,7 @@ def plot_undulation_spectrum(ax,sn,**kwargs):
 	ax.plot(q_fit,energy_fit,'.',lw=0,markersize=4,markeredgewidth=0,
 		label=label,alpha=1.,zorder=4,color=colors[sn]['fitted'])
 	def hqhq(q_raw,kappa,sigma,area,exponent=4.0):
-		return 1.0/(area/2.0*(kappa*q_raw**(exponent)+sigma*q_raw**2))
+		return 1.0/(area/1.0*(kappa*q_raw**(exponent)+sigma*q_raw**2))
 	ax.plot(q_fit,hqhq(q_fit,kappa=uspec['kappa'],sigma=uspec['sigma'],
 		area=uspec['area']),lw=1,zorder=3,color=colors[sn]['line'])
 
@@ -166,14 +214,15 @@ def decorate_undulation_plot(ax,art):
 	add_axgrid(ax,art=art)
 
 def compute_protein_proximity_height_correlation(fr,pbc=False):
-	"""Calculation for basic_compute_loop to correlate membrane height with proximity to proteins."""
+	"""Calculation for basic_compute_loop to correlate membrane 
+	height with proximity to proteins."""
 	global surf,vecs,protein_pts
 	# gather points
 	surf = mesh[fr]
 	ngrid = surf.shape
 	if pbc: surf = np.tile(surf,(3,3))
 	vec = vecs[fr]
-	#! unpack pts per the structure of points_all
+	# unpack pts per the structure of points_all
 	pts_this = np.concatenate(protein_pts[fr])[...,:2]
 	# get XY points for the grid
 	if not pbc:
@@ -212,34 +261,11 @@ def plot_height_proximity_correlation(**kwargs):
 			nframes = len(vecs)
 			mesh = data[sn]['data']['mesh'].mean(axis=0)
 			ngrid = mesh.shape[-2:]
-			mesh -= np.tile(mesh.reshape(nframes,-1).mean(axis=1),(ngrid[0],ngrid[1],1)).transpose((2,0,1))
+			mesh -= np.tile(mesh.reshape(nframes,-1).mean(axis=1),
+				(ngrid[0],ngrid[1],1)).transpose((2,0,1))
 			incoming = basic_compute_loop(compute_protein_proximity_height_correlation,
 				looper=[dict(fr=fr) for fr in range(0,nframes,sample_rate)])
 			post[sn] = dict(sizes=[len(i) for i in incoming],incoming=np.concatenate(incoming))
-
-	# testing seaborn 2D histogram
-	if False:
-		binw = 0.5
-		rmax,zmax = [max([np.abs(v['incoming'][:,i]).max() for v in post.values()]) for i in range(2)]
-		bins = np.arange(0,rmax+binw,binw)
-		for snum,sn in enumerate(sns):
-			sample = post[sn]['incoming'][::1]
-			fig = sb.jointplot(x=sample.T[0],y=sample.T[1],kind='kde',
-				space=0,color='k',xlim=(0,rmax),ylim=(-zmax,zmax))
-			fig.savefig(os.path.join(work.plotdir,'fig.height_by_proximity.%s.png'%sn))
-
-	# testing seaborn lvplot
-	if False:
-		binw = 1.0
-		axes,fig = square_tiles(len(sns),figsize=(8,8))
-		for snum,sn in enumerate(sns):
-			ax = axes[snum]
-			rmax,zmax = [max([np.abs(v['incoming'][:,i]).max() for v in post.values()]) for i in range(2)]
-			bins = np.arange(0,rmax+binw,binw)
-			sample = post[sn]['incoming'][::len(post[sn]['incoming'])/1000]
-			binned = [sample[np.all((sample.T[0]>=bins[ii],sample.T[0]<=bins[ii+1]),axis=0)][:,1] for ii,i in enumerate(bins[:-1])]
-			sb.lvplot(data=binned,ax=ax, scale="linear", palette="mako")
-		plt.savefig(os.path.join(work.plotdir,'fig.debug.png'))
 
 	# regular plot
 	binw = 1.0
@@ -252,7 +278,8 @@ def plot_height_proximity_correlation(**kwargs):
 		bins = np.arange(0,rmax+binw,binw)
 		rate = 1
 		sample = post[sn]['incoming'][::rate]
-		binned = [sample[np.all((sample.T[0]>=bins[ii],sample.T[0]<=bins[ii+1]),axis=0)][:,1] for ii,i in enumerate(bins[:-1])]
+		binned = [sample[np.all((sample.T[0]>=bins[ii],
+			sample.T[0]<=bins[ii+1]),axis=0)][:,1] for ii,i in enumerate(bins[:-1])]
 		means = np.array([np.mean(i) for i in binned])
 		stds = np.array([np.std(i) for i in binned])
 		ax.plot(bins[:-1],means,label=sn,color=colors[snum])
@@ -261,10 +288,13 @@ def plot_height_proximity_correlation(**kwargs):
 	ax.set_xlim((0.,pbc_spacing/2.))
 	ax.axhline(0,c='k',lw=1)
 	plt.legend()
-	plt.savefig(os.path.join(work.plotdir,'fig.debug.png'))
+	plt.savefig(os.path.join(work.plotdir,'fig.height_proximity.png'))
 
 plotrun.routine = ['undulation_spectra','plot_height_profiles']
 if __name__=='__main__': 
 
-	plot_height_proximity_correlation()
+	# in addition to height profiles and undulation spectra we 
+	#   can also take an average height-vs-proximity correlation
+	#   over all frames (averaged by proximity)
+	if 1: plot_height_proximity_correlation()
 	pass
