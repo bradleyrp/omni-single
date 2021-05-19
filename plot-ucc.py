@@ -3,35 +3,30 @@
 """
 UCC
 Undulation Curvature Coupling (v5, ca 2017.12.06)
-...
 """
 
-import time,copy
+import time,copy,pprint
 import scipy
 import scipy.optimize
 import scipy.interpolate
 
 machine_eps = eps = np.finfo(float).eps
 
-###
-### !!! LEGACY CODE NEEDS TO BE REWORKED
-###
-
 def basic_undulation_fitter(qs,hqs,area,**kwargs):
 	"""
 	Fit the undulations with no curvature.
 	"""
-	#---directions
+	# directions
 	fit_tension = kwargs.pop('fit_tension',True)
 	fit_correction = kwargs.pop('fit_correction',True)
 	fit_protrusion = kwargs.pop('fit_protrusion',True)
-	#---settings
+	# settings
 	q_min = kwargs.pop('q_min',0.0)
 	q_cut = kwargs.pop('q_cut',4.0)
 	binner_method = kwargs.pop('binner_method','explicit')
 	bin_width = kwargs.pop('bin_width',0.05)
 	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
-	#---! check this. using complex here. this is also performed by the build_hqhq function in the class
+	# using complex here. this is also performed by the build_hqhq function in the class
 	hqhq = (np.abs(hqs).reshape((len(hqs),-1)).mean(axis=0)[1:])**2
 	band = np.all((qs>=q_min,qs<=q_cut),axis=0)
 	def model(q_raw,sigma,kappa,gamma_p,vibe,
@@ -43,19 +38,16 @@ def basic_undulation_fitter(qs,hqs,area,**kwargs):
 				(1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps))
 		else: 
 			pure = ((1.0)/(area))*(
-				(1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+(1.)/(gamma_p*q_raw**2+machine_eps))
-		#---! CRITICAL ERROR:
-		#---! ... if correct: osc = (vibe*q_raw+machine_eps)*(1./(np.exp(vibe*q_raw)-1+machine_eps))
-		#---! ... INCORRECT RESULTS DUE TO FUDGE FACTORS!
-		#---! removed to be safer 
-		#---! ... if correct: osc = (vibe*q_raw+machine_eps)*(1./(np.exp(vibe*q_raw)-1)+machine_eps)
+				(1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
+				(1.)/(gamma_p*q_raw**2+machine_eps))
 		if correct: osc = (vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))
 		else: osc = 1.0
 		return pure * osc
 	def residual(a,b): return ((np.log10(a/b))**2).mean()
 	print('2 binner')
 	binner = Binner(wavevectors=qs[band],mode=binner_method,bin_width=bin_width)
-	def objective(args,protrusion=fit_protrusion,correct=fit_correction,tension=fit_tension):
+	def objective(args,
+		protrusion=fit_protrusion,correct=fit_correction,tension=fit_tension):
 		(sigma,kappa,gamma_p,vibe) = args
 		heights = hqhq[band]
 		heights_model = model(qs[band],sigma,kappa,gamma_p,vibe,
@@ -67,7 +59,8 @@ def basic_undulation_fitter(qs,hqs,area,**kwargs):
 		"""Watch the optimization."""
 		global stepno
 		args_string = ' '.join([stringer(a) for a in args])
-		output = (u'\r' if stepno>0 else '\n')+'[OPTIMIZE] step %s: %s'%(stepno,args_string)
+		output = (u'\r' if stepno>0 else '\n')+\
+			'[OPTIMIZE] step %s: %s'%(stepno,args_string)
 		if not silent:
 			sys.stdout.flush()
 			sys.stdout.write(output)
@@ -116,7 +109,8 @@ def formulate_wavevectors(dims,vecs=None,lx=None,ly=None,lenscale=1.0):
 	elif type(lx)==type(None) or type(ly)==type(None):
 		raise Exception('send box dimensions (lx and ly) or framewise box vectors (vecs)')
 	else: Lx,Ly = lx,ly
-	if len(dims)!=2: raise Exception('dims must be the number of grid points in each of two directions')
+	if len(dims)!=2:
+		raise Exception('dims must be the number of grid points in each of two directions')
 	# formulate the wavevectors
 	lenscale = 1.0
 	m,n = mn = dims
@@ -166,10 +160,7 @@ class Binner:
 		# note the speed and usability of bincount over manually vectorizing things
 		if self.mode=='explicit': return values[self.indexer].mean(axis=1)
 		else: 
-			try: 
-				out = np.bincount(self.indexer,weights=values)/self.counts
-			except: 
-				import ipdb;ipdb.set_trace()
+			out = np.bincount(self.indexer,weights=values)/self.counts
 			return out
 
 def fft_field(dat):
@@ -211,8 +202,9 @@ def make_isotropic_fields(foci,vecs,ngrid,magnitude=1.0,extent=1.0):
 	spots = positions[...,:2].mean(axis=2)
 	# nprots is really the number of foci or spots
 	nprots,nframes = spots.shape[:2]
-	#! more elegant way to do this trick? itertools? np.unravel_index(1000,(nprots,nframes)) ?
-	#! previously used the concatenate,transpose,meshgrid trick for indices, deprecated by the new trick
+	#! more elegant way to do this trick? itertools? np.unravel_index(1000,(nprots,nframes))?
+	#! previously used the concatenate,transpose,meshgrid trick 
+	#!   for indices, deprecated by the new trick
 	inds = np.concatenate(np.transpose(np.meshgrid(np.arange(nprots),np.arange(nframes))))
 	# compute the grid points 
 	prop_pts = np.transpose(np.meshgrid(range(0,ngrid[0]),range(0,ngrid[1])))/ngrid.astype(float)
@@ -223,7 +215,9 @@ def make_isotropic_fields(foci,vecs,ngrid,magnitude=1.0,extent=1.0):
 	#! check indexing
 	xypts = xypts.reshape((nframes,-1,2))
 	# compute all euclidean distances from each protein foci to grid points for all frames
-	distances = np.array([np.linalg.norm(xypts-np.tile(spots[i].reshape((nframes,1,2)),(1,xypts.shape[1],1)),axis=2) for i in range(len(spots))])
+	distances = np.array([np.linalg.norm(xypts-
+		np.tile(spots[i].reshape((nframes,1,2)),(1,xypts.shape[1],1)),axis=2) 
+		for i in range(len(spots))])
 	# only a square, division, and exp stand between us and the field
 	fields = np.exp(-distances**2/extent**2)
 	# return to a square shape
@@ -318,9 +312,11 @@ class UCCFields:
 		else: raise Exception
 	def fields_from_heights(self,heights):
 		# get the heights and center them
-		#self.fields = np.reshape(heights.reshape(self.nframes,-1).T - 
-		#	heights.reshape(self.nframes,-1).mean(axis=1),(self.nframes,self.ngrid[0],self.ngrid[1]))
-		self.fields = (heights.transpose(1,2,0)-np.array([np.mean(i) for i in heights])).transpose(2,0,1)
+		# self.fields = np.reshape(heights.reshape(self.nframes,-1).T - 
+		#	heights.reshape(self.nframes,-1).mean(axis=1),
+		#   (self.nframes,self.ngrid[0],self.ngrid[1]))
+		self.fields = (heights.transpose(1,2,0)-
+			np.array([np.mean(i) for i in heights])).transpose(2,0,1)
 		# the height transform only happens once
 		self.fields_q = fft_field(self.fields)
 
@@ -512,9 +508,12 @@ class UndulationCurvatureCoupling:
 			# vibration must be nonnegative
 			if self.positive_vibe: vibe = np.abs(vibe)
 			# no grease here
-			if not self.grease: raw = (vibe*self.qs_raw)*(0.+1./(np.exp(vibe*self.qs_raw)-1))
+			if not self.grease: 
+				raw = (vibe*self.qs_raw)*(0.+1./(np.exp(vibe*self.qs_raw)-1))
 			# standard grease is outside the exponential
-			else: raw = (vibe*self.qs_raw+machine_eps)*(0.+1./(np.exp(vibe*self.qs_raw)-1)+machine_eps)
+			else: 
+				raw = (vibe*self.qs_raw+machine_eps)*(
+					0.+1./(np.exp(vibe*self.qs_raw)-1)+machine_eps)
 			if not self.oscillator_reverse: return raw
 			else: return log_reverse(raw)
 		self.oscillator = oscillator_function
@@ -585,26 +584,33 @@ if __name__=='__main__':
 	#! note that __replotting__ was removed here because absent from omnicalc.py 
 
 	# switches
-	do_demo,do_survey = 0,1
-	do_spectra_survey_debug_dep,do_spectra_survey_debug = 0,1
+	do_demo = 0
+	do_survey = 1
+	do_spectra_survey_debug_dep = 0
+	do_spectra_survey_debug = 1
 	do_compute_landscape = 0
 
 	# constants
-	halfsweep = np.concatenate((np.arange(0.01,0.1+0.01,0.01),np.arange(0.2,1.0+0.1,0.1),
+	halfsweep = np.concatenate((
+		np.arange(0.01,0.1+0.01,0.01),
+		np.arange(0.2,1.0+0.1,0.1),
 		np.arange(2.,10.+1.,1.)))
 	curvatures_extreme = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
 	halfsweep = np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05])
 	halfsweep_bigger = np.array([0.0,0.005,0.01,0.02,0.04,0.05,0.1,0.2,0.3,0.5,1.,5,10.])
 	curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
-	curvatures_legacy_symmetric_bigger = np.concatenate((halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
+	curvatures_legacy_symmetric_bigger = np.concatenate((
+		halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
 
 	if do_demo:
+	
 		# settings
 		sn = work.sns()[0]
 		# singleton example
 		self = ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,
 			model_style='bending',equipartition_model='harmonic_oscillators')
-		ucc.build_curvature_fields(mode='protein_dynamic',isotropy_mode='isotropic',extent=2.0)
+		ucc.build_curvature_fields(
+			mode='protein_dynamic',isotropy_mode='isotropic',extent=2.0)
 		ucc.build_elastic_hamiltonian(0.0)
 		ucc.build_equipartition()
 		ucc.build_objective()
@@ -613,12 +619,12 @@ if __name__=='__main__':
 	if do_survey:
 
 		# settings
-		positive_vibe = False
-		oscillator_reverse = True
+		positive_vibe = True
+		oscillator_reverse = False
 		curvature_sweep_number = 2
 		#! cannot change the following or you get an array size mismatch
 		binner_method = ['explicit','perfect','blurry'][0]
-		subtract_protrusions = False
+		subtract_protrusions = True
 
 		sn = work.sns()[0]
 		from codes.hypothesizer import hypothesizer
@@ -630,12 +636,14 @@ if __name__=='__main__':
 			][curvature_sweep_number]
 		binners = ['explicit','perfect','blurry']
 		extents = np.array([0.25,0.5,1.0,2.0,3.0,4.0,8.0])
-		#! hypotheses are built in argument-order so pick extent first since that is slowest and not redone
+		# hypotheses are built in argument-order so pick extent first 
+		#   since that is slowest and gets recomputed the least at the front
 		hypos = hypothesizer(*({'route':['extent'],'values':extents},
 			{'route':['curvature'],'values':curvatures}))
 
 		# spectra figure for one result 
 		if do_spectra_survey_debug_dep:
+		
 			### DEPRECATED!
 			extent,curvature = 1.0,0.0
 			self = ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,
@@ -720,7 +728,8 @@ if __name__=='__main__':
 					model_style='bending',equipartition_model='harmonic_oscillators',
 					oscillator_reverse=oscillator_reverse,positive_vibe=positive_vibe,
 					binner_method=binner_method,subtract_protrusions=subtract_protrusions)
-				ucc.build_curvature_fields(mode='protein_dynamic',isotropy_mode='isotropic',extent=extent)
+				ucc.build_curvature_fields(
+					mode='protein_dynamic',isotropy_mode='isotropic',extent=extent)
 				ucc.build_elastic_hamiltonian(curvature)
 				ucc.build_equipartition()
 				ucc.build_objective()
@@ -732,6 +741,7 @@ if __name__=='__main__':
 			print('1 binner')
 			binner = Binner(wavevectors=self.qs,mode=binner_method)
 			fitted = ucc.opt.fit.x
+			print('[STATUS] fitted: %s'%str(fitted))
 			hel = ucc.hel(*fitted[:1])
 			hosc = ucc.equipartition(*fitted[1:])
 			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,label='observed')
@@ -746,16 +756,23 @@ if __name__=='__main__':
 			sigma = 0.0
 			q_raw = self.qs
 			area = self.area
+			print('[STATUS] fits: %s'%pprint.pformat(dict([(i,globals()[i]) for i in 
+				['kappa','sigma','vibe'] ])))
 			model_basic = (
-				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+(1.)/(gamma_p*q_raw**2+machine_eps))*
+				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
+					(1.)/(gamma_p*q_raw**2+machine_eps))*
 				((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))))
 			ax.plot(binner.bin(self.qs),binner.bin(model_basic),'.-',c='k',lw=1,label='basic')
 			ax.plot(binner.bin(self.qs),binner.bin(model_q4),'.-',c='r',lw=1,zorder=5,label='q4')
 			ax.plot(binner.bin(self.qs),binner.bin(
-				logsum(model_q4,logdiff(self.hqhq,model_basic))),'-',c='m',lw=1,zorder=10,label='corrected')
+				logsum(model_q4,logdiff(self.hqhq,model_basic))),
+				'-',c='m',lw=1,zorder=10,label='corrected')
 			ax = axes[0]
 			ax.plot(binner.bin(self.qs),binner.bin(
-				logsum(1.0,logdiff(self.hqhq,model_basic))),'-',c='m',lw=1,zorder=10,label='corrected')
+				logsum(1.0,logdiff(self.hqhq,model_basic))),
+					'-',c='m',lw=1,zorder=10,label='corrected')
+			ax.plot(binner.bin(self.qs),binner.bin(model_basic)*q_raw**4*kappa*area,
+				'.-',c='k',lw=1,label='basic')
 			for ax in axes:
 				ax.set_xscale('log')
 				ax.set_yscale('log')
@@ -763,22 +780,6 @@ if __name__=='__main__':
 			axes[0].legend()
 			axes[1].legend()
 			picturesave('fig.debug.v13',work.plotdir)
-
-			"""
-			investigating differences:
-				np.abs(np.reshape(np.mean(multipliers(hqs,hqs),axis=0),-1)[1:])
-				(np.abs(hqs).reshape((len(hqs),-1)).mean(axis=0)[1:])**2
-			a test shows what we expect
-				>>> (np.abs(hqs)*np.conjugate(np.abs(hqs))[0])[0][0][1]
-				0.053552032807518662
-				>>> (hqs*hqs)[0][0][1]
-				(-0.05347209479518359-0.0029249437656910485j)
-				>>> np.abs((hqs*hqs)[0][0][1])
-				0.053552032807518662
-			((np.abs(hqs)*np.abs(hqs))[0][0][1])
-			for now I think they are different because of a subsequent fit
-			so proceding with the plan to subtract the noise
-			"""
 
 		# compute the landscape
 		if do_compute_landscape:
@@ -813,8 +814,8 @@ if __name__=='__main__':
 			contour_nlevels = 100
 			under_color = 'm'
 			figname = 'fig.ucc.review.%s.pv%d.ro%d.cs%d.b%d.sp%d'%(sn,
-				positive_vibe,oscillator_reverse,curvature_sweep_number,binners.index(binner_method),
-				subtract_protrusions)
+				positive_vibe,oscillator_reverse,curvature_sweep_number,
+				binners.index(binner_method),subtract_protrusions)
 
 			figsize = (12,8)
 			axes,fig = square_tiles(2,figsize,favor_rows=True)
@@ -840,10 +841,13 @@ if __name__=='__main__':
 			finex = np.linspace(c0,c1,contour_interp_pts)
 			finey = np.linspace(e0,e1,contour_interp_pts)
 			grid_x,grid_y = np.meshgrid(finex,finey)
-			errormap = scipy.interpolate.griddata(curvature_extent_error[:,:2],curvature_extent_error[:,2],
+			errormap = scipy.interpolate.griddata(
+				curvature_extent_error[:,:2],
+				curvature_extent_error[:,2],
 				(grid_x,grid_y),method='cubic')
 			levels = np.linspace(error_min,error_max,contour_nlevels)
-			cs = ax.contourf(grid_x,grid_y,errormap,levels=levels,vmax=error_max,vmin=error_min,
+			cs = ax.contourf(grid_x,grid_y,
+				errormap,levels=levels,vmax=error_max,vmin=error_min,
 				extend='both',origin='lower',lw=2,zorder=3,cmap=mpl.cm.jet)
 			cs.cmap.set_over('w')
 			if under_color: cs.cmap.set_under(under_color)
