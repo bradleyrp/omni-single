@@ -26,7 +26,7 @@ def basic_undulation_fitter(qs,hqs,area,**kwargs):
 	binner_method = kwargs.pop('binner_method','explicit')
 	bin_width = kwargs.pop('bin_width',0.05)
 	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
-	# using complex here. this is also performed by the build_hqhq function in the class
+	# using complex here. see also build_hqhq 
 	hqhq = (np.abs(hqs).reshape((len(hqs),-1)).mean(axis=0)[1:])**2
 	band = np.all((qs>=q_min,qs<=q_cut),axis=0)
 	def model(q_raw,sigma,kappa,gamma_p,vibe,
@@ -40,14 +40,19 @@ def basic_undulation_fitter(qs,hqs,area,**kwargs):
 			pure = ((1.0)/(area))*(
 				(1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
 				(1.)/(gamma_p*q_raw**2+machine_eps))
-		if correct: osc = (vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))
+		# we include epsilon here to avoid divide by zero errors
+		#   however note that this may affect the optimizer (see grease below)
+		if correct: osc = (vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1+machine_eps))
 		else: osc = 1.0
 		return pure * osc
-	def residual(a,b): return ((np.log10(a/b))**2).mean()
-	print('2 binner')
+	def residual(a,b): 
+		# added epsiolon here by default
+		return ((np.log10(a/(b+machine_eps)))**2).mean()
 	binner = Binner(wavevectors=qs[band],mode=binner_method,bin_width=bin_width)
 	def objective(args,
-		protrusion=fit_protrusion,correct=fit_correction,tension=fit_tension):
+		protrusion=fit_protrusion,
+		correct=fit_correction,
+		tension=fit_tension):
 		(sigma,kappa,gamma_p,vibe) = args
 		heights = hqhq[band]
 		heights_model = model(qs[band],sigma,kappa,gamma_p,vibe,
@@ -59,8 +64,8 @@ def basic_undulation_fitter(qs,hqs,area,**kwargs):
 		"""Watch the optimization."""
 		global stepno
 		args_string = ' '.join([stringer(a) for a in args])
-		output = (u'\r' if stepno>0 else '\n')+\
-			'[OPTIMIZE] step %s: %s'%(stepno,args_string)
+		output = ((u'\r' if stepno>0 else '\n')+
+			'[OPTIMIZE] step %s: %s'%(stepno,args_string))
 		if not silent:
 			sys.stdout.flush()
 			sys.stdout.write(output)
@@ -84,9 +89,9 @@ def loader():
 	#! later add separate undulations names maybe?
 	seepspace = 'plotspecs,data,calc'.split(',')
 	if any([s not in globals() for s in seepspace]):
-		#! deprecated: plotspecs = work.meta['plots'][plotname].get('specs',{})
+		# the following flexible names are meant to allow inputs from 
+		#   other sources, namely mesoscale simulations
 		plotspecs = work.plotspec.specs
-		#! propagate these names to the class for collection
 		protein_abstractor_name = plotspecs.get('protein_abstractor_name','protein_abstractor')
 		undulations_name = plotspecs.get('undulations_name','undulations')
 		data,calc = plotload('ucc')
@@ -97,8 +102,9 @@ def loader():
 ### Utility Functions
 ###
 
-def logdiff(x,y): return 10.**(np.log10(x)-np.log10(y))
-def logsum(x,y): return 10.**(np.log10(x)+np.log10(y))
+# logs use epsilon to prevent division by zero by default
+def logdiff(x,y): return 10.**(np.log10(x+machine_eps)-np.log10(y+machine_eps))
+def logsum(x,y): return 10.**(np.log10(x+machine_eps)+np.log10(y+machine_eps))
 
 def formulate_wavevectors(dims,vecs=None,lx=None,ly=None,lenscale=1.0):
 	"""
@@ -158,7 +164,8 @@ class Binner:
 	def bin(self,values): 
 		"""Fast binner method."""
 		# note the speed and usability of bincount over manually vectorizing things
-		if self.mode=='explicit': return values[self.indexer].mean(axis=1)
+		if self.mode=='explicit': 
+			return values[self.indexer].mean(axis=1)
 		else: 
 			out = np.bincount(self.indexer,weights=values)/self.counts
 			return out
@@ -223,7 +230,11 @@ def make_isotropic_fields(foci,vecs,ngrid,magnitude=1.0,extent=1.0):
 	# return to a square shape
 	return fields.reshape((nprots,nframes,ngrid[0],ngrid[1]))
 
-def residual_standard(hel,hosc): return np.mean((np.log10(hel)-np.log10(hosc))**2)
+def residual_standard(hel,hosc): 
+	# we use epsiolon by default
+	return np.mean((
+		np.log10(hel+machine_eps)-
+		np.log10(hosc+machine_eps))**2)
 
 def stringer(x,p=5):
 	"""A nice way to print numbers."""
@@ -253,7 +264,8 @@ class QuickOpt:
 	def callback(self,args):
 		"""Watch the optimization."""
 		args_string = ' '.join([stringer(a) for a in args])
-		output = (u'\r' if self.stepno>0 else '\n')+'[OPTIMIZE] step %s: %s'%(self.stepno,args_string)
+		output = ((u'\r' if self.stepno>0 else '\n')+
+			'[OPTIMIZE] step %s: %s'%(self.stepno,args_string))
 		if not self.silent:
 			sys.stdout.flush()
 			sys.stdout.write(output)
@@ -341,7 +353,9 @@ class UndulationCurvatureCoupling:
 		self.residual_name = kwargs.pop('residual_name','standard')
 		self.positive_vibe = kwargs.pop('positive_vibe',True)
 		self.oscillator_reverse = kwargs.pop('oscillator_reverse',False)
-		self.grease = kwargs.pop('grease',False)
+		# we use epsilon by default however previous notes suggest this
+		#   should be investigated further because it may affect the optimizer
+		self.grease = kwargs.pop('grease',True)
 		self.binner_method = kwargs.pop('binner_method','explicit')
 		self.bin_width = kwargs.pop('bin_width',0.05)
 		self.subtract_protrusions = kwargs.pop('subtract_protrusions',False)
@@ -368,7 +382,8 @@ class UndulationCurvatureCoupling:
 		self.nframes = len(self.vecs)
 		# save the "foci" or positions of supposed curvature fields
 		# points_all from protein_abstractor has dimensions frames, protein, beads/atoms, xyz
-		#! this will fail if the proteins have different numbers of beads. this case needs to be considered
+		#! this will fail if the proteins have different 
+		#!   numbers of beads. this case needs to be considered
 		self.foci = data['protein_abstractor'][self.sn]['data']['points_all']
 		self.foci_dims = ['frames','focus','beads','coordinate']
 		self.ngrid = self.compute_grid_counts(self.vecs,self.grid_spacing)
@@ -385,12 +400,16 @@ class UndulationCurvatureCoupling:
 		# get the residual function with a prefixed name from globals
 		self.residual = globals()['residual_%s'%self.residual_name]
 		# prepare the binner
-		print('3 binner')
-		self.binner = Binner(wavevectors=self.qs_raw,mode=self.binner_method,bin_width=self.bin_width)
+		self.binner = Binner(
+			wavevectors=self.qs_raw,
+			mode=self.binner_method,
+			bin_width=self.bin_width)
 		self.qs = self.binner.binned_independent
 		# prepare the band according to the reduced wavevectors from the binner
 		self.band = np.where(np.all((self.qs>=self.q_min,self.qs<=self.q_cut),axis=0))[0]
-		self.band_raw = np.where(np.all((self.qs_raw>=self.q_min,self.qs_raw<=self.q_cut),axis=0))[0]
+		self.band_raw = np.where(np.all((
+			self.qs_raw>=self.q_min,
+			self.qs_raw<=self.q_cut),axis=0))[0]
 		# fit protrusions here
 		if self.subtract_protrusions or True:
 			#! fitter is old-school and needs to be updated or at least cleaned up a bit
@@ -419,10 +438,11 @@ class UndulationCurvatureCoupling:
 		"""Compute the terms in equation 23."""
 		hqs = self.zs.fields_q
 		# protrusions are subtracted from the explicit data 
-		#if self.subtract_protrusions: 
-		#	hqs = (hqs - 1./(self.qs_2d**2*self.gamma*self.area))
+		#! if self.subtract_protrusions: 
+		#!	hqs = (hqs - 1./(self.qs_2d**2*self.gamma*self.area))
 		# curvature sum function
-		self.curvature.fields_sum = self.curvature.curvature_multiplex(self.curvature.fields,*curvatures)
+		self.curvature.fields_sum = self.curvature.curvature_multiplex(
+			self.curvature.fields,*curvatures)
 		# we FFT after generating the final field
 		cqs = self.curvature.fields_q = fft_field(self.curvature.fields_sum)
 		termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
@@ -430,12 +450,15 @@ class UndulationCurvatureCoupling:
 			self.termlist_alt = np.abs(np.reshape(np.mean(termlist[0],axis=0),-1)[1:])
 			kappa = self.kappa
 			#! why is kappa necessary here? it makes a difference for the answer
-			m = 1./(self.area*kappa/2.*self.qs_2d**4)
-			m2 = 1./(self.area*kappa/2.*self.qs_2d**4)+1./(self.area*self.gamma*self.qs_2d**2)
+			m = 1./(self.area*kappa/2.*self.qs_2d**4+machine_eps)
+			m2 = (
+				1./(self.area*kappa/2.*self.qs_2d**4+machine_eps) + 
+				1./(self.area*self.gamma*self.qs_2d**2+machine_eps))
 			termlist[0] = logdiff(termlist[0],logdiff(m2,m))
 			#! other attempts to properly filter things out
 			#! termlist[0] = termlist[0]-1./(self.area*self.gamma*self.qs_2d**2)*self.qs_2d**4
-			#! termlist[0] = logdiff(termlist[0]/self.qs_2d**4,1./(self.area*self.gamma*self.qs_2d**2))*self.qs_2d**4
+			#! termlist[0] = logdiff(termlist[0]/self.qs_2d**4,
+			#!   1./(self.area*self.gamma*self.qs_2d**2))*self.qs_2d**4
 		# reshape the terms into one-dimensional lists, dropping the zeroth mode and converting to real
 		self.termlist = np.array([np.abs(np.reshape(np.mean(k,axis=0),-1)[1:]) for k in termlist])
 		#! prolly slow
@@ -447,8 +470,12 @@ class UndulationCurvatureCoupling:
 			q_raw = self.qs
 			area = self.area
 			model_basic = (
-				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+(1.)/(gamma_p*q_raw**2+machine_eps))*
+				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
+				(1.)/(gamma_p*q_raw**2+machine_eps))*
 				((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))))
+			#! dev: enter debugging mode for alternate binning methods because size mismatch
+			if self.binner_method!='explicit':
+				import ipdb;ipdb.set_trace()
 			self.termlist[0] = logsum(model_q4,logdiff(self.termlist[0],model_basic))
 
 	def build_elastic_hamiltonian(self,*curvatures):
@@ -456,7 +483,8 @@ class UndulationCurvatureCoupling:
 		couple_sign = self.couple_sign
 		# use qs_raw because binning happens downstream
 		qs = self.qs_raw
-		#! should area jitter?
+		# note that we do not jitter the area here and we use NPT simulations so there
+		#   should be slight variations in the area
 		area = self.area
 		if len(curvatures)>0: 
 			self.coupling(*curvatures)
@@ -509,11 +537,14 @@ class UndulationCurvatureCoupling:
 			if self.positive_vibe: vibe = np.abs(vibe)
 			# no grease here
 			if not self.grease: 
+				raise Exception('we have added epsilon to all opportunities for '
+					'division by zero in this code so we recommend keeping the "grease" on '
+					'in this location for consistency')
 				raw = (vibe*self.qs_raw)*(0.+1./(np.exp(vibe*self.qs_raw)-1))
 			# standard grease is outside the exponential
 			else: 
-				raw = (vibe*self.qs_raw+machine_eps)*(
-					0.+1./(np.exp(vibe*self.qs_raw)-1)+machine_eps)
+				raw = (vibe*self.qs_raw)*(
+					0.+1./(np.exp(vibe*self.qs_raw)-1+machine_eps))
 			if not self.oscillator_reverse: return raw
 			else: return log_reverse(raw)
 		self.oscillator = oscillator_function
@@ -565,8 +596,8 @@ class UndulationCurvatureCoupling:
 			router = route_args_objective(*args)
 			args_hel = router['args_hel']
 			args_equipartition = router['args_equipartition']
-			# it is very nice to have this in one place in the code!
-			# METHODOLOGY: we bin and then filter (but you could do this the other way around)
+			# it is useful to have this in one place in the code to avoid repetition
+			# methodology: we bin and then filter (but you could do this the other way around)
 			error = self.residual(
 				self.binner.bin(self.equipartition(*args_equipartition))[self.band],
 				self.binner.bin(self.hel(*args_hel))[self.band])
@@ -581,12 +612,11 @@ class UndulationCurvatureCoupling:
 if __name__=='__main__':
 
 	# use replot() to rerun the main block
-	#! note that __replotting__ was removed here because absent from omnicalc.py 
+	# note that we removed __replotting__ because absent from omnicalc.py 
 
 	# switches
 	do_demo = 0
 	do_survey = 1
-	do_spectra_survey_debug_dep = 0
 	do_spectra_survey_debug = 1
 	do_compute_landscape = 0
 
@@ -604,9 +634,7 @@ if __name__=='__main__':
 
 	if do_demo:
 	
-		# settings
 		sn = work.sns()[0]
-		# singleton example
 		self = ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,
 			model_style='bending',equipartition_model='harmonic_oscillators')
 		ucc.build_curvature_fields(
@@ -619,12 +647,13 @@ if __name__=='__main__':
 	if do_survey:
 
 		# settings
-		positive_vibe = True
-		oscillator_reverse = False
+		#! working method is positive_vibe, no oscillator_reverse, and subtract_protrusions
+		positive_vibe = False
+		oscillator_reverse = True
+		subtract_protrusions = False
 		curvature_sweep_number = 2
-		#! cannot change the following or you get an array size mismatch
+		# explicit is the standard method for now. others must be refactored
 		binner_method = ['explicit','perfect','blurry'][0]
-		subtract_protrusions = True
 
 		sn = work.sns()[0]
 		from codes.hypothesizer import hypothesizer
@@ -640,84 +669,6 @@ if __name__=='__main__':
 		#   since that is slowest and gets recomputed the least at the front
 		hypos = hypothesizer(*({'route':['extent'],'values':extents},
 			{'route':['curvature'],'values':curvatures}))
-
-		# spectra figure for one result 
-		if do_spectra_survey_debug_dep:
-		
-			### DEPRECATED!
-			extent,curvature = 1.0,0.0
-			self = ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,
-				model_style='bending',equipartition_model='harmonic_oscillators',
-				oscillator_reverse=oscillator_reverse,positive_vibe=positive_vibe,
-				binner_method=binner_method,subtract_protrusions=subtract_protrusions)
-			ucc.build_curvature_fields(mode='protein_dynamic',isotropy_mode='isotropic',extent=extent)
-			ucc.build_elastic_hamiltonian(curvature)
-			ucc.build_equipartition()
-			ucc.build_objective()
-			ucc.optimize()
-			if 1:
-				fitted = ucc.opt.fit.x
-				hel = ucc.hel(*fitted[:1])
-				hosc = ucc.equipartition(*fitted[1:])
-				fig = plt.figure()
-				ax = fig.add_subplot(111)
-				if 1:
-					ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0)
-					ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0)
-					qs_binned = ucc.binner.bin(ucc.qs_raw)
-				if False:
-					hel_binned = ucc.binner.bin(hel)
-					hosc_binned = ucc.binner.bin(hosc)
-					ax.plot(ucc.qs,hel_binned,'.',c='b',lw=0)
-					ax.plot(ucc.qs,hosc_binned,'.',c='r',lw=0)
-				if False:
-					curvatures = (0.,)
-					hqs = self.zs.fields_q
-					if False:
-						hqs = (hqs - np.reshape(1./(self.qs_2d**2*self.gamma*self.area),-1)[1:])
-					# curvature sum function
-					self.curvature.fields_sum = self.curvature.curvature_multiplex(
-						self.curvature.fields,*curvatures)
-					# we FFT after generating the final field
-					cqs = self.curvature.fields_q = fft_field(self.curvature.fields_sum)
-					termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
-					termlist = [termlist[0]-np.reshape(1./(self.qs_2d**2*self.gamma*self.area),-1)[1:],]+\
-						termlist[1:]
-					# reshape the terms into one-dimensional lists, drop zero mode and convert to real
-					termlist = np.array([np.abs(np.reshape(np.mean(k,axis=0),-1)[1:]) for k in termlist])
-					spec = termlist[0]*self.qs**4
-					ax.plot(ucc.qs,spec,'.',c='r',lw=0)
-					test = np.reshape(1./(self.qs_2d**2*self.gamma*self.area),-1)[1:]
-					ax.plot(ucc.qs,test,'.',c='b',lw=0)
-				# trying stuff to figure out subtract protrusions
-				if 0:
-					kappa = self.opt.fit.x[0] # vaulted it up to energy with qs**4
-					ax.plot(self.qs,self.termlist[0]*self.qs**4,'.',c='b',lw=0)
-					ax.plot(self.qs,self.termlist_alt*self.qs**4,'.',c='c',lw=0)
-					binner = Binner(wavevectors=self.qs,mode='perfect')
-					qsp = binner.bin(self.qs)
-					m = 1./(self.area*kappa/2.*self.qs**4)
-					mp = binner.bin(m)
-					m2 = 1./(self.area*kappa/2.*self.qs**4)+1./(self.area*self.gamma*2.*self.qs**2)
-					m2p = binner.bin(m2)
-					m3 = 1./(self.area*self.gamma*2.*self.qs**2)
-					ax.plot(qsp,mp*qsp**4,'-',c='r',lw=1,zorder=3)
-					ax.plot(qsp,m2p*qsp**4,'-',c='m',lw=1,zorder=3)
-					def logdiff(x,y): return 10.**(np.log10(x)-np.log10(y))
-					# this looks great: 
-					mmp = logdiff(self.termlist[0],logdiff(m2,m))
-					# this is a line that bends up at 10**0: mmp = np.abs(self.termlist[0]-logdiff(m2,m))
-					# looks good
-					ax.plot(self.qs,mmp*self.qs**4,'.',c='k',lw=0)
-					# ax.plot(self.qs,self.termlist[0]-m3,'.',c='k',lw=0)
-				# did subtract protrusion work?
-				if 0:
-					ax.plot(self.qs,self.termlist[0],'.',c='k',lw=0)
-					ax.plot(self.qs,self.termlist_alt,'.',c='r',lw=0)
-				ax.set_xscale('log')
-				ax.set_yscale('log')
-				ax.axvline(ucc.q_cut,c='k',lw=1)
-				picturesave('fig.debug.v12',work.plotdir)
 
 		# new spectra figure for debugging
 		if do_spectra_survey_debug:
@@ -737,20 +688,34 @@ if __name__=='__main__':
 
 			fig = plt.figure(figsize=(12,8))
 			axes = [fig.add_subplot(121),fig.add_subplot(122)]
-			ax = axes[0]
-			print('1 binner')
 			binner = Binner(wavevectors=self.qs,mode=binner_method)
 			fitted = ucc.opt.fit.x
 			print('[STATUS] fitted: %s'%str(fitted))
-			hel = ucc.hel(*fitted[:1])
-			hosc = ucc.equipartition(*fitted[1:])
-			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,label='observed')
+			hel = ucc.hel(*fitted[:-1])
+			hosc = ucc.equipartition(*fitted[-1:])
+		
+			# left panel in the energy space	
+			ax = axes[0]
+			ax.axhline(1.,c='k',lw=1)
+			ax.set_ylabel('energy ($k_BT$)')
+			ax.set_xlabel('wavevector (${nm}^{-1}$')
+			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,
+				label='$H_el$ ($\kappa=%.1f k_BT)$'%fitted[0])
 			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,label='harmonic oscillator')
+			if 0: ax.plot(binner.bin(self.qs),binner.bin(
+				logsum(1.0,logdiff(self.hqhq,model_basic))),
+					'-',c='m',lw=1,zorder=10,label='corrected')
+			if 0: ax.plot(binner.bin(self.qs),binner.bin(model_basic)*q_raw**4*kappa*area,
+				'.-',c='k',lw=1,label='basic')
 
+			# right panel in hq space
 			ax = axes[1]
-			model_q4 = 1./(self.area*self.kappa/2.*self.qs**4)
+			ax.set_ylabel('$\|{h_q}{h_q}\|$ (${nm}^{-2}$)')
+			ax.set_xlabel('wavevector (${nm}^{-1})$')
+			model_q4 = 1./(self.area*self.kappa*self.qs**4)
 			# plot the first coupled term (i.e. hqhq) in equation 23
-			ax.plot(binner.bin(self.qs),binner.bin(self.hqhq),'.-',c='b',lw=1,label='???')
+			ax.plot(binner.bin(self.qs),binner.bin(self.hqhq),'.',c='b',lw=1,label='observed')
+			ax.plot(binner.bin(self.qs),binner.bin(model_q4),'-',c='r',lw=1,zorder=5,label='fit')
 			# plot the standard model
 			kappa,gamma_p,vibe = self.kappa,self.gamma,self.vibe
 			sigma = 0.0
@@ -762,17 +727,12 @@ if __name__=='__main__':
 				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
 					(1.)/(gamma_p*q_raw**2+machine_eps))*
 				((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))))
-			ax.plot(binner.bin(self.qs),binner.bin(model_basic),'.-',c='k',lw=1,label='basic')
-			ax.plot(binner.bin(self.qs),binner.bin(model_q4),'.-',c='r',lw=1,zorder=5,label='q4')
-			ax.plot(binner.bin(self.qs),binner.bin(
+			if 0: ax.plot(binner.bin(self.qs),binner.bin(model_basic),'.-',c='k',lw=1,label='basic')
+			if 0: ax.plot(binner.bin(self.qs),binner.bin(
 				logsum(model_q4,logdiff(self.hqhq,model_basic))),
 				'-',c='m',lw=1,zorder=10,label='corrected')
-			ax = axes[0]
-			ax.plot(binner.bin(self.qs),binner.bin(
-				logsum(1.0,logdiff(self.hqhq,model_basic))),
-					'-',c='m',lw=1,zorder=10,label='corrected')
-			ax.plot(binner.bin(self.qs),binner.bin(model_basic)*q_raw**4*kappa*area,
-				'.-',c='k',lw=1,label='basic')
+
+			# formatting
 			for ax in axes:
 				ax.set_xscale('log')
 				ax.set_yscale('log')

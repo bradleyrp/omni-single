@@ -97,6 +97,7 @@ collections:
   batch-rockfish-2020.12:
     - v1021
     - v650
+  single-repro: [v650]
 
 slices:
   v1021: 
@@ -205,8 +206,7 @@ plots:
   curvature_undulation_coupling:
     autoplot: True
     script: plot-curvature_undulation_coupling_drilldown.py
-    collections:
-      - batch-rockfish-2020.12
+    collections: single-repro
     calculation: 
       - curvature_undulation_coupling
   ucc:
