@@ -211,8 +211,7 @@ plots:
       - curvature_undulation_coupling
   ucc:
     autoplot: True
-    collections:
-      - batch-rockfish-2020.12
+    collections: single-repro
     calculation:
       undulations: {}
       protein_abstractor: {}
