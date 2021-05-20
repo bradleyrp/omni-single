@@ -418,18 +418,20 @@ class UndulationCurvatureCoupling:
 			self.qs_raw>=self.q_min,
 			self.qs_raw<=self.q_cut),axis=0))[0]
 
-		#! previously used this only when subtracting protrusions because later the
-		#!   optimizer should set these values more carefully. later we might want to use
-		#!   this to subtract the protrusions, but it would be better to fit everything together
-		result = basic_undulation_fitter(self.qs_raw,self.zs.fields_q,
-			self.area,q_cut=1.0,fit_tension=False,fit_correction=False,
-			binner_method=self.binner_method,fit_protrusion=self.subtract_protrusions)
-		# microscopic surface tension must be positive and is enforced in the fitter above
-		# if we fit protrusions then we store the fits here for reference later
-		self.gamma = np.abs(result['gamma'])
-		self.kappa = np.abs(result['kappa'])
-		self.vibe = np.abs(result['vibe'])
-		self.hqhq = result['hqhq']
+		#!!??
+		if 1:
+			#! previously used this only when subtracting protrusions because later the
+			#!   optimizer should set these values more carefully. later we might want to use
+			#!   this to subtract the protrusions, but it would be better to fit everything together
+			result = basic_undulation_fitter(self.qs_raw,self.zs.fields_q,
+				self.area,q_cut=1.0,fit_tension=False,fit_correction=False,
+				binner_method=self.binner_method,fit_protrusion=self.subtract_protrusions)
+			# microscopic surface tension must be positive and is enforced in the fitter above
+			# if we fit protrusions then we store the fits here for reference later
+			self.gamma = np.abs(result['gamma'])
+			self.kappa = np.abs(result['kappa'])
+			self.vibe = np.abs(result['vibe'])
+			self.hqhq = result['hqhq']
 
 	def compute_grid_counts(self,vecs,grid_spacing):
 		"""Compute the number of grid points to get as close as possible to a particular spacing."""
@@ -474,6 +476,19 @@ class UndulationCurvatureCoupling:
 		# reshape the terms into one-dimensional lists, dropping the zeroth mode and converting to real
 		self.termlist = np.array([
 			np.abs(np.reshape(np.mean(k,axis=0),-1)[1:]) for k in termlist])
+		# same exact result if you take the magnitude and average or average and then take the magnitude
+		if 0: self.termlist_alt = np.array([
+			(np.abs(k).reshape((len(k),-1)).mean(axis=0)[1:]) for k in termlist])
+		# compare this to the previous function, the basic_undulation_fitter, which squared the mean
+		#   of the hqs. this gives a slightly different result than self.termlist[0] which comes from
+		#   np.abs(np.reshape(np.mean(multipliers(hqs,hqs),axis=0),-1)[1:]) which itself does the 
+		#   matrix multiplication over complex numbers. we continue with the solution in termlist because
+		#   both the wavevectors and FFT fields (hqs or cqs) should be complex
+		# we hold self.hqs and self.hqhq for reference only
+		self.hqs = self.zs.fields_q
+		self.hqhq = (np.abs(hqs).reshape((len(hqs),-1)).mean(axis=0)[1:])**2	
+
+		#!!?? 
 		#! unclear what happens below but we have turned it off for now
 		if self.subtract_protrusions:
 			raise Exception('dev')
@@ -528,7 +543,7 @@ class UndulationCurvatureCoupling:
 			termlist = self.termlist
 			if debug:
 				import ipdb;ipdb.set_trace()
-			return (area/2. * ( kappa * (
+			return (area * ( kappa * (
 				termlist[0] * qs**4 
 				+ couple_sign*termlist[1] * qs**2
 				+ couple_sign*termlist[2] * qs**2 
@@ -543,7 +558,7 @@ class UndulationCurvatureCoupling:
 			def equipartition_default(): 
 				# we must use the binner qs to ensure we operate in explicit 
 				#   wavevectors since binning will occur downstream
-				return np.ones(self.binner.qs.shape[0])
+				return energy_per_mode * np.ones(self.binner.qs.shape[0])
 			#! replace this function with free variables if oscillator
 			self.equipartition = equipartition_default
 		elif self.equipartition_model=='harmonic_oscillators':
@@ -767,6 +782,8 @@ if __name__=='__main__':
 		binner_method = ['explicit','perfect','blurry'][1]
 		# decide which physical parameters to fit
 		model_style = ['bending','tension','tension_protrusion'][0]
+		# define energy per mode for the default equipartition model
+		energy_per_mode = 1.
 
 		sn = work.sns()[0]
 		from codes.hypothesizer import hypothesizer
@@ -807,14 +824,18 @@ if __name__=='__main__':
 				ucc.optimize()
 
 			# PLOT: survey the fitting procedure
-			fig = plt.figure(figsize=(8,12))
-			axes = [fig.add_subplot(311),fig.add_subplot(312),fig.add_subplot(313)]
-			#! binner = Binner(wavevectors=self.qs,mode=binner_method)
-			#! debugging
-			#! binner_alt = Binner(wavevectors=self.qs,mode='perfect')
-			fitted = ucc.opt.fit.x
-			print('[STATUS] fitted: %s'%str(fitted))
-			#! refactor this so the argument handling in the class handles this
+			# in the deprecated validation procedure we check that changing from the q4 spectrum
+			#   to energy in a fit without tension, protrusions, oscillator, or curvature, gives us
+			#   the same spectrum that we originally fit things to. this is useful for checking that 
+			#   the kappa fit for the UCC method matches a typical q4 spectrum fit
+			do_survey_validate = False
+			if do_survey_validate:
+				fig = plt.figure(figsize=(8,12))
+				axes = [fig.add_subplot(311),fig.add_subplot(312),fig.add_subplot(313)]
+			else: 
+				fig = plt.figure(figsize=(8,10))
+				axes = [fig.add_subplot(211),fig.add_subplot(212)]
+			#! dev: refactor this so the argument handling in the class handles this
 			if equipartition_model=='default':
 				hel = ucc.hel(fitted[0])
 				hosc = ucc.equipartition()
@@ -823,21 +844,21 @@ if __name__=='__main__':
 				hel = ucc.hel(*fitted[:-1])
 				hosc = ucc.equipartition(*fitted[-1:])
 				label_hosc = 'harmonic oscillator (%.1f)'%fitted[-1]
-			#! use the original fit
-			#! hel_alt = ucc.hel(ucc.kappa)
 		
 			# left panel shows energy spectra
 			ax = axes[0]
-			#! ax.set_ylim((0.5,4))
-			#! ax.set_xlim((0.05,2))
-			ax.axhline(1.,c='k',lw=1)
+			ax.set_ylim((0.1,10))
+			ax.set_xlim((0.05,2))
+			ax.axhline(energy_per_mode,c='k',lw=1)
 			ax.set_ylabel('energy ($k_BT$)')
 			ax.set_xlabel('wavevector (${nm}^{-1}$')
+			# plot the explicit energy spectrum
 			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,
 				label='$H_{el}$ ($\kappa=%.1f k_BT)$'%fitted[0])
+			# plot the perfect binner results
 			ax.plot(ucc.qs,ucc.binner.bin(hel),'-',c='k',zorder=2,lw=4)
-			if 0: ax.plot(ucc.qs_raw,hel_alt,'.',c='m',lw=0,
-				label='$H_{el (alt)}$ ($\kappa=%.1f k_BT)$'%fitted[0])
+			ends_check = np.argsort(ucc.qs_raw)[:2] 
+			if 0: print('[CHECK] two left values are: %s'%str(hel[ends_check]))
 			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,
 				label=label_hosc)
 			if 0: ax.plot(binner.bin(self.qs),binner.bin(
@@ -850,44 +871,28 @@ if __name__=='__main__':
 			ax = axes[1]
 			ax.set_ylabel('$\|{h_q}{h_q}\|$ (${nm}^{-2}$)')
 			ax.set_xlabel('wavevector (${nm}^{-1})$')
-			model_q4 = 1./(self.area*self.kappa*self.qs**4)
+			kappa = fitted[0]
+			model_q4 = 1./(self.area * kappa * self.qs**4)
 			# plot the binned undulation spectrum
 			# if you use the perfect binner, the ucc.qs are the reduced wavevectors
-			ax.plot(ucc.qs,ucc.binner.bin(ucc.hqhq),'.',c='b',lw=1,label='observed')
+			# note that we are using ucc.termlist[0] which is hqhq computed from the complex fields
+			ax.plot(ucc.qs,ucc.binner.bin(ucc.termlist[0]),'.',c='b',lw=1,label='observed')
 			# plot the fitted line
 			ax.plot(ucc.qs[ucc.band],model_q4[ucc.band],'-',c='r',lw=2,zorder=5,
-				label='fit ($\kappa=%.1f{k_{B}T}$)'%self.kappa)
-			if 0:
-				ax.plot(ucc.binner.bin(self.qs),ucc.binner.bin(ucc.hqhq),'.',c='b',lw=1,label='observed')
-				ax.plot(ucc.binner.bin(self.qs),ucc.binner.bin(model_q4),'-',c='r',lw=1,zorder=5,label='fit')
-			# plot the standard model
-			kappa,gamma_p,vibe = self.kappa,self.gamma,self.vibe
-			sigma = 0.0
-			q_raw = self.qs
-			area = self.area
-			print('[STATUS] fits: %s'%pprint.pformat(dict([(i,globals()[i]) for i in 
-				['kappa','sigma','gamma_p','vibe'] ])))
-			model_basic = (
-				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
-					(1.)/(gamma_p*q_raw**2+machine_eps))*
-				((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1+machine_eps))))
-			if 0: ax.plot(binner.bin(self.qs),binner.bin(model_basic),'.-',c='k',lw=1,label='basic')
-			if 0: ax.plot(binner.bin(self.qs),binner.bin(
-				logsum(model_q4,logdiff(self.hqhq,model_basic))),
-				'-',c='m',lw=1,zorder=10,label='corrected')
+				label='fit ($\kappa=%.1f{k_{B}T}$)'%kappa)
 
-			#! extra panel for debugging
-			ax = axes[2]
-			model_q4 = 1./(self.area*self.kappa*self.qs**4)
-			# plot the first coupled term (i.e. hqhq) in equation 23
-			ax.plot(ucc.qs_raw,fitted[0]*area*self.hqhq*ucc.qs_raw**4,'.',c='b',lw=1,
-				label='observed ($\kappa=%.1f$)'%fitted[0])
-			ax.plot(ucc.qs_raw,self.kappa*area*self.hqhq*ucc.qs_raw**4,'.',c='m',lw=1,
-				label='observed ($\kappa=%.1f$)'%self.kappa)
-			ax.plot(ucc.qs_raw,fitted[0]/2.*area*self.hqhq*ucc.qs_raw**4,'.',c='purple',lw=1,
-				label='observed ($\kappa=%.1f$)'%(fitted[0]/2))
-			ax.axhline(1.0,c='k',lw=1)
-			axes[2].legend()
+			if do_survey_validate:
+				ax = axes[2]
+				# plot the first coupled term (i.e. hqhq) in equation 23
+				# use termlist not hqhq so we retire
+				#   energy_this = kappa * ucc.area * ucc.hqhq * ucc.qs_raw**4
+				energy_this = kappa * ucc.area * ucc.termlist[0] * ucc.qs_raw**4
+				print('[CHECK] two left values are: %s'%str(energy_this[ends_check]))
+				ax.plot(ucc.qs_raw,energy_this,'.',c='b',lw=1,
+					label='observed ($\kappa=%.1f$)'%fitted[0])
+				ax.plot(ucc.qs,ucc.binner.bin(energy_this),'-',c='k',zorder=2,lw=2)
+				ax.axhline(1.0,c='k',lw=1)
+				axes[2].legend()
 
 			# formatting
 			for ax in axes:
