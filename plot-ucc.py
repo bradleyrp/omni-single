@@ -243,6 +243,16 @@ def residual_standard(hel,hosc):
 		np.log10(hel+machine_eps)-
 		np.log10(hosc+machine_eps))**2)
 
+def residual_linear(hel,hosc): 
+	# testing purposes only
+	return np.mean((hel-hosc)**2)
+
+def residual_modelfix(hel,hosc): 
+	# testing purposes only
+	return np.mean((
+		np.log10(hel+machine_eps)+
+		np.log10(hosc+machine_eps))**2)
+
 def stringer(x,p=5):
 	"""A nice way to print numbers."""
 	return (' '*(1*(x>0)))+('%.1e'%x 
@@ -346,7 +356,7 @@ class UndulationCurvatureCoupling:
 	"""
 	Supervise the undulation-curvature coupling algorithm.
 	"""
-	model_style_valid = ['bending','tension','tension_protrusion']
+	model_style_valid = ['bending','tension','tension_protrusion','protrusion']
 	def __init__(self,**kwargs):
 		"""Load data."""
 		self.sn = kwargs.pop('sn')
@@ -511,6 +521,7 @@ class UndulationCurvatureCoupling:
 		if self.model_style=='tension_protrusion': arglist = ['sigma','kappa','gamma']
 		elif self.model_style=='tension': arglist = ['sigma','kappa']
 		elif self.model_style=='bending': arglist = ['kappa']
+		elif self.model_style=='protrusion': arglist = ['kappa','gamma']
 		else: raise Exception
 		if len(args)!=len(arglist)+(self.nstrengths if not self.fix_curvatures else 0): 
 			raise Exception('incorrect arguments to the Hamiltonian for style %s: %s'%(
@@ -544,7 +555,7 @@ class UndulationCurvatureCoupling:
 			termlist = self.termlist
 			if debug:
 				import ipdb;ipdb.set_trace()
-			return (area/2. * ( kappa * (
+			return (area/2 * ( kappa * (
 				termlist[0] * qs**4 
 				+ couple_sign*termlist[1] * qs**2
 				+ couple_sign*termlist[2] * qs**2 
@@ -569,7 +580,7 @@ class UndulationCurvatureCoupling:
 			self.energy_per_mode = 1.
 			self.build_oscillator_function()
 			self.equipartition = self.oscillator
-		else: raise Exception
+		else: raise Exception('invalid equipartition_model: %s'%equipartition_model)
 
 	def build_oscillator_function(self):
 		"""Build an harmonic oscillators function."""
@@ -604,6 +615,7 @@ class UndulationCurvatureCoupling:
 		if self.model_style=='tension_protrusion': init += [init_sigma,init_kappa,init_gamma]
 		elif self.model_style=='bending': init += [init_kappa]
 		elif self.model_style=='tension': init += [init_sigma,init_kappa]
+		elif self.model_style=='protrusion': init += [init_kappa,init_gamma]
 		else: raise Exception
 		if self.equipartition_model=='default': init += []
 		elif self.equipartition_model=='harmonic_oscillators': init += [init_vibe]
@@ -618,6 +630,7 @@ class UndulationCurvatureCoupling:
 		if self.model_style=='tension_protrusion': arglist_hel = ['sigma','kappa','gamma']
 		elif self.model_style=='bending': arglist_hel = ['kappa']
 		elif self.model_style=='tension': arglist_hel = ['sigma','kappa']
+		elif self.model_style=='protrusion': arglist_hel = ['kappa','gamma']
 		else: raise Exception
 		# arguments must be in a list: hel then hosc then curvatures
 		if self.equipartition_model=='default': arglist_equipartition = []
@@ -777,17 +790,41 @@ if __name__=='__main__':
 	if do_survey:
 
 		# settings
-		#! working method is positive_vibe, no oscillator_reverse, and subtract_protrusions
 		positive_vibe = False
 		oscillator_reverse = False
+		#! dev: the following should be retired
 		subtract_protrusions = False
 		curvature_sweep_number = 2
-		equipartition_model = ['default','harmonic_oscilators'][0]
-		# explicit is the standard method for now. others must be refactored
+		equipartition_model = ['default','harmonic_oscillators'][1]
+		# the default preferred method is the perfect binner
 		binner_method = ['explicit','perfect','blurry'][1]
 		# decide which physical parameters to fit
-		model_style = ['bending','tension','tension_protrusion'][1]
-		# define energy per mode for the default equipartition model
+		model_style = ['bending','tension','tension_protrusion','protrusion'][1]
+		# the default method ("standard") uses log residuals
+		residual_name = ['standard','linear','modelfix'][2]
+		# the default equipartition model simply fits to 1/2 kBT and is useful for checking kappa 
+		#   without any curvature to ensure that this fitting method matches the typical q^{-4} fit
+		# the binner method called "perfect" will average valuse that occur at each unique wavevector
+		#   which creates fewer wavevectors in our plot and also somewhat evens out the distribution of
+		#   wavevectors along the x-axis. the perfect method treats each wavevector magnitude as a unique
+		#   mode, and for this reason we think it is the appropriate measure. the blurry method bins the
+		#   wavevectors into finite bins, thus collapsing the number of wavevectors even further. for
+		#   CGMD simulations with the upward "swoosh" shape, the blurry binner produces a higher kappa
+		#   as expected because it counteracts the extra weight from the higher density of wavevectors at
+		#   higher values, which pulls the kappa down because the swoosh goes up
+		# note on tension above. in the v650 (4xENTH) reference simulation, we see that adding tension
+		#   causes kappa to drop slightly from 20.4 to 19.0 kBT, presumably because the intensities at 
+		#   lower wavevectors are somewhat lower than expected, indicating a slight surface tension,
+		#   however the inclusion of sigma in these calculations does not affect the results very
+		#   much because we are well below the crossover
+		# residuals should be standard, which takes the residuals in the log space
+		# note that the linear method would have a more profound effect if we were 
+		#   fitting hqhq to q^{-4} directly (see undulate.py) because then the linear residuals
+		#   would shrink with higher wavevectors and hence lower hqhq. in the energy space, switching
+		#   to linear residuals has much less effect because the intensities are all flanking a
+		#   mostly uniform value (both the oscillators and equipartition are still somewhat constant)
+		#   but as we noted above, the log residuals are more accurate because the fit should respect
+		#   the intensities across several orders of magnitude in hqhq	
 
 		sn = work.sns()[0]
 		from codes.hypothesizer import hypothesizer
@@ -817,7 +854,8 @@ if __name__=='__main__':
 					oscillator_reverse=oscillator_reverse,
 					positive_vibe=positive_vibe,
 					binner_method=binner_method,
-					subtract_protrusions=subtract_protrusions)
+					subtract_protrusions=subtract_protrusions,
+					residual_name=residual_name)
 				ucc.build_curvature_fields(
 					mode='protein_dynamic',
 					isotropy_mode='isotropic',
@@ -857,11 +895,18 @@ if __name__=='__main__':
 			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,
 				label='$H_{el}$ ($\kappa=%.1f k_BT)$'%kappa)
 			# plot the perfect binner results
-			ax.plot(ucc.qs,ucc.binner.bin(hel),'-',c='k',zorder=2,lw=4)
+			if residual_name=='modelfix':
+				energy_apparent = ucc.binner.bin(hel)*ucc.binner.bin(hosc)
+				ax.plot(ucc.qs,energy_apparent,'-',c='k',zorder=2,lw=4)
+			# standard method follows
+			else: 
+				ax.plot(ucc.qs,ucc.binner.bin(hel),'-',c='k',zorder=2,lw=4)
 			ends_check = np.argsort(ucc.qs_raw)[:2] 
-			if 0: print('[CHECK] two left values are: %s'%str(hel[ends_check]))
-			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,
-				label={'default':'equipartition','harmonic_oscillators':'oscillators'}[equipartition_model])
+			print('[STATUS] the left two intensities are: %s'%str(hel[ends_check]))
+			label_hosc = {
+				'default':'equipartition',
+				'harmonic_oscillators':'oscillators'}[equipartition_model]
+			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,label=label_hosc)
 			if 0: ax.plot(binner.bin(self.qs),binner.bin(
 				logsum(1.0,logdiff(self.hqhq,model_basic))),
 					'-',c='m',lw=1,zorder=10,label='corrected')
