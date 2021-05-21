@@ -12,80 +12,6 @@ import scipy.interpolate
 
 machine_eps = eps = np.finfo(float).eps
 
-def basic_undulation_fitter(qs,hqs,area,**kwargs):
-	"""
-	Fit the undulations with no curvature.
-	"""
-	#! this code is legacy and needs checked carefully
-	#!   it is used later on in the coupling function
-	#!   one the ucc class works and matches undulate.py, this should be retired
-	# directions
-	fit_tension = kwargs.pop('fit_tension',True)
-	fit_correction = kwargs.pop('fit_correction',True)
-	fit_protrusion = kwargs.pop('fit_protrusion',True)
-	print('[STATUS calling basic_undulation_fitter: %s'%(dict(
-		fit_tension=fit_tension,fit_correction=fit_correction,
-		fit_protrusion=fit_protrusion)))
-	# settings
-	q_min = kwargs.pop('q_min',0.0)
-	q_cut = kwargs.pop('q_cut',4.0)
-	binner_method = kwargs.pop('binner_method','explicit')
-	bin_width = kwargs.pop('bin_width',0.05)
-	if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
-	# using complex here. see also build_hqhq 
-	hqhq = (np.abs(hqs).reshape((len(hqs),-1)).mean(axis=0)[1:])**2
-	band = np.all((qs>=q_min,qs<=q_cut),axis=0)
-	def model(q_raw,sigma,kappa,gamma_p,vibe,
-		protrusion=True,correct=True,tension=True,only_tension=False):
-		kappa,gamma_p = np.abs(kappa),np.abs(gamma_p)
-		if not tension: sigma = 0.0
-		if protrusion==False:
-			pure = ((1.0)/(area))*(
-				(1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps))
-		else: 
-			pure = ((1.0)/(area))*(
-				(1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
-				(1.)/(gamma_p*q_raw**2+machine_eps))
-		# we include epsilon here to avoid divide by zero errors
-		#   however note that this may affect the optimizer (see grease below)
-		if correct: osc = (vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1+machine_eps))
-		else: osc = 1.0
-		return pure * osc
-	def residual(a,b): 
-		# added epsilon here by default
-		return ((np.log10(a/(b+machine_eps)))**2).mean()
-	binner = Binner(wavevectors=qs[band],mode=binner_method,bin_width=bin_width)
-	def objective(args,
-		protrusion=fit_protrusion,
-		correct=fit_correction,
-		tension=fit_tension):
-		(sigma,kappa,gamma_p,vibe) = args
-		heights = hqhq[band]
-		heights_model = model(qs[band],sigma,kappa,gamma_p,vibe,
-			protrusion=protrusion,correct=correct,tension=tension)
-		return residual(binner.bin(heights),binner.bin(heights_model))
-	global stepno
-	stepno = 1
-	def callback(args,silent=False):
-		"""Watch the optimization."""
-		global stepno
-		args_string = ' '.join([stringer(a) for a in args])
-		output = ((u'\r' if stepno>0 else '')+
-			'[OPTIMIZE] step %s: %s'%(stepno,args_string))
-		if not silent:
-			sys.stdout.flush()
-			sys.stdout.write(output)
-		stepno += 1
-	initial_conditions = (0.,20.,0.,0.)
-	fit = scipy.optimize.minimize(objective,
-		x0=initial_conditions,method='Nelder-Mead',callback=callback)
-	fitted = model(qs,*fit.x)
-	print('\n[OPTIMIZE] completed with error %s'%fit.fun)
-	return dict(sigma=fit.x[0] if fit_tension else 0.0,band=band,hqhq=hqhq,
-		kappa=np.abs(fit.x[1]),vibe=fit.x[3] if fit_correction else 0.0,
-		gamma=fit.x[2] if fit_protrusion else 0.0,
-		model=model)
-
 @autoload(plotrun)
 def loader():
 	"""
@@ -216,9 +142,9 @@ def make_isotropic_fields(foci,vecs,ngrid,magnitude=1.0,extent=1.0):
 	spots = positions[...,:2].mean(axis=2)
 	# nprots is really the number of foci or spots
 	nprots,nframes = spots.shape[:2]
-	#! more elegant way to do this trick? itertools? np.unravel_index(1000,(nprots,nframes))?
-	#! previously used the concatenate,transpose,meshgrid trick 
-	#!   for indices, deprecated by the new trick
+	# question: more elegant way to do this trick? itertools? np.unravel_index(1000,(nprots,nframes))?
+	# previously used the concatenate,transpose,meshgrid trick 
+	#   for indices, deprecated by the new trick
 	inds = np.concatenate(np.transpose(np.meshgrid(np.arange(nprots),np.arange(nframes))))
 	# compute the grid points 
 	prop_pts = np.transpose(np.meshgrid(range(0,ngrid[0]),range(0,ngrid[1])))/ngrid.astype(float)
@@ -226,7 +152,6 @@ def make_isotropic_fields(foci,vecs,ngrid,magnitude=1.0,extent=1.0):
 	xypts = (np.tile(np.reshape(prop_pts,(ngrid[0],ngrid[1],1,2)),(nframes,1))*vecs[...,:2])
 	# switch to 1D indexing
 	xypts = np.transpose(xypts,(2,0,1,3))
-	#! check indexing
 	xypts = xypts.reshape((nframes,-1,2))
 	# compute all euclidean distances from each protein foci to grid points for all frames
 	distances = np.array([np.linalg.norm(xypts-
@@ -291,9 +216,6 @@ class QuickOpt:
 def log_reverse(raw):
 	return 10.**(-1.0*np.log10(raw))
 
-###
-### Manage Fields
-###
 class UCCFields:
 	"""
 	Manage a set of fields.
@@ -316,7 +238,9 @@ class UCCFields:
 		if len(fields.shape)!=4: raise Exception
 		if len(curvatures)==0: raise Exception('no curvatures')
 		if len(curvatures)==1: curvatures = [curvatures[0] for i in fields]
-		elif len(curvatures)!=len(fields): raise Exception('not enough curvatures nor only one')
+		elif len(curvatures)!=len(fields):
+			raise Exception('not enough curvatures nor only one: %d curvatures and %d fields'%(
+				len(curvatures),len(fields)))
 		else: raise Exception('not enough curvatures')
 		method = kwargs.pop('method','mean')
 		if kwargs: raise Exception('unprocessed kwargs %s'%kwargs)
@@ -349,9 +273,6 @@ class UCCFields:
 		# the height transform only happens once
 		self.fields_q = fft_field(self.fields)
 
-###
-### Parent Class for Undulation Curvature Coupling
-###
 class UndulationCurvatureCoupling:
 	"""
 	Supervise the undulation-curvature coupling algorithm.
@@ -685,7 +606,10 @@ if __name__=='__main__':
 	do_demo = 0
 	do_survey = 1
 	do_spectra_survey_debug = 1
-	do_compute_landscape = 1
+	# make sure you select the correct do_scheme before running a landscape
+	do_compute_landscape = 0
+	#! dev: wilderness and pixel methods are pending refactor 
+	do_wilderness = 0
 
 	# METHOD 1: demo mode runs a single optimization to fit kappa only
 	if do_demo:
@@ -716,7 +640,7 @@ if __name__=='__main__':
 			'repro-negative','repro-negative-corrected',
 			'repro-positive','repro-positive-corrected',
 			# select the scheme here
-			][4]
+			][1]
 		positive_vibe = False
 		oscillator_reverse = False
 		curvature_sweep_number = 2
@@ -1054,4 +978,36 @@ if __name__=='__main__':
 			meta_out['hypos'] = hypos
 			picturesave(figname,work.plotdir,
 				backup=False,version=False,meta=meta_out)
+
+	if do_wilderness:
+
+		print('[STATUS] wilderness method starts here')
+		extent = 8.0
+		if 'ucc' not in globals():
+	
+			# select a single simulation
+			sn = work.sns()[0]
+			#! pending: testing on v650
+			sn = 'v650'
+			nprots = 4
+			ucc = UndulationCurvatureCoupling(
+				nstrengths=nprots,
+				sn=sn,grid_spacing=grid_spacing,q_cut=q_cut,
+				model_style=model_style,
+				equipartition_model=equipartition_model,
+				oscillator_reverse=oscillator_reverse,
+				positive_vibe=positive_vibe,
+				binner_method=binner_method,
+				residual_name=residual_name)
+			ucc.build_curvature_fields(
+				mode='protein_dynamic',
+				isotropy_mode='isotropic',
+				extent=extent)
+		print('[STATUS] building functions')
+		ucc.build_elastic_hamiltonian()
+		ucc.build_equipartition()
+		ucc.build_objective()
+		print('[STATUS] starting optimize')
+		if 0: ucc.optimize()
+		else: print('[STATUS] pending refactor: run the optimizer here')
 
