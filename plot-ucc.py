@@ -507,6 +507,18 @@ class UndulationCurvatureCoupling:
 				import ipdb;ipdb.set_trace()
 			self.termlist[0] = logsum(model_q4,logdiff(self.termlist[0],model_basic))
 
+	def route_args_hel(self,*args):
+		if self.model_style=='tension_protrusion': arglist = ['sigma','kappa','gamma']
+		elif self.model_style=='tension': arglist = ['sigma','kappa']
+		elif self.model_style=='bending': arglist = ['kappa']
+		else: raise Exception
+		if len(args)!=len(arglist)+(self.nstrengths if not self.fix_curvatures else 0): 
+			raise Exception('incorrect arguments to the Hamiltonian for style %s: %s'%(
+				self.model_style,args))
+		out = dict(zip(arglist,args))
+		if not self.fix_curvatures: out.update(curvatures=args[len(arglist):])
+		return out
+
 	def build_elastic_hamiltonian(self,*curvatures):
 		"""Construct the H_{el} function, the elastic energy function."""
 		# locals from self
@@ -520,19 +532,8 @@ class UndulationCurvatureCoupling:
 			self.coupling(*curvatures)
 			self.fix_curvatures = True
 		else: self.fix_curvatures = False
-		def route_args_hel(*args):
-			if self.model_style=='tension_protrusion': arglist = ['sigma','kappa','gamma']
-			elif self.model_style=='tension': arglist = ['sigma','kappa']
-			elif self.model_style=='bending': arglist = ['kappa']
-			else: raise Exception
-			if len(args)!=len(arglist)+(self.nstrengths if not self.fix_curvatures else 0): 
-				raise Exception('incorrect arguments to the Hamiltonian for style %s: %s'%(
-					self.model_style,args))
-			out = dict(zip(arglist,args))
-			if not self.fix_curvatures: out.update(curvatures=args[len(arglist):])
-			return out
 		def hamiltonian(*args,debug=False):
-			params = route_args_hel(*args)
+			params = self.route_args_hel(*args)
 			kappa = params.get('kappa')
 			sigma = params.get('sigma',0.0)
 			gamma = params.get('gamma',0.0)
@@ -543,7 +544,7 @@ class UndulationCurvatureCoupling:
 			termlist = self.termlist
 			if debug:
 				import ipdb;ipdb.set_trace()
-			return (area * ( kappa * (
+			return (area/2. * ( kappa * (
 				termlist[0] * qs**4 
 				+ couple_sign*termlist[1] * qs**2
 				+ couple_sign*termlist[2] * qs**2 
@@ -555,14 +556,17 @@ class UndulationCurvatureCoupling:
 	def build_equipartition(self):
 		"""Construct our working definition of equipartition."""
 		if self.equipartition_model=='default':
+			# if no oscillator correction we use equipartition here
+			self.energy_per_mode = 1./2
 			def equipartition_default(): 
 				# we must use the binner qs to ensure we operate in explicit 
 				#   wavevectors since binning will occur downstream
-				return energy_per_mode * np.ones(self.binner.qs.shape[0])
+				return self.energy_per_mode * np.ones(self.binner.qs.shape[0])
 			#! replace this function with free variables if oscillator
 			self.equipartition = equipartition_default
 		elif self.equipartition_model=='harmonic_oscillators':
-			#! internalize the oscillator function
+			# for the oscillator correction we fit to 1 kBT 
+			self.energy_per_mode = 1.
 			self.build_oscillator_function()
 			self.equipartition = self.oscillator
 		else: raise Exception
@@ -608,36 +612,37 @@ class UndulationCurvatureCoupling:
 		else: init += [init_curvature for i in range(self.nstrengths)]
 		return init
 
+	def route_args_objective(self,*args):
+		"""Route arguments incoming to the objective function to customers."""
+		#! dev: this mimics the router for hel. avoid repetition here
+		if self.model_style=='tension_protrusion': arglist_hel = ['sigma','kappa','gamma']
+		elif self.model_style=='bending': arglist_hel = ['kappa']
+		elif self.model_style=='tension': arglist_hel = ['sigma','kappa']
+		else: raise Exception
+		# arguments must be in a list: hel then hosc then curvatures
+		if self.equipartition_model=='default': arglist_equipartition = []
+		elif self.equipartition_model=='harmonic_oscillators': arglist_equipartition = ['vibe']
+		else: raise Exception
+		if self.fix_curvatures: n_curvatures = 0
+		else: n_curvatures = self.nstrengths
+		n_expected_args = (n_curvatures+len(arglist_hel)+len(arglist_equipartition))
+		if len(args)!=(n_curvatures+len(arglist_hel)+len(arglist_equipartition)):
+			raise Exception('incorrect number of arguments to the objective. expected %d and got %d'%(
+				n_expected_args,len(args)))
+		hel_i = len(arglist_hel)
+		heq_i = hel_i + len(arglist_equipartition)
+		out = dict(args_equipartition=args[hel_i:heq_i],
+			args_hel=tuple(list(args[0:hel_i])+([] if self.fix_curvatures else list(args)[heq_i:])),)
+		return out
+
 	def build_objective(self):
 		"""
 		Build an objective function from energies, 
 		an equipartition model, the residual, and the band.
 		"""
-		def route_args_objective(*args):
-			"""Route arguments incoming to the objective function to customers."""
-			#! dev: this mimics the router for hel. avoid repetition here
-			if self.model_style=='tension_protrusion': arglist_hel = ['sigma','kappa','gamma']
-			elif self.model_style=='bending': arglist_hel = ['kappa']
-			elif self.model_style=='tension': arglist_hel = ['sigma','kappa']
-			else: raise Exception
-			# arguments must be in a list: hel then hosc then curvatures
-			if self.equipartition_model=='default': arglist_equipartition = []
-			elif self.equipartition_model=='harmonic_oscillators': arglist_equipartition = ['vibe']
-			else: raise Exception
-			if self.fix_curvatures: n_curvatures = 0
-			else: n_curvatures = self.nstrengths
-			n_expected_args = (n_curvatures+len(arglist_hel)+len(arglist_equipartition))
-			if len(args)!=(n_curvatures+len(arglist_hel)+len(arglist_equipartition)):
-				raise Exception('incorrect number of arguments to the objective. expected %d and got %d'%(
-					n_expected_args,len(args)))
-			hel_i = len(arglist_hel)
-			heq_i = hel_i + len(arglist_equipartition)
-			out = dict(args_equipartition=args[hel_i:heq_i],
-				args_hel=tuple(list(args[0:hel_i])+([] if self.fix_curvatures else list(args)[heq_i:])),)
-			return out
 		def objective(args):
 			"""Route the parameters."""
-			router = route_args_objective(*args)
+			router = self.route_args_objective(*args)
 			args_hel = router['args_hel']
 			args_equipartition = router['args_equipartition']
 			# it is useful to have this in one place in the code to avoid repetition
@@ -712,7 +717,7 @@ if __name__=='__main__':
 					ucc.build_equipartition()
 					ucc.build_objective()
 					ucc.optimize()
-					#! collect
+					# collect the results
 					jobs[(extent,curvature)] = ucc.opt.fit.fun
 					fitted[(extent,curvature)] = ucc.opt.fit.x
 
@@ -781,9 +786,8 @@ if __name__=='__main__':
 		# explicit is the standard method for now. others must be refactored
 		binner_method = ['explicit','perfect','blurry'][1]
 		# decide which physical parameters to fit
-		model_style = ['bending','tension','tension_protrusion'][0]
+		model_style = ['bending','tension','tension_protrusion'][1]
 		# define energy per mode for the default equipartition model
-		energy_per_mode = 1.
 
 		sn = work.sns()[0]
 		from codes.hypothesizer import hypothesizer
@@ -835,32 +839,29 @@ if __name__=='__main__':
 			else: 
 				fig = plt.figure(figsize=(8,10))
 				axes = [fig.add_subplot(211),fig.add_subplot(212)]
-			#! dev: refactor this so the argument handling in the class handles this
-			if equipartition_model=='default':
-				hel = ucc.hel(fitted[0])
-				hosc = ucc.equipartition()
-				label_hosc = 'fitted'
-			else:
-				hel = ucc.hel(*fitted[:-1])
-				hosc = ucc.equipartition(*fitted[-1:])
-				label_hosc = 'harmonic oscillator (%.1f)'%fitted[-1]
+			args_parse = ucc.route_args_objective(*ucc.opt.fit.x)
+			args_hel = ucc.route_args_hel(*args_parse['args_hel'])
+			for key in ['kappa','sigma','gamma']:
+				globals()[key] = args_hel.get(key,0.0)
+			hel = ucc.hel(*args_parse['args_hel'])
+			hosc = ucc.equipartition(*args_parse['args_equipartition'])
 		
 			# left panel shows energy spectra
 			ax = axes[0]
 			ax.set_ylim((0.1,10))
 			ax.set_xlim((0.05,2))
-			ax.axhline(energy_per_mode,c='k',lw=1)
+			ax.axhline(ucc.energy_per_mode,c='k',lw=1)
 			ax.set_ylabel('energy ($k_BT$)')
 			ax.set_xlabel('wavevector (${nm}^{-1}$')
 			# plot the explicit energy spectrum
 			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,
-				label='$H_{el}$ ($\kappa=%.1f k_BT)$'%fitted[0])
+				label='$H_{el}$ ($\kappa=%.1f k_BT)$'%kappa)
 			# plot the perfect binner results
 			ax.plot(ucc.qs,ucc.binner.bin(hel),'-',c='k',zorder=2,lw=4)
 			ends_check = np.argsort(ucc.qs_raw)[:2] 
 			if 0: print('[CHECK] two left values are: %s'%str(hel[ends_check]))
 			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,
-				label=label_hosc)
+				label={'default':'equipartition','harmonic_oscillators':'oscillators'}[equipartition_model])
 			if 0: ax.plot(binner.bin(self.qs),binner.bin(
 				logsum(1.0,logdiff(self.hqhq,model_basic))),
 					'-',c='m',lw=1,zorder=10,label='corrected')
@@ -871,7 +872,6 @@ if __name__=='__main__':
 			ax = axes[1]
 			ax.set_ylabel('$\|{h_q}{h_q}\|$ (${nm}^{-2}$)')
 			ax.set_xlabel('wavevector (${nm}^{-1})$')
-			kappa = fitted[0]
 			model_q4 = 1./(self.area * kappa * self.qs**4)
 			# plot the binned undulation spectrum
 			# if you use the perfect binner, the ucc.qs are the reduced wavevectors
