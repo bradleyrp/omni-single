@@ -277,7 +277,7 @@ class QuickOpt:
 			self.error = self.objective(self.fit)
 			self.fitted = self.fit
 		else: raise Exception('unclear optimize procedure %s'%self.scipy_optimize_function)
-		print('\n[RESULT] error: %s, solution: %s'%(self.error,str(self.fitted)))
+		print('\n[RESULT] error: %.5f, solution: %s'%(self.error,str(self.fitted)))
 	def callback(self,args):
 		"""Watch the optimization."""
 		args_string = ' '.join([stringer(a) for a in args])
@@ -376,7 +376,9 @@ class UndulationCurvatureCoupling:
 		self.binner_method = kwargs.pop('binner_method','explicit')
 		self.bin_width = kwargs.pop('bin_width',0.05)
 		self.subtract_protrusions = kwargs.pop('subtract_protrusions',False)
-		#! settings for the mapping
+		if self.subtract_protrusions:
+			raise Exception('subtract_protrusions is deprecated')
+		# curvature mapping settings
 		self.nstrengths = kwargs.pop('nstrengths',1)
 		if kwargs: raise ValueError('kwargs remain %s'%kwargs)
 		# valid model styles
@@ -385,7 +387,7 @@ class UndulationCurvatureCoupling:
 		# load heights from data
 		global data
 		if data==None: raise Exception
-		self.build() #! future routing here
+		self.build()
 
 	def build(self):
 		"""Prepare the calculation."""
@@ -427,21 +429,19 @@ class UndulationCurvatureCoupling:
 		self.band_raw = np.where(np.all((
 			self.qs_raw>=self.q_min,
 			self.qs_raw<=self.q_cut),axis=0))[0]
-
-		#!!??
-		if 1:
-			#! previously used this only when subtracting protrusions because later the
-			#!   optimizer should set these values more carefully. later we might want to use
-			#!   this to subtract the protrusions, but it would be better to fit everything together
+		# previously used the basic_undulation_fitter here to get a bare kappa
+		#   note that this could be used to fit kappa first before comparing to an oscillator
+		if 0:
+			# this result can produce a kappa, gamma, vibration, and hqhq for later
+			#   however it would be better to use the ucc instance below to do this
+			#   since it will provide the same results
+			# this call is retained here for reference only. there are three ways to get kappa
+			#   without curvature: the method below, the undulations parent class, and undulate.py
+			#   and all three should produce the same result. the undulations parent class matches
+			#   the fits in undulate.py (see do_scheme=='null' to check the comparison
 			result = basic_undulation_fitter(self.qs_raw,self.zs.fields_q,
 				self.area,q_cut=1.0,fit_tension=False,fit_correction=False,
-				binner_method=self.binner_method,fit_protrusion=self.subtract_protrusions)
-			# microscopic surface tension must be positive and is enforced in the fitter above
-			# if we fit protrusions then we store the fits here for reference later
-			self.gamma = np.abs(result['gamma'])
-			self.kappa = np.abs(result['kappa'])
-			self.vibe = np.abs(result['vibe'])
-			self.hqhq = result['hqhq']
+				binner_method=self.binner_method,fit_protrusion=False)
 
 	def compute_grid_counts(self,vecs,grid_spacing):
 		"""Compute the number of grid points to get as close as possible to a particular spacing."""
@@ -459,30 +459,48 @@ class UndulationCurvatureCoupling:
 		"""Compute the terms in equation 23."""
 		hqs = self.zs.fields_q
 		# protrusions are subtracted from the explicit data 
-		#! discarded method: remove protrusions from the spectra before the fit. this method
-		#!   was discarded for the obvious reason that it would be better to simply include
-		#!   protrusions in the model. comments retained here for posterity
-		#!     if self.subtract_protrusions: hqs = (hqs - 1./(self.qs_2d**2*self.gamma*self.area))
+		# discarded method: remove protrusions from the spectra before the fit. this method
+		#   was discarded for the obvious reason that it would be better to simply include
+		#   protrusions in the model. comments retained here for posterity
+		#     if self.subtract_protrusions: hqs = (hqs - 1./(self.qs_2d**2*self.gamma*self.area))
 		# curvature sum function
 		self.curvature.fields_sum = self.curvature.curvature_multiplex(
 			self.curvature.fields,*curvatures)
 		# we FFT after generating the final field
 		cqs = self.curvature.fields_q = fft_field(self.curvature.fields_sum)
 		termlist = [multipliers(x,y) for x,y in [(hqs,hqs),(hqs,cqs),(cqs,hqs),(cqs,cqs)]]
-		#! discarded method
-		if self.subtract_protrusions or False:
-			self.termlist_alt = np.abs(np.reshape(np.mean(termlist[0],axis=0),-1)[1:])
-			kappa = self.kappa
-			#! why is kappa necessary here? it makes a difference for the answer
-			m = 1./(self.area*kappa/2.*self.qs_2d**4+machine_eps)
-			m2 = (
-				1./(self.area*kappa/2.*self.qs_2d**4+machine_eps) + 
-				1./(self.area*self.gamma*self.qs_2d**2+machine_eps))
-			termlist[0] = logdiff(termlist[0],logdiff(m2,m))
-			#! other attempts to properly filter things out
-			#! termlist[0] = termlist[0]-1./(self.area*self.gamma*self.qs_2d**2)*self.qs_2d**4
-			#! termlist[0] = logdiff(termlist[0]/self.qs_2d**4,
-			#!   1./(self.area*self.gamma*self.qs_2d**2))*self.qs_2d**4
+		"""
+		# discarded method: when subtracting protrusions, we can filter out the protrusion 
+		#   contribution in several different ways, however the much more straightforward way is to
+		#   fit everything together. this is the approach that the code takes below, and these 
+		#   notes are retained for reference only (you should not use them without a very good reason)
+		# if you used the method below, self.kappa would come from the result object returned from
+		#   the basic_undulation_fitter, so a regular q4 fit is being used below to filter protrusion
+		#   contributions to the intensities in the spectra
+		#     self.termlist_alt = np.abs(np.reshape(np.mean(termlist[0],axis=0),-1)[1:])
+		#     m = 1./(self.area*self.kappa/2.*self.qs_2d**4+machine_eps)
+		#     m2 = (
+		#       1./(self.area*self.kappa/2.*self.qs_2d**4+machine_eps) + 
+		#       1./(self.area*self.gamma*self.qs_2d**2+machine_eps))
+		#     termlist[0] = logdiff(termlist[0],logdiff(m2,m))
+		#   other attempts to properly filter things out
+		#     termlist[0] = termlist[0]-1./(self.area*self.gamma*self.qs_2d**2)*self.qs_2d**4
+		#     termlist[0] = logdiff(termlist[0]/self.qs_2d**4,
+		#     1./(self.area*self.gamma*self.qs_2d**2))*self.qs_2d**4
+		# discarded method: further methods for filtering out the oscillator correction this time
+		#   note that this method is not the right way to analyze these spectra. retained for reference
+		#     model_q4 = 1./(self.area*self.kappa/2.*self.qs**4)
+		#     # plot the standard model
+		#     kappa,gamma_p,vibe = self.kappa,self.gamma,self.vibe
+		#     sigma = 0.0
+		#     q_raw = self.qs
+		#     area = self.area
+		#     model_basic = (
+		#     	((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
+		#     	(1.)/(gamma_p*q_raw**2+machine_eps))*
+		#     	((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))))
+		#     self.termlist[0] = logsum(model_q4,logdiff(self.termlist[0],model_basic))
+		"""
 		# reshape the terms into one-dimensional lists, dropping the zeroth mode and converting to real
 		self.termlist = np.array([
 			np.abs(np.reshape(np.mean(k,axis=0),-1)[1:]) for k in termlist])
@@ -498,24 +516,6 @@ class UndulationCurvatureCoupling:
 		self.hqs = self.zs.fields_q
 		self.hqhq = (np.abs(hqs).reshape((len(hqs),-1)).mean(axis=0)[1:])**2	
 
-		#!!?? 
-		#! unclear what happens below but we have turned it off for now
-		if self.subtract_protrusions:
-			raise Exception('dev')
-			model_q4 = 1./(self.area*self.kappa/2.*self.qs**4)
-			# plot the standard model
-			kappa,gamma_p,vibe = self.kappa,self.gamma,self.vibe
-			sigma = 0.0
-			q_raw = self.qs
-			area = self.area
-			model_basic = (
-				((1.0)/(area))*((1.)/(kappa*q_raw**4+sigma*q_raw**2+machine_eps)+
-				(1.)/(gamma_p*q_raw**2+machine_eps))*
-				((vibe*q_raw)*(1./(np.exp(vibe*q_raw)-1))))
-			#! dev: enter debugging mode for alternate binning methods because size mismatch
-			if self.binner_method!='explicit':
-				import ipdb;ipdb.set_trace()
-			self.termlist[0] = logsum(model_q4,logdiff(self.termlist[0],model_basic))
 
 	def route_args_hel(self,*args):
 		if self.model_style=='tension_protrusion': arglist = ['sigma','kappa','gamma']
@@ -573,7 +573,6 @@ class UndulationCurvatureCoupling:
 				# we must use the binner qs to ensure we operate in explicit 
 				#   wavevectors since binning will occur downstream
 				return self.energy_per_mode * np.ones(self.binner.qs.shape[0])
-			#! replace this function with free variables if oscillator
 			self.equipartition = equipartition_default
 		elif self.equipartition_model=='harmonic_oscillators':
 			# for the oscillator correction we fit to 1 kBT 
@@ -674,29 +673,24 @@ class UndulationCurvatureCoupling:
 
 if __name__=='__main__':
 
-	# use replot() to rerun main block when adjusting the plots
-	# note that we removed __replotting__ because absent from omnicalc.py 
+	"""
+	omnicalc development notes:
+	  this plot uses the autoload method
+	  if you use __replotting__ instead of __main__ above, and package the code below in functions
+	  then you can use e.g. `make plot ucc some_function` to run plots non-interactively from the shell
+	  however for now we are sticking with the legacy interactive mode with replot()
+	"""
 
 	# switches
 	do_demo = 0
 	do_survey = 1
 	do_spectra_survey_debug = 1
-	do_compute_landscape = 0
+	do_compute_landscape = 1
 
-	# constants
-	halfsweep = np.concatenate((
-		np.arange(0.01,0.1+0.01,0.01),
-		np.arange(0.2,1.0+0.1,0.1),
-		np.arange(2.,10.+1.,1.)))
-	curvatures_extreme = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
-	halfsweep = np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05])
-	halfsweep_bigger = np.array([0.0,0.005,0.01,0.02,0.04,0.05,0.1,0.2,0.3,0.5,1.,5,10.])
-	curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
-	curvatures_legacy_symmetric_bigger = np.concatenate((
-		halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
-
+	# METHOD 1: demo mode runs a single optimization to fit kappa only
 	if do_demo:
 	
+		# select a simulation
 		sn = work.sns()[0]
 		self = ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,
 			model_style='bending',equipartition_model='default',binner_method='perfect')
@@ -707,17 +701,286 @@ if __name__=='__main__':
 		ucc.build_objective()
 		ucc.optimize()
 
-	#! compute landscape code moved here while testing survey at the end
+	# METHOD 2: the survey mode allows us to inspect spectra or complete a curvature-error landscape
 	if do_survey:
 
-		# compute the landscape
+		# select a single simulation to survey
+		sn = work.sns()[0]
+
+		# settings
+		grid_spacing = 0.5
+		q_cut = 1.0
+		# the schemes are specific combinations of parameters (see below)
+		do_scheme = [
+			None,'null',
+			'repro-negative','repro-negative-corrected',
+			'repro-positive','repro-positive-corrected',
+			# select the scheme here
+			][4]
+		positive_vibe = False
+		oscillator_reverse = False
+		curvature_sweep_number = 2
+		equipartition_model = ['default','harmonic_oscillators'][1]
+		# the default preferred method is the perfect binner
+		binner_method = ['explicit','perfect','blurry'][1]
+		# decide which physical parameters to fit
+		model_style = ['bending','tension','tension_protrusion','protrusion'][2]
+		# the default method ("standard") uses log residuals
+		residual_name = ['standard','linear','modelfix'][2]
+		# show the plot relative to unity otherwise we view the swoosh shape without correction
+		plot_corrected = True
+
+		# perform the survey for specific hypotheses (see do_scheme above)
+		if do_scheme=='null':
+			# the null hypothesis matches kappa only between the q4 fit and this code
+			# follow equipartition and give each mode kBT/2
+			equipartition_model = 'default'
+			# average intensities in exactly unique bins
+			binner_method = 'perfect'
+			# include bending only
+			model_style = 'bending'
+			# use standard log residual method
+			residual_name = 'standard'
+			plot_corrected = False
+		elif do_scheme in ['repro-negative-corrected','repro-negative']:
+			equipartition_model = 'harmonic_oscillators'
+			# average intensities in exactly unique bins
+			binner_method = 'perfect'
+			# include bending and tension
+			model_style = 'tension'
+			# reproduce previous work
+			residual_name = 'standard'
+			positive_vibe = False
+			if do_scheme == 'repro-negative-corrected':
+				plot_corrected = True
+			elif do_scheme == 'repro-negative':
+				plot_corrected = False
+			else: raise ValueError
+		elif do_scheme=='repro-positive':
+			equipartition_model = 'harmonic_oscillators'
+			# average intensities in exactly unique bins
+			binner_method = 'perfect'
+			# include bending and tension
+			model_style = 'tension'
+			# reproduce previous work
+			residual_name = 'modelfix'
+			positive_vibe = True
+			if do_scheme == 'repro-positive-corrected':
+				plot_corrected = True
+			elif do_scheme == 'repro-positive':
+				plot_corrected = False
+			else: raise ValueError
+
+		"""
+		SETTINGS NOTES
+		the default equipartition model simply fits to 1/2 kBT and is useful for checking kappa 
+		  without any curvature to ensure that this fitting method matches the typical q^{-4} fit
+		the binner method called "perfect" will average valuse that occur at each unique wavevector
+		  which creates fewer wavevectors in our plot and also somewhat evens out the distribution of
+		  wavevectors along the x-axis. the perfect method treats each wavevector magnitude as a unique
+		  mode, and for this reason we think it is the appropriate measure. the blurry method bins the
+		  wavevectors into finite bins, thus collapsing the number of wavevectors even further. for
+		  CGMD simulations with the upward "swoosh" shape, the blurry binner produces a higher kappa
+		  as expected because it counteracts the extra weight from the higher density of wavevectors at
+		  higher values, which pulls the kappa down because the swoosh goes up
+		note on tension above. in the v650 (4xENTH) reference simulation, we see that adding tension
+		  causes kappa to drop slightly from 20.4 to 19.0 kBT, presumably because the intensities at 
+		  lower wavevectors are somewhat lower than expected, indicating a slight surface tension,
+		  however the inclusion of sigma in these calculations does not affect the results very
+		  much because we are well below the crossover
+		residuals should be standard, which takes the residuals in the log space
+		note that the linear method would have a more profound effect if we were 
+		  fitting hqhq to q^{-4} directly (see undulate.py) because then the linear residuals
+		  would shrink with higher wavevectors and hence lower hqhq. in the energy space, switching
+		  to linear residuals has much less effect because the intensities are all flanking a
+		  mostly uniform value (both the oscillators and equipartition are still somewhat constant)
+		  but as we noted above, the log residuals are more accurate because the fit should respect
+		  the intensities across several orders of magnitude in hqhq	
+		"""
+
+		from codes.hypothesizer import hypothesizer
+		# various curvature sweeps, deprecated, see below
+		if 0: curvatures = [
+			curvatures_extreme,
+			curvatures_legacy_symmetric,
+			curvatures_legacy_symmetric_bigger,
+			][curvature_sweep_number]
+		# constants, deprecated
+		if 0:
+			halfsweep = np.concatenate((
+				np.arange(0.01,0.1+0.01,0.01),
+				np.arange(0.2,1.0+0.1,0.1),
+				np.arange(2.,10.+1.,1.)))
+			curvatures_extreme = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
+			halfsweep = np.array([0.0,0.005,0.01,0.014,0.018,0.02,0.024,0.028,0.032,0.04,0.05])
+			halfsweep_bigger = np.array([0.0,0.005,0.01,0.02,0.04,0.05,0.1,0.2,0.3,0.5,1.,5,10.])
+			curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
+			curvatures_legacy_symmetric_bigger = np.concatenate((
+				halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
+		curvatures = np.array([0.0,0.001,0.005,0.010,0.02,0.024,0.032])
+		binners = ['explicit','perfect','blurry']
+		extents = np.array([0,1,2,4,8,12,18,24]).astype(float)
+		# hypotheses are built in argument-order so pick extent first 
+		#   since that is slowest and gets recomputed the least at the front
+		hypos = hypothesizer(*(
+			{'route':['extent'],'values':extents},
+			{'route':['curvature'],'values':curvatures}))
+
+		# METHOD 2a: survey the spectra for one simulation with zero curvature
+		if do_spectra_survey_debug:
+
+			# test the no-curvature case
+			extent,curvature = 1.0,0.0
+			if 'ucc' not in globals():
+				self = ucc = UndulationCurvatureCoupling(
+					sn=sn,grid_spacing=grid_spacing,q_cut=q_cut,
+					model_style=model_style,
+					equipartition_model=equipartition_model,
+					oscillator_reverse=oscillator_reverse,
+					positive_vibe=positive_vibe,
+					binner_method=binner_method,
+					residual_name=residual_name)
+				ucc.build_curvature_fields(
+					mode='protein_dynamic',
+					isotropy_mode='isotropic',
+					extent=extent)
+				ucc.build_elastic_hamiltonian(curvature)
+				ucc.build_equipartition()
+				ucc.build_objective()
+				ucc.optimize()
+
+			# prepare metadata for this plot
+			meta_out = dict(
+				curvature=curvature,
+				sn=sn,grid_spacing=grid_spacing,q_cut=q_cut,
+				model_style=model_style,
+				equipartition_model=equipartition_model,
+				oscillator_reverse=oscillator_reverse,
+				positive_vibe=positive_vibe,
+				binner_method=binner_method,
+				residual_name=residual_name,
+				plot_corrected=plot_corrected,
+				do_scheme=do_scheme,
+				fields=dict(
+					mode='protein_dynamic',
+					isotropy_mode='isotropic',
+					extent=extent),)
+
+			# PLOT: survey the fitting procedure
+			# in the deprecated validation procedure we check that changing from the q4 spectrum
+			#   to energy in a fit without tension, protrusions, oscillator, or curvature, gives us
+			#   the same spectrum that we originally fit things to. this is useful for checking that 
+			#   the kappa fit for the UCC method matches a typical q4 spectrum fit
+			do_survey_validate = False
+			do_energy_zoom = True
+			if do_survey_validate:
+				fig = plt.figure(figsize=(8,12))
+				axes = [fig.add_subplot(311),fig.add_subplot(312),fig.add_subplot(313)]
+			else: 
+				fig = plt.figure(figsize=(8,10))
+				axes = [fig.add_subplot(211),fig.add_subplot(212)]
+			args_parse = ucc.route_args_objective(*ucc.opt.fit.x)
+			args_hel = ucc.route_args_hel(*args_parse['args_hel'])
+			for key in ['kappa','sigma','gamma']:
+				globals()[key] = args_hel.get(key,0.0)
+			kappa_asterisk = False
+			if (residual_name=='modelfix' 
+				or do_scheme in ['repro-negative','repro-negative-corrected']): 
+				kappa_asterisk = True
+				#! dev: pending issue: kappa with oscillators vs bare kappa are different
+				# rescale kappa to account for difference in equipartition-generated kappa (kBT/2) and 
+				#   the oscillator-corrected (kBT) kappa. this is a theory question that needs discussed
+				kappa = kappa/2.
+			hel = ucc.hel(*args_parse['args_hel'])
+			hosc = ucc.equipartition(*args_parse['args_equipartition'])
+		
+			# left panel shows energy spectra
+			ax = axes[0]
+			if do_energy_zoom:
+				ax.set_ylim((0.1,10))
+				ax.set_xlim((0.05,2))
+			ax.axhline(ucc.energy_per_mode,c='k',lw=1)
+			ax.set_ylabel('energy ($k_BT$) or residual')
+			ax.set_xlabel('wavevector (${nm}^{-1}$)')
+			# plot the explicit energy spectrum
+			if not plot_corrected: hel_plot = hel
+			else: hel_plot = hel / hosc
+			ax.plot(ucc.qs_raw,hel_plot,'.',c='b',lw=0,
+				label='$H_{el}$ ($\kappa%s=%.1f k_BT)$'%(
+					r'\mathbf{\star}' if kappa_asterisk else '',kappa))
+			# plot the perfect binner results
+			if residual_name=='modelfix' and not plot_corrected:
+				energy_apparent = ucc.binner.bin(hel) * ucc.binner.bin(hosc)
+			elif plot_corrected:
+				energy_apparent = ucc.binner.bin(hel) / ucc.binner.bin(hosc)
+			else: energy_apparent = ucc.binner.bin(hel)
+			ax.plot(ucc.qs,energy_apparent,'-',c='k',zorder=2,lw=2)
+			ends_check = np.argsort(ucc.qs_raw)[:2] 
+			print('[STATUS] the left two intensities are: %s'%str(hel[ends_check]))
+			label_hosc = {
+				'default':'equipartition',
+				'harmonic_oscillators':'oscillators'}[equipartition_model]
+			if not residual_name=='modelfix': hosc_plot = hosc
+			else: hosc_plot = log_reverse(hosc)
+			if not plot_corrected:
+				ax.plot(ucc.qs_raw,hosc_plot,'-',c='r',lw=2,label=label_hosc)
+			else:
+				# in the corrected version we rescale the oscillator to unity (hence it is a residual)
+				ax.plot(ucc.qs_raw,hosc_plot/hosc,'-',c='r',lw=2,label=label_hosc)
+
+			# right panel shows h2q
+			ax = axes[1]
+			ax.set_ylabel('$\|{h_q}{h_q}\|$ (${nm}^{-2}$)')
+			ax.set_xlabel('wavevector (${nm}^{-1}$)')
+			model_q4 = 1./(self.area * kappa * self.qs**4)
+			# plot the binned undulation spectrum
+			# if you use the perfect binner, the ucc.qs are the reduced wavevectors
+			# note that we are using ucc.termlist[0] which is hqhq computed from the complex fields
+			ax.plot(ucc.qs,ucc.binner.bin(ucc.termlist[0]),'.',c='b',lw=1,label='observed')
+			# plot the fitted line
+			ax.plot(ucc.qs[ucc.band],model_q4[ucc.band],'-',c='r',lw=2,zorder=5,
+				label='fit ($\kappa=%.1f{k_{B}T}$)'%kappa)
+
+			if do_survey_validate:
+				ax = axes[2]
+				# plot the first coupled term (i.e. hqhq) in equation 23
+				# use termlist not hqhq so we retire
+				#   energy_this = kappa * ucc.area * ucc.hqhq * ucc.qs_raw**4
+				energy_this = kappa * ucc.area * ucc.termlist[0] * ucc.qs_raw**4
+				print('[CHECK] two left values are: %s'%str(energy_this[ends_check]))
+				ax.plot(ucc.qs_raw,energy_this,'.',c='b',lw=1,
+					label='observed ($\kappa=%.1f$)'%fitted[0])
+				ax.plot(ucc.qs,ucc.binner.bin(energy_this),'-',c='k',zorder=2,lw=2)
+				ax.axhline(1.0,c='k',lw=1)
+				axes[2].legend()
+
+			# formatting
+			for ax in axes:
+				ax.set_xscale('log')
+				ax.set_yscale('log')
+				ax.axvline(ucc.q_cut,c='k',lw=1)
+			axes[0].legend()
+			axes[1].legend()
+			# to review metaadata you need ImageMagick:
+			#   identify -verbose fig.<NAME>.v<NUMBER>.png | grep meta
+			picturesave('fig.ucc.survey.%s'%sn,
+				work.plotdir,meta=meta_out,version=True)
+
+		# METHOD 2b: compute the error landscape across curvatures and extents 
 		if do_compute_landscape:
 
 			if 'jobs' not in globals():
-				ucc = UndulationCurvatureCoupling(sn=sn,grid_spacing=0.5,q_cut=10.0,
-					model_style='bending',equipartition_model='harmonic_oscillators',
-					oscillator_reverse=oscillator_reverse,positive_vibe=positive_vibe,
-					binner_method=binner_method,subtract_protrusions=subtract_protrusions)
+				
+				# ucc instance is the same as method 2a above (adjust settings up there)
+				ucc = UndulationCurvatureCoupling(
+					sn=sn,grid_spacing=grid_spacing,q_cut=q_cut,
+					model_style=model_style,
+					equipartition_model=equipartition_model,
+					oscillator_reverse=oscillator_reverse,
+					positive_vibe=positive_vibe,
+					binner_method=binner_method,
+					residual_name=residual_name)
+
 				jobs,fitted = {},{}
 				start = time.time()
 				for hnum,hypo in enumerate(hypos[:]):
@@ -742,9 +1005,9 @@ if __name__=='__main__':
 			contour_line_skip = 4
 			contour_nlevels = 100
 			under_color = 'm'
-			figname = 'fig.ucc.review.%s.pv%d.ro%d.cs%d.b%d.sp%d'%(sn,
+			figname = 'fig.ucc.review.%s.pv%d.ro%d.cs%d.b%d'%(sn,
 				positive_vibe,oscillator_reverse,curvature_sweep_number,
-				binners.index(binner_method),subtract_protrusions)
+				binners.index(binner_method))
 
 			figsize = (12,8)
 			axes,fig = square_tiles(2,figsize,favor_rows=True)
@@ -785,166 +1048,10 @@ if __name__=='__main__':
 				vmin=error_min,levels=levels_contour,
 				extend='both',origin='lower',linewidths=0.5,colors='k',zorder=4)
 			ax.set_aspect(curvatures.ptp()/extents.ptp())
-			picturesave(figname,work.plotdir,backup=False,version=False,meta={})
-
-	if do_survey:
-
-		# settings
-		positive_vibe = False
-		oscillator_reverse = False
-		#! dev: the following should be retired
-		subtract_protrusions = False
-		curvature_sweep_number = 2
-		equipartition_model = ['default','harmonic_oscillators'][1]
-		# the default preferred method is the perfect binner
-		binner_method = ['explicit','perfect','blurry'][1]
-		# decide which physical parameters to fit
-		model_style = ['bending','tension','tension_protrusion','protrusion'][1]
-		# the default method ("standard") uses log residuals
-		residual_name = ['standard','linear','modelfix'][2]
-		# the default equipartition model simply fits to 1/2 kBT and is useful for checking kappa 
-		#   without any curvature to ensure that this fitting method matches the typical q^{-4} fit
-		# the binner method called "perfect" will average valuse that occur at each unique wavevector
-		#   which creates fewer wavevectors in our plot and also somewhat evens out the distribution of
-		#   wavevectors along the x-axis. the perfect method treats each wavevector magnitude as a unique
-		#   mode, and for this reason we think it is the appropriate measure. the blurry method bins the
-		#   wavevectors into finite bins, thus collapsing the number of wavevectors even further. for
-		#   CGMD simulations with the upward "swoosh" shape, the blurry binner produces a higher kappa
-		#   as expected because it counteracts the extra weight from the higher density of wavevectors at
-		#   higher values, which pulls the kappa down because the swoosh goes up
-		# note on tension above. in the v650 (4xENTH) reference simulation, we see that adding tension
-		#   causes kappa to drop slightly from 20.4 to 19.0 kBT, presumably because the intensities at 
-		#   lower wavevectors are somewhat lower than expected, indicating a slight surface tension,
-		#   however the inclusion of sigma in these calculations does not affect the results very
-		#   much because we are well below the crossover
-		# residuals should be standard, which takes the residuals in the log space
-		# note that the linear method would have a more profound effect if we were 
-		#   fitting hqhq to q^{-4} directly (see undulate.py) because then the linear residuals
-		#   would shrink with higher wavevectors and hence lower hqhq. in the energy space, switching
-		#   to linear residuals has much less effect because the intensities are all flanking a
-		#   mostly uniform value (both the oscillators and equipartition are still somewhat constant)
-		#   but as we noted above, the log residuals are more accurate because the fit should respect
-		#   the intensities across several orders of magnitude in hqhq	
-
-		sn = work.sns()[0]
-		from codes.hypothesizer import hypothesizer
-		# various curvature sweeps
-		curvatures = [
-			curvatures_extreme,
-			curvatures_legacy_symmetric,
-			curvatures_legacy_symmetric_bigger,
-			][curvature_sweep_number]
-		binners = ['explicit','perfect','blurry']
-		extents = np.array([0.25,0.5,1.0,2.0,3.0,4.0,8.0])
-		# hypotheses are built in argument-order so pick extent first 
-		#   since that is slowest and gets recomputed the least at the front
-		hypos = hypothesizer(*({'route':['extent'],'values':extents},
-			{'route':['curvature'],'values':curvatures}))
-
-		# new spectra figure for debugging
-		if do_spectra_survey_debug:
-
-			# test the no-curvature case
-			extent,curvature = 1.0,0.0
-			if 'ucc' not in globals():
-				self = ucc = UndulationCurvatureCoupling(
-					sn=sn,grid_spacing=0.5,q_cut=1.,
-					model_style=model_style,
-					equipartition_model=equipartition_model,
-					oscillator_reverse=oscillator_reverse,
-					positive_vibe=positive_vibe,
-					binner_method=binner_method,
-					subtract_protrusions=subtract_protrusions,
-					residual_name=residual_name)
-				ucc.build_curvature_fields(
-					mode='protein_dynamic',
-					isotropy_mode='isotropic',
-					extent=extent)
-				ucc.build_elastic_hamiltonian(curvature)
-				ucc.build_equipartition()
-				ucc.build_objective()
-				ucc.optimize()
-
-			# PLOT: survey the fitting procedure
-			# in the deprecated validation procedure we check that changing from the q4 spectrum
-			#   to energy in a fit without tension, protrusions, oscillator, or curvature, gives us
-			#   the same spectrum that we originally fit things to. this is useful for checking that 
-			#   the kappa fit for the UCC method matches a typical q4 spectrum fit
-			do_survey_validate = False
-			if do_survey_validate:
-				fig = plt.figure(figsize=(8,12))
-				axes = [fig.add_subplot(311),fig.add_subplot(312),fig.add_subplot(313)]
-			else: 
-				fig = plt.figure(figsize=(8,10))
-				axes = [fig.add_subplot(211),fig.add_subplot(212)]
-			args_parse = ucc.route_args_objective(*ucc.opt.fit.x)
-			args_hel = ucc.route_args_hel(*args_parse['args_hel'])
-			for key in ['kappa','sigma','gamma']:
-				globals()[key] = args_hel.get(key,0.0)
-			hel = ucc.hel(*args_parse['args_hel'])
-			hosc = ucc.equipartition(*args_parse['args_equipartition'])
-		
-			# left panel shows energy spectra
-			ax = axes[0]
-			ax.set_ylim((0.1,10))
-			ax.set_xlim((0.05,2))
-			ax.axhline(ucc.energy_per_mode,c='k',lw=1)
-			ax.set_ylabel('energy ($k_BT$)')
-			ax.set_xlabel('wavevector (${nm}^{-1}$')
-			# plot the explicit energy spectrum
-			ax.plot(ucc.qs_raw,hel,'.',c='b',lw=0,
-				label='$H_{el}$ ($\kappa=%.1f k_BT)$'%kappa)
-			# plot the perfect binner results
-			if residual_name=='modelfix':
-				energy_apparent = ucc.binner.bin(hel)*ucc.binner.bin(hosc)
-				ax.plot(ucc.qs,energy_apparent,'-',c='k',zorder=2,lw=4)
-			# standard method follows
-			else: 
-				ax.plot(ucc.qs,ucc.binner.bin(hel),'-',c='k',zorder=2,lw=4)
-			ends_check = np.argsort(ucc.qs_raw)[:2] 
-			print('[STATUS] the left two intensities are: %s'%str(hel[ends_check]))
-			label_hosc = {
-				'default':'equipartition',
-				'harmonic_oscillators':'oscillators'}[equipartition_model]
-			ax.plot(ucc.qs_raw,hosc,'.',c='r',lw=0,label=label_hosc)
-			if 0: ax.plot(binner.bin(self.qs),binner.bin(
-				logsum(1.0,logdiff(self.hqhq,model_basic))),
-					'-',c='m',lw=1,zorder=10,label='corrected')
-			if 0: ax.plot(binner.bin(self.qs),binner.bin(model_basic)*q_raw**4*kappa*area,
-				'.-',c='k',lw=1,label='basic')
-
-			# right panel shows h2q
-			ax = axes[1]
-			ax.set_ylabel('$\|{h_q}{h_q}\|$ (${nm}^{-2}$)')
-			ax.set_xlabel('wavevector (${nm}^{-1})$')
-			model_q4 = 1./(self.area * kappa * self.qs**4)
-			# plot the binned undulation spectrum
-			# if you use the perfect binner, the ucc.qs are the reduced wavevectors
-			# note that we are using ucc.termlist[0] which is hqhq computed from the complex fields
-			ax.plot(ucc.qs,ucc.binner.bin(ucc.termlist[0]),'.',c='b',lw=1,label='observed')
-			# plot the fitted line
-			ax.plot(ucc.qs[ucc.band],model_q4[ucc.band],'-',c='r',lw=2,zorder=5,
-				label='fit ($\kappa=%.1f{k_{B}T}$)'%kappa)
-
-			if do_survey_validate:
-				ax = axes[2]
-				# plot the first coupled term (i.e. hqhq) in equation 23
-				# use termlist not hqhq so we retire
-				#   energy_this = kappa * ucc.area * ucc.hqhq * ucc.qs_raw**4
-				energy_this = kappa * ucc.area * ucc.termlist[0] * ucc.qs_raw**4
-				print('[CHECK] two left values are: %s'%str(energy_this[ends_check]))
-				ax.plot(ucc.qs_raw,energy_this,'.',c='b',lw=1,
-					label='observed ($\kappa=%.1f$)'%fitted[0])
-				ax.plot(ucc.qs,ucc.binner.bin(energy_this),'-',c='k',zorder=2,lw=2)
-				ax.axhline(1.0,c='k',lw=1)
-				axes[2].legend()
-
-			# formatting
-			for ax in axes:
-				ax.set_xscale('log')
-				ax.set_yscale('log')
-				ax.axvline(ucc.q_cut,c='k',lw=1)
-			axes[0].legend()
-			axes[1].legend()
-			picturesave('fig.debug.v13',work.plotdir)
+			# metadata from the survey above
+			meta_out = copy.deepcopy(meta_out)
+			# attach hypotheses
+			meta_out['hypos'] = hypos
+			picturesave(figname,work.plotdir,
+				backup=False,version=False,meta=meta_out)
 
