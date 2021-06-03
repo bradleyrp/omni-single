@@ -1,0 +1,231 @@
+readme: |
+  This specs file can reproduce undulation spectra for existing simulations
+  marked v1021 and v650 below. The v650 simulation is the "4xENTH" simulation.
+  The v1021 simulation is a subsampled copy of a BAR-domain simulation.
+  
+  The raw simulation data are required to run this calculation. These include the following files:
+
+    v1021/s01-run
+    v1021/s01-run/slurm-1997.out
+    v1021/s01-run/md.part0005.gro
+    v1021/s01-run/system.top
+    v1021/s01-run/md.part0005.cpt
+    v1021/s01-run/system-groups.ndx
+    v1021/s01-run/system-inspect.ndx
+    v1021/s01-run/md.part0005.edr
+    v1021/s01-run/martini.ff
+    v1021/s01-run/martini.ff/martini-v2.2-aminoacids.itp
+    v1021/s01-run/martini.ff/PIP2.itp
+    v1021/s01-run/martini.ff/martini-v2.1.itp
+    v1021/s01-run/martini.ff/martini-v2.0-lipids.itp
+    v1021/s01-run/martini.ff/martini_v2.1.itp
+    v1021/s01-run/martini.ff/martini-v2.2.itp
+    v1021/s01-run/martini.ff/martini-v2.0-cholesterol.itp
+    v1021/s01-run/martini.ff/martini-v2.0-ions.itp
+    v1021/s01-run/slurm-4205.out
+    v1021/s01-run/system.gro
+    v1021/s01-run/Protein_A.itp
+    v1021/s01-run/md.part0005_prev.cpt
+    v1021/s01-run/md.part0005.tpr
+    v1021/s01-run/md.part0004.tpr
+    v1021/s01-run/md.part0005.xtc
+    v1021/s01-run/input-md-in.mdp
+    v1021/s01-run/go.sh
+    v1021/s01-run/md.part0005.mdp
+
+  Not all simulations follow this file structure. To use existing simulations in the calculation codes,
+  you may need to put them in a subfolder (e.g. `s01-run`) and then use the standard GROMACS naming
+  scheme. I created the directory structure above to include the v1021 simulation in the following
+  calculations.
+ 
+  These files are located in the spot_directory outlined in `calcs/readme.md`. Note that the
+  original trajectory used a very high sampling rate, so it has been reduced manually. Since it was
+  reduced manually, we use `'skip':1` below. The full trajectory covers 2-12 microseconds and includes
+  500 frames for a sampling rate of 200 ns per frame. The full trajectories are available upon request
+  but take several 100s of GBs of space.
+
+  If you follow the general instructions in the `calcs/readme.md` file, they will take you through
+  to the following commands:
+
+    make compute
+    make plot undulations
+
+  These will compute the undulation spectra. You can also create simulation videos if you have 
+  access to `ffmpeg` or a Singularity container. 
+
+    make plot undulations_videos
+
+  This will produce individual images for each frame in an undulation video. You can render them
+  into a video with the command supplied at the end. For this example, we tested this on an HPC 
+  resource with a Singularity container that provided ffmpeg. You could alternately render this on
+  a local workstation. For posterity, the render command on the cluster is:
+
+    singularity exec -B path/to/plot path/to/ffmpeg_latest.sif bash # add the tail of the command here
+
+  The undulations and undulation videos provide the most direct view of the protein-induced curvature.
+
+  PENDING: 
+    
+    We are still working on reproducing the undulation-curvature coupling code in `calcs/plot-ucc.py`
+    The curvature codes were last used for Bradley-2016 and later refactored for use on mesoscale 
+    membrane simulations in the presence of dextran for Farokhirad-2019. I (Ryan) am working on 
+    documenting these codes now (2021.05.10).
+
+  Available data:
+
+    - original simulations from Bradley and Radhakrishnan 2016 (v650 below)
+    - new simulations of BAR domains from models produced by PT and RPB (e.g. v1021 below)
+
+        v1021-v1026 6 replicates of the mebrane-binding portion of endophilin-A1
+        v1031-v1036 6 replicates of the membrane-binding domain of IRSp53 
+        To confirm the sequence, you can BLAST the sequence from Protein_A.itp in each folder.
+  
+  For further questions about this data, or a walkthrough, please contact Ryan Bradley.
+
+director:
+  # global flags
+  autoplot: True
+  unregistered_plots: True
+
+variables:
+  selectors:
+    resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2 or resname POPC or resname POP2 or resname DOPE)
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+    common_slice_s003:
+      groups: 
+        lipids: +selectors/lipid_selection
+        proteins: +selectors/protein_selection
+      slices:
+        current: {'pbc':'mol','groups':['lipids','proteins'],'start':2000000,'end':12000000,'skip':10000}
+
+collections:
+  s003:
+    - v1021
+    - v1024
+    - v1025
+    - v1026
+    - v1031
+    - v1032
+    - v1033
+    - v1034
+  single-repro: [v650]
+
+slices:
+  v1021: +selectors/common_slice_s003 
+  v1024: +selectors/common_slice_s003 
+  v1025: +selectors/common_slice_s003 
+  v1026: +selectors/common_slice_s003 
+  v1031: +selectors/common_slice_s003 
+  v1032: +selectors/common_slice_s003 
+  v1033: +selectors/common_slice_s003 
+  v1034: +selectors/common_slice_s003 
+  v650: 
+    groups:
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+
+calculations:
+  lipid_abstractor:
+    ignore: False
+    slice_name: current
+    group: lipids
+    collections: [s003]
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        # set cluster: False if scikit-learn has trouble separating the leaflets
+        cluster: False
+        lipid_tip: "name PO4"
+  undulations:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: [s003] 
+    specs:
+      upstream:
+        # choose the upstream by (1) a loop key and (2) specific specs
+        lipid_abstractor:
+          selector: lipid_com
+          separator:
+            cluster: True
+      # specs can be looped
+      grid_spacing:
+        loop: [0.5]
+  protein_abstractor:
+    slice_name: current
+    group: proteins
+    collections: [s003] 
+
+pending:
+  #! this calculation is pending further testing
+  curvature_undulation_coupling:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: 
+      - batch-rockfish-2020.12
+    specs:
+      upstream:
+        protein_abstractor: {}
+        undulations: {}
+      design:
+        loop:
+          v1_fixed_extent_1:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+          v9_fixed_extent_10:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+
+plots:
+  undulations:
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections:
+      - batch-rockfish-2020.12
+  undulations_videos:
+    script: undulations_videos.py
+    calculation: undulations
+    autoplot: False
+
+  #! this plot is pending further testing
+  curvature_undulation_coupling:
+    autoplot: True
+    script: plot-curvature_undulation_coupling_drilldown.py
+    collections: single-repro
+    calculation: 
+      - curvature_undulation_coupling
+  ucc:
+    autoplot: True
+    collections: single-repro
+    calculation:
+      undulations: {}
+      protein_abstractor: {}
+    
