@@ -1,4 +1,8 @@
 readme: |
+
+  DO NOT USE THIS
+  DEPRECATED BY curvature_repro_20210602.yaml
+
   This specs file can reproduce undulation spectra for existing simulations
   marked v1021 and v650 below. The v650 simulation is the "4xENTH" simulation.
   The v1021 simulation is a subsampled copy of a BAR-domain simulation.
