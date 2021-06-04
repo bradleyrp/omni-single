@@ -1,29 +1,80 @@
 readme: |
-  This specs (specifications) file can reproduce undulation spectra for 
-  simulations in the "banana" dataset, which includes 12 simulations of
-  coarse-grained BAR domains.
 
-  ...!!!
+  DO NOT USE THIS
+  DEPRECATED BY curvature_repro_20210602.yaml
 
-    Not all simulations follow this file structure. To use existing simulations in the calculation codes,
-    you may need to put them in a subfolder (e.g. `s01-run`) and then use the standard GROMACS naming
-    scheme. I created the directory structure above to include the v1021 simulation in the following
-    calculations.
-   
-    These files are located in the spot_directory outlined in `calcs/readme.md`. Note that the
-    original trajectory used a very high sampling rate, so it has been reduced manually. Since it was
-    reduced manually, we use `'skip':1` below. The full trajectory covers 2-12 microseconds and includes
-    500 frames for a sampling rate of 200 ns per frame. The full trajectories are available upon request
-    but take several 100s of GBs of space.
+  This specs file can reproduce undulation spectra for existing simulations
+  marked v1021 and v650 below. The v650 simulation is the "4xENTH" simulation.
+  The v1021 simulation is a subsampled copy of a BAR-domain simulation.
+  
+  The raw simulation data are required to run this calculation. These include the following files:
 
-    If you follow the general instructions in the `calcs/readme.md` file, they will take you through
-    to the following commands:
+    v1021/s01-run
+    v1021/s01-run/slurm-1997.out
+    v1021/s01-run/md.part0005.gro
+    v1021/s01-run/system.top
+    v1021/s01-run/md.part0005.cpt
+    v1021/s01-run/system-groups.ndx
+    v1021/s01-run/system-inspect.ndx
+    v1021/s01-run/md.part0005.edr
+    v1021/s01-run/martini.ff
+    v1021/s01-run/martini.ff/martini-v2.2-aminoacids.itp
+    v1021/s01-run/martini.ff/PIP2.itp
+    v1021/s01-run/martini.ff/martini-v2.1.itp
+    v1021/s01-run/martini.ff/martini-v2.0-lipids.itp
+    v1021/s01-run/martini.ff/martini_v2.1.itp
+    v1021/s01-run/martini.ff/martini-v2.2.itp
+    v1021/s01-run/martini.ff/martini-v2.0-cholesterol.itp
+    v1021/s01-run/martini.ff/martini-v2.0-ions.itp
+    v1021/s01-run/slurm-4205.out
+    v1021/s01-run/system.gro
+    v1021/s01-run/Protein_A.itp
+    v1021/s01-run/md.part0005_prev.cpt
+    v1021/s01-run/md.part0005.tpr
+    v1021/s01-run/md.part0004.tpr
+    v1021/s01-run/md.part0005.xtc
+    v1021/s01-run/input-md-in.mdp
+    v1021/s01-run/go.sh
+    v1021/s01-run/md.part0005.mdp
 
-      make compute
-      make plot undulations
+  Not all simulations follow this file structure. To use existing simulations in the calculation codes,
+  you may need to put them in a subfolder (e.g. `s01-run`) and then use the standard GROMACS naming
+  scheme. I created the directory structure above to include the v1021 simulation in the following
+  calculations.
+ 
+  These files are located in the spot_directory outlined in `calcs/readme.md`. Note that the
+  original trajectory used a very high sampling rate, so it has been reduced manually. Since it was
+  reduced manually, we use `'skip':1` below. The full trajectory covers 2-12 microseconds and includes
+  500 frames for a sampling rate of 200 ns per frame. The full trajectories are available upon request
+  but take several 100s of GBs of space.
 
-    These will compute the undulation spectra. You can also create simulation videos if you have 
-    access to `ffmpeg` or a Singularity container. 
+  If you follow the general instructions in the `calcs/readme.md` file, they will take you through
+  to the following commands:
+
+    make compute
+    make plot undulations
+
+  These will compute the undulation spectra. You can also create simulation videos if you have 
+  access to `ffmpeg` or a Singularity container. 
+
+    make plot undulations_videos
+
+  This will produce individual images for each frame in an undulation video. You can render them
+  into a video with the command supplied at the end. For this example, we tested this on an HPC 
+  resource with a Singularity container that provided ffmpeg. You could alternately render this on
+  a local workstation. For posterity, the render command on the cluster is:
+
+    singularity exec -B path/to/plot path/to/ffmpeg_latest.sif bash # add the tail of the command here
+
+  The undulations and undulation videos provide the most direct view of the protein-induced curvature.
+
+  PENDING: 
+    
+    We are still working on reproducing the undulation-curvature coupling code in `calcs/plot-ucc.py`
+    The curvature codes were last used for Bradley-2016 and later refactored for use on mesoscale 
+    membrane simulations in the presence of dextran for Farokhirad-2019. I (Ryan) am working on 
+    documenting these codes now (2021.05.10).
+>>>>>>> 6aa74f7e758f1e752ed624cb5e22a21fbd068401
 
       make plot undulations_videos
 
