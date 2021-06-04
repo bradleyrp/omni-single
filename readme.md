@@ -1,12 +1,56 @@
-# How to reproduce these calculations
+# Status of the factory codes
 
-This README was added on 2021.05.10 in order to provide general instructions for reproducing these calculations. The status of the "factory" codes (specifically the calculation portion which we called "omnicalc") is as follows:
+This README was added on 2021.05.10 (and updated 2021.06.02) in order to provide general instructions for reproducing these calculations. The status of the "factory" codes (specifically the calculation portion which we called "omnicalc") is as follows:
 
-- the calculations for specific projects (atomistic bilayers, coarse-grained bilayers, and some mesoscale calculations) are av
+- The "legacy-factory" code is available at the master branch of `https://github.com/biophyscode/factory` and can be used to reproduce a number of coarse-grained, atomistic, and mesoscale membrane analyses. The legacy factory code serves as a simple glue (the associated web portal is no longer supported).
+- The calculations codes are available at `https://github.com/bradleyrp/omni-single` which is fetched by the legacy factory when you reproduce a calculation according to the instructions below. The factory only makes it easier to apply a simple calculation script to many different simulations. These calculation codes can be extracted for manual use or application to other simulation datasets. 
+- The instructions below will produce undulation spectra and height videos for atomistic and coarse-grained simulations.
 
-## General instructions
+To reproduce the undulations methods, we recommend following the instructions below to adapt the `calcs/specs/curvature_repro_20210501.yaml` specifications file, which has further, more specific instructions.
 
-### 1. Get the data
+## Short instructions
+
+If you have already set up the factory, you can run your calculations with the following commands, which are required every time you want to run a calculation. Typically we edit the specs file, run `make compute`, and iterate until the calculation is complete. Then we make plots.
+
+~~~
+# get an interactive session on a cluster
+salloc -p <partition_name> -c <num_cpus> -t 120 srun --pty bash
+# load gromacs (you may need to use a specific version number)
+module load gromacs/2020.5
+# load your anaconda environment
+module load anaconda
+conda activate bpcfac
+# navigate to the calculations folder by the project name (in this case "banana")
+cd path/to/legacy-factory/calc/banana
+# tell the metadata_filter to look at a single metadata file you have prepared, note that you will probably use a different name
+make unset meta_filter && make set meta_filter curvature_repro_20210602.yaml
+# check the available times for your trajectories, which can help you write the specs file
+make look times
+# create simulation samples, and run the calculation scripts in the specs file to create post-processing data
+make compute
+# create plots
+make plot undulations
+~~~
+
+### Changing the data source
+
+If you set up the factory according to the "Full instructions" below, you might still want to tell the legacy-factory where to find your data. To do this, you should edit the `config.py` file in the `legacy-factory/calc/banana` folder and update these keys:
+
+- `route_to_data`
+- `spot_directory`
+
+If you add these paths together, they should point to your dataset, described below. If you have a simulation in a folder at `/data/myname/2021.06.02-banana-s003/v1000` then `route_to-data` is `/data/myname`, while `spot_directory` is `2021.06.02-banana-s003` and in your specs file you will refer to the simulation as `v1000`.
+
+Note that the `config.py` also tells you where your intermediate analysis data is stored, and also where the plots are stored:
+
+- `post_data_spot`
+- `post_plot_spot`
+
+In the "Full instructions" below, you can also set all of the items in `config.py` from the connections file. It doesn't matter which method you use, as long as the `config.py` is current.
+
+## Background on the source data
+
+The factory and omnicalc codes are designed to apply individual calculation scripts to many simulations in a repeatable way. To facilitate this, we place a few constraints on the source data. The automacs simulation codes will produce simulations that follow the naming conventions outlined in this section. If you already received a preexisting automacs simulation set, then you should only have to set up the paths correctly to analyze them with the methods described in the instructions below.
 
 We start with existing simulation data, and produce two additional kinds of postprocessing data summarized below:
 
@@ -24,46 +68,34 @@ This is written in the JSON format, and provides information on the simulation "
 
 I typically name the simulations with numbers. In the example that motivates these instructions, we will discuss a BAR-domain simulation in `v1021` and reproduce undulation spectra from the `v650` simulation labeled `4xENTH`, which was one of subjects of [Bradley-2016](https://www.pnas.org/content/113/35/E5117.abstract).
 
-In the following steps, we will start with item #1 abve (the original simulation data), and reproduce the undulation calculation.
+## Full Instructions
+
+### 1. Get the data
+
+For this example, we will use the following dataset and specs files:
+
+- the source data are in a folder called `2021.06.02-banana-s003` which includes simulations marked `v1021-v1028` and `v1031-v1038`
+- the specs file comes with the omni-single repo (see below) and can be found at `calcs/specs/curvature_repro_20210501.yaml`
+
+When you follow these instructions, you will use a copy of the source data, and you will customize your own specs file.
 
 ### 2. Install an anaconda environment
 
 There are many ways to install an environment. In the past Ryan Bradley and Joe Jordan have used the "factory" to manage software environments, serve a web portal for starting simulations, and lastly, to glue together the simulation code. At some point we forked the code into two pices. In this step, we will install an Anaconda environment.
 
-You are welcome to install the environment manually with the following dependency file (in YAML). You can do this with a pre-installed Anaconda distribution with `conda env update --file <env.yaml> -p ./path/to/env`.
+We recommend using an existing anaconda distribution if your cluster already has one. If you have access to the `conda` command, then you can install the requirements with `conda env update --file <env.yaml> -n bpcfac` or follow the exact instructions below. **WARNING:** when copying code from the instructions, especially YAML files, you must ensure that you include leading spaces. Some browsers (e.g. safari) allow you to copy the code block below directly into the terminal to write the file. Failing this, you can simply copy the text into a text editor, as long as you ensure  that you have the correct spacing.
 
 ```
+# load the module on your cluster if needed
+module load anaconda
+# make a file with the requirements using the EOF trick
+cat > env_bpcfac.yaml <<EOF
 name: bpcfac
 dependencies:
   - python==3.8.5
   - pip
   - pip:
-    - django<2
-    - django-extensions
-    - pyyaml
-    - nbformat
-    - image # not sure which is PIL
-    - Pillow # this might also be PIL
-    - numpy
-    - ipdb
-    - mdanalysis
-    - h5py
-    - scikit-learn
-    - seaborn
-```
-
-Alternately, you can use the new version of the factory to automatically install Anaconda and make the environments with a couple commands. Note that I have labeled this the `factory` because it uses an updated code, but it will be distinct from the older version below, which we call the `legacy-factory`. The environment name here is `bpcfac` but you are welcome to use a different name. In the following instructions we use a cat/EOF trick to write a text file from the shell so the instructions are (more) concise.
-
-```
-git clone https://github.com/bradleyrp/factory -b streamline ./factory
-cd factory
-cat > specs/env_bpcfac.yaml << EOF
-name: bpcfac
-dependencies:
-  - python==3.8.5
-  - pip
-  - pip:
-    - django<2
+    - django==1.11.29
     - django-extensions
     - pyyaml
     - nbformat
@@ -76,12 +108,13 @@ dependencies:
     - scikit-learn
     - seaborn
 EOF
-make conda specs/env_bpcfac.yaml
-# to use this environment, you can run this command from anywhere
-source path/to/factory env.sh bpcfac
+# update the environment
+conda env update --file env_bpcfac.yaml -n bpcfac
+# activate the environment
+conda activate bpcfac
 ```
 
-You will need to activate this environment for all subsequent steps with `conda activate path/to/env`.
+For the remainder of the pipeline you must activate this environment whenever you want to run a calculation.
 
 ### 3. Clone the (legacy) factory
 
@@ -94,9 +127,10 @@ git clone http://github.com/biophyscode/factory ./legacy-factory
 cd legacy-factory
 # this is the factory root path
 export FACTORY_ROOT=$PWD
+echo "remember the factory root for later:" $FACTORY_ROOT
 ```
 
-Next we create a "connection" file to set some paths and point to the calculation repositories. You can use the cat/EOF trick below to write the `connections/banana.yaml` file or just make the file with vim. Before you write this file, change the `route_to_data` items and `spot_directory` so that they provide the parent directory and folder name for your source data. In the example below, my source data are located at `/data/rbradley/data/2021.02.15-banana-set`. We are calling this project "banana" but the factory was designed to host many projects, and the name is arbitrary.
+Next we create a "connection" file to set some paths and point to the calculation repositories. You can use the cat/EOF trick below to write the `connections/banana.yaml` file or just make the file with vim. Before you write this file, change the `route_to_data` items and `spot_directory` so that they provide the parent directory and folder name for your source data. In the example below, my source data are located at `/data/rbradley/2021.06.02-banana-s003`. We are calling this project "banana" but the factory was designed to host many projects, and the name is arbitrary.
 
 ```
 mkdir -p connections
@@ -118,9 +152,9 @@ banana:
       # the default namer uses only the name (you must generate unique names if importing from many spots)
       namer: "lambda name,spot=None: name"
       # parent location of the spot_directory (may be changed if you mount the data elsewhere)
-      route_to_data: /data/rbradley/data/
+      route_to_data: /data/rbradley
       # path of the parent directory for the simulation data
-      spot_directory: 2021.02.15-banana-set
+      spot_directory: 2021.06.02-banana-s003
       # rules for parsing the data in the spot directories
       regexes:
         # each simulation folder in the spot directory must match the top regex
@@ -151,26 +185,29 @@ make connect
 Now the factory is ready. You will use the following path to run all of the scripts:
 
 ```
-cd $FACTORY_ROOT/calcs/banana
-export $CALC_ROOT=$PWD
+cd $FACTORY_ROOT/calc/banana
+export CALC_ROOT=$PWD
+echo "remember the banana calculation folder for later:" $CALC_ROOT
 ```
 
-We have a couple more files to set. First we set a config file with a GROMACS binary suffix. If you are using an HPC system, you probably need to specify `gmx_mpi` to run GROMACS. We also have a flag for wrapping GROAMCS with `mpiexec`, which is required on the cluster I tested this with.
+### 5. Install or confirm GROMACS
+
+We have a couple more files to set. First we set a config file with a GROMACS binary suffix. If you are using an HPC system, you probably need to specify `gmx_mpi` to run GROMACS. We also have a flag for wrapping GROAMCS with `mpiexec`, which is required on the cluster I tested this with. Before writing the `gromacs_config.py` file below *you must confirm that you have a working copy of GROMACS which matches the TPR version number for the GROMACS that generated your source data*.
 
 ```
-cat > gromacs_config.py <<EOF
+cat > gromacs_config.py <<'EOF'
 #!/usr/bin/python
 machine_configuration = {
-	"LOCAL": dict(gpu_flag="auto",
-		use_mpiexec=True,
-		gmx_series=5,
-		suffix="_mpi"),}
+"LOCAL": dict(gpu_flag="auto",
+use_mpiexec=True,
+gmx_series=5,
+suffix="_mpi"),}
 EOF
 ```
 
 ### 5. Refresh the codes
 
-In case we need to update this code, you can pull new changes with these commands:
+In case we need to update this code, you can pull new changes with these commands (from the `$CALC_ROOT` location):
 
 ```
 git pull
@@ -179,13 +216,16 @@ git -C calcs pull
 
 ### 6. Configure the calculation
 
-This code uses a YAML file to set up the calculation in order to allow for more flexible loops and parameter sweeps. For this example, I have prepared a file named `calcs/specs/curvature_repro_20210501.yaml`. I recommend inspecting it. To use this file, run this command:
+This code uses a YAML file to set up the calculation in order to allow for more flexible loops and parameter sweeps. For this example, I have prepared a file named `calcs/specs/curvature_repro_20210501.yaml`. I recommend that you make your own copy and then set this as the `meta_filter`. This will allow you to independently develop your calculations.
 
 ```
-make set meta_filter curvature_repro_20210501.yaml
+cp calcs/specs/curvature_repro_20210501.yaml cp calcs/specs/curvature_repro_MYNAME.yaml
+make set meta_filter curvature_repro_MYNAME.yaml
 ```
 
 I strongly recommend maintaining your own specs files as you add data to your dataset and expand and refine your analyses. These individual files, combined with the git commit hashes for calculation codes, can tell you exactly how to reproduce a calculation later on. 
+
+...!!!
 
 ### 7. Compute undulation spectra
 
