@@ -90,8 +90,7 @@ pending:
     uptype: post
     group: lipids
     slice_name: current
-    collections: 
-      - batch-rockfish-2020.12
+    collections: [s003] 
     specs:
       upstream:
         protein_abstractor: {}
@@ -129,8 +128,7 @@ plots:
       undulations:
         grid_spacing: 0.5
     slices: current
-    collections:
-      - batch-rockfish-2020.12
+    collections: [s003] 
   undulations_videos:
     script: undulations_videos.py
     calculation: undulations
