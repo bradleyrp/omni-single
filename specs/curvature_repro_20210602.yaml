@@ -129,6 +129,13 @@ plots:
         grid_spacing: 0.5
     slices: current
     collections: [s003] 
+  # modifications to merge undulations with Jon Nukpezah
+  undulations_20210728:
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections: [s003] 
   undulations_videos:
     script: undulations_videos.py
     calculation: undulations
