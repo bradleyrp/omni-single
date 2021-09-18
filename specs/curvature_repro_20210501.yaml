@@ -74,25 +74,6 @@ readme: |
     The curvature codes were last used for Bradley-2016 and later refactored for use on mesoscale 
     membrane simulations in the presence of dextran for Farokhirad-2019. I (Ryan) am working on 
     documenting these codes now (2021.05.10).
->>>>>>> 6aa74f7e758f1e752ed624cb5e22a21fbd068401
-
-      make plot undulations_videos
-
-    This will produce individual images for each frame in an undulation video. You can render them
-    into a video with the command supplied at the end. For this example, we tested this on an HPC 
-    resource with a Singularity container that provided ffmpeg. You could alternately render this on
-    a local workstation. For posterity, the render command on the cluster is:
-
-      singularity exec -B path/to/plot path/to/ffmpeg_latest.sif bash # add the tail of the command here
-
-    The undulations and undulation videos provide the most direct view of the protein-induced curvature.
-
-    PENDING: 
-      
-      We are still working on reproducing the undulation-curvature coupling code in `calcs/plot-ucc.py`
-      The curvature codes were last used for Bradley-2016 and later refactored for use on mesoscale 
-      membrane simulations in the presence of dextran for Farokhirad-2019. I (Ryan) am working on 
-      documenting these codes now (2021.05.10).
 
     Available data:
 
