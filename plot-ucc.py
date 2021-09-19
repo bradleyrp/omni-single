@@ -605,9 +605,10 @@ if __name__=='__main__':
 	# switches
 	do_demo = 0
 	do_survey = 1
-	do_spectra_survey_debug = 1
+	# survey the spectra for one simulation with zero curvature
+	do_spectra_survey_debug = 0
 	# make sure you select the correct do_scheme before running a landscape
-	do_compute_landscape = 0
+	do_compute_landscape = 1
 	#! dev: wilderness and pixel methods are pending refactor 
 	do_wilderness = 0
 
@@ -643,7 +644,6 @@ if __name__=='__main__':
 			][1]
 		positive_vibe = False
 		oscillator_reverse = False
-		curvature_sweep_number = 2
 		equipartition_model = ['default','harmonic_oscillators'][1]
 		# the default preferred method is the perfect binner
 		binner_method = ['explicit','perfect','blurry'][1]
@@ -741,7 +741,14 @@ if __name__=='__main__':
 			curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
 			curvatures_legacy_symmetric_bigger = np.concatenate((
 				halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
-		curvatures = np.array([0.0,0.001,0.005,0.010,0.02,0.024,0.032])
+		curvatures_catalog = [None,
+			np.array([0.0,0.001,0.005,0.010,0.02,0.024,0.032]), # curvature_sweep_number==2
+			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,0.04,0.05]),
+			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,
+				0.04,0.05,0.06,0.08,0.1,0.2,0.5,1.0,2.0,10.0]),]
+		# select curvatures
+		curvature_sweep_number = 4
+		curvatures = curvatures_catalog[curvature_sweep_number]
 		binners = ['explicit','perfect','blurry']
 		extents = np.array([0,1,2,4,8,12,18,24]).astype(float)
 		# hypotheses are built in argument-order so pick extent first 
@@ -892,6 +899,23 @@ if __name__=='__main__':
 
 		# METHOD 2b: compute the error landscape across curvatures and extents 
 		if do_compute_landscape:
+
+			# prepare metadata for this plot
+			meta_out = dict(
+				curvatures=list(curvatures),
+				sn=sn,grid_spacing=grid_spacing,q_cut=q_cut,
+				model_style=model_style,
+				equipartition_model=equipartition_model,
+				oscillator_reverse=oscillator_reverse,
+				positive_vibe=positive_vibe,
+				binner_method=binner_method,
+				residual_name=residual_name,
+				plot_corrected=plot_corrected,
+				do_scheme=do_scheme,
+				fields=dict(
+					mode='protein_dynamic',
+					isotropy_mode='isotropic',
+					extent=list(extents)),)
 
 			if 'jobs' not in globals():
 				

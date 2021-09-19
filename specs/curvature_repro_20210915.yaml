@@ -1,0 +1,157 @@
+readme: |
+
+  This specs file can be used to reproduce undulations calculations from the
+  2021.06.02-banana-s003 dataset. See the calc/readme.md for instructions. 
+
+director:
+  # global flags
+  autoplot: True
+  unregistered_plots: True
+
+variables:
+  selectors:
+    resnames_lipid: ['DOPC','DOPS','PIP2','POP2','POPC','DOPE']
+    lipid_selection: (resname DOPC or resname DOPS or resname PIP2 or resname POPC or resname POP2 or resname DOPE)
+    protein_selection: (name BB or name SC1 or name SC2 or name SC3 or name SC4 or name SC5)
+    common_slice_s003:
+      groups: 
+        lipids: +selectors/lipid_selection
+        proteins: +selectors/protein_selection
+      slices:
+        current: {'pbc':'mol','groups':['lipids','proteins'],'start':2000000,'end':12000000,'skip':10000}
+
+collections:
+  s003:
+    - v1021
+    - v1024
+    - v1025
+    - v1026
+    - v1031
+    - v1032
+    - v1033
+    - v1034
+  single-repro: [v650]
+
+slices:
+  v1021: +selectors/common_slice_s003 
+  v1024: +selectors/common_slice_s003 
+  v1025: +selectors/common_slice_s003 
+  v1026: +selectors/common_slice_s003 
+  v1031: +selectors/common_slice_s003 
+  v1032: +selectors/common_slice_s003 
+  v1033: +selectors/common_slice_s003 
+  v1034: +selectors/common_slice_s003 
+  v650: 
+    groups:
+      lipids: +selectors/lipid_selection
+      proteins: +selectors/protein_selection
+    slices:
+      current: {'pbc':'mol','groups':['lipids','proteins'],'start':100000,'end':600000,'skip':160}
+
+calculations:
+  lipid_abstractor:
+    ignore: False
+    slice_name: current
+    group: lipids
+    collections: [s003]
+    specs:
+      selector:
+        loop:
+          lipid_com:
+            resnames: +selectors/resnames_lipid
+            type: com
+      separator: 
+        # set cluster: False if scikit-learn has trouble separating the leaflets
+        cluster: False
+        lipid_tip: "name PO4"
+  undulations:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: [single-repro] 
+    specs:
+      upstream:
+        # choose the upstream by (1) a loop key and (2) specific specs
+        lipid_abstractor:
+          selector: lipid_com
+          separator:
+            cluster: True
+      # specs can be looped
+      grid_spacing:
+        loop: [0.5]
+  protein_abstractor:
+    slice_name: current
+    group: proteins
+    collections: [single-repro] 
+
+pending:
+  #! this calculation is pending further testing
+  curvature_undulation_coupling:
+    uptype: post
+    group: lipids
+    slice_name: current
+    collections: [s003] 
+    specs:
+      upstream:
+        protein_abstractor: {}
+        undulations: {}
+      design:
+        loop:
+          v1_fixed_extent_1:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 1.0
+          v9_fixed_extent_10:
+            style: wilderness
+            optimize_method: wait
+            store_instantaneous_fields: False
+            store_instantaneous_fields_explicit: True
+            curvature_sum: mean
+            curvature_positions: 
+              method: protein_dynamic_single_catchall
+              nframes: 100
+            extents:
+              method: fixed_isotropic
+              extent: 10.0
+
+plots:
+  undulations:
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections: [s003] 
+  # modifications to merge undulations with Jon Nukpezah
+  undulations_20210728:
+    calculation: 
+      undulations:
+        grid_spacing: 0.5
+    slices: current
+    collections: [s003] 
+  undulations_videos:
+    script: undulations_videos.py
+    calculation: undulations
+    autoplot: False
+
+  #! this plot is pending further testing
+  curvature_undulation_coupling:
+    autoplot: True
+    script: plot-curvature_undulation_coupling_drilldown.py
+    collections: single-repro
+    calculation: 
+      - curvature_undulation_coupling
+  ucc:
+    autoplot: True
+    collections: single-repro
+    calculation:
+      undulations: {}
+      protein_abstractor: {}
+    
