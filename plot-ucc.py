@@ -606,9 +606,9 @@ if __name__=='__main__':
 	do_demo = 0
 	do_survey = 1
 	# survey the spectra for one simulation with zero curvature
-	do_spectra_survey_debug = 0
+	do_spectra_survey_debug = 1
 	# make sure you select the correct do_scheme before running a landscape
-	do_compute_landscape = 1
+	do_compute_landscape = 0
 	#! dev: wilderness and pixel methods are pending refactor 
 	do_wilderness = 0
 
@@ -641,7 +641,8 @@ if __name__=='__main__':
 			'repro-negative','repro-negative-corrected',
 			'repro-positive','repro-positive-corrected',
 			# select the scheme here
-			][1]
+			'2021.09.21.2100',
+			][-1]
 		positive_vibe = False
 		oscillator_reverse = False
 		equipartition_model = ['default','harmonic_oscillators'][1]
@@ -653,6 +654,9 @@ if __name__=='__main__':
 		residual_name = ['standard','linear','modelfix'][2]
 		# show the plot relative to unity otherwise we view the swoosh shape without correction
 		plot_corrected = True
+		# whether we frame up the spectra or show the whole thing
+		do_energy_zoom = True
+
 
 		# perform the survey for specific hypotheses (see do_scheme above)
 		if do_scheme=='null':
@@ -694,6 +698,15 @@ if __name__=='__main__':
 			elif do_scheme == 'repro-positive':
 				plot_corrected = False
 			else: raise ValueError
+		elif do_scheme=='2021.09.21.2100':
+			positive_vibe = False
+			oscillator_reverse = True
+			equipartition_model = 'harmonic_oscillators'
+			binner_method = 'perfect'
+			model_style = 'tension'
+			residual_name = 'standard'
+			plot_corrected = True
+			do_energy_zoom = False
 
 		"""
 		SETTINGS NOTES
@@ -741,13 +754,13 @@ if __name__=='__main__':
 			curvatures_legacy_symmetric = np.concatenate((halfsweep[::-1]*-1,[0.],halfsweep))
 			curvatures_legacy_symmetric_bigger = np.concatenate((
 				halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
-		curvatures_catalog = [None,
+		curvatures_catalog = [None,None,
 			np.array([0.0,0.001,0.005,0.010,0.02,0.024,0.032]), # curvature_sweep_number==2
 			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,0.04,0.05]),
 			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,
 				0.04,0.05,0.06,0.08,0.1,0.2,0.5,1.0,2.0,10.0]),]
 		# select curvatures
-		curvature_sweep_number = 4
+		curvature_sweep_number = 2
 		curvatures = curvatures_catalog[curvature_sweep_number]
 		binners = ['explicit','perfect','blurry']
 		extents = np.array([0,1,2,4,8,12,18,24]).astype(float)
@@ -803,7 +816,6 @@ if __name__=='__main__':
 			#   the same spectrum that we originally fit things to. this is useful for checking that 
 			#   the kappa fit for the UCC method matches a typical q4 spectrum fit
 			do_survey_validate = False
-			do_energy_zoom = True
 			if do_survey_validate:
 				fig = plt.figure(figsize=(8,12))
 				axes = [fig.add_subplot(311),fig.add_subplot(312),fig.add_subplot(313)]
@@ -823,13 +835,14 @@ if __name__=='__main__':
 				#   the oscillator-corrected (kBT) kappa. this is a theory question that needs discussed
 				kappa = kappa/2.
 			hel = ucc.hel(*args_parse['args_hel'])
+			# args_parse['args_equipartition'] = (args_parse['args_equipartition'][0]/1.2,) # ...!!! hacking
 			hosc = ucc.equipartition(*args_parse['args_equipartition'])
 		
 			# left panel shows energy spectra
 			ax = axes[0]
 			if do_energy_zoom:
 				ax.set_ylim((0.1,10))
-				ax.set_xlim((0.05,2))
+				ax.set_xlim((0.05,1i0))
 			ax.axhline(ucc.energy_per_mode,c='k',lw=1)
 			ax.set_ylabel('energy ($k_BT$) or residual')
 			ax.set_xlabel('wavevector (${nm}^{-1}$)')
