@@ -842,7 +842,7 @@ if __name__=='__main__':
 			ax = axes[0]
 			if do_energy_zoom:
 				ax.set_ylim((0.1,10))
-				ax.set_xlim((0.05,1i0))
+				ax.set_xlim((0.05,2))
 			ax.axhline(ucc.energy_per_mode,c='k',lw=1)
 			ax.set_ylabel('energy ($k_BT$) or residual')
 			ax.set_xlabel('wavevector (${nm}^{-1}$)')
