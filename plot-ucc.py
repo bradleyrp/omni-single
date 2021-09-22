@@ -608,7 +608,7 @@ if __name__=='__main__':
 	# survey the spectra for one simulation with zero curvature
 	do_spectra_survey_debug = 1
 	# make sure you select the correct do_scheme before running a landscape
-	do_compute_landscape = 0
+	do_compute_landscape = 1
 	#! dev: wilderness and pixel methods are pending refactor 
 	do_wilderness = 0
 
@@ -643,6 +643,7 @@ if __name__=='__main__':
 			# select the scheme here
 			'2021.09.21.2100',
 			'2021.09.21.2130',
+			'2021.09.21.2200',
 			][-1]
 		positive_vibe = False
 		oscillator_reverse = False
@@ -716,6 +717,15 @@ if __name__=='__main__':
 			residual_name = 'modelfix'
 			plot_corrected = False
 			do_energy_zoom = False
+		elif do_scheme=='2021.09.21.2200':
+			positive_vibe = False
+			oscillator_reverse = True
+			equipartition_model = 'harmonic_oscillators'
+			binner_method = 'explicit'
+			model_style = 'tension'
+			residual_name = 'standard'
+			plot_corrected = False
+			do_energy_zoom = False
 
 		"""
 		SETTINGS NOTES
@@ -773,6 +783,8 @@ if __name__=='__main__':
 		curvatures = curvatures_catalog[curvature_sweep_number]
 		binners = ['explicit','perfect','blurry']
 		extents = np.array([0,1,2,4,8,12,18,24]).astype(float)
+		# switched to smaller extents at some point, circa 2021.09.21.2200
+		extents = np.array([0,1,2,4,6,8,10]).astype(float)
 		# hypotheses are built in argument-order so pick extent first 
 		#   since that is slowest and gets recomputed the least at the front
 		hypos = hypothesizer(*(
@@ -1014,10 +1026,15 @@ if __name__=='__main__':
 			cs.cmap.set_over('w')
 			if under_color: cs.cmap.set_under(under_color)
 			levels_contour = levels[np.where(levels<=contour_line_max)][::contour_line_skip]
-			if False: cs_lines = ax.contour(grid_x,grid_y,errormap,vmax=error_max,
+			if 1: cs_lines = ax.contour(grid_x,grid_y,errormap,vmax=error_max,
 				vmin=error_min,levels=levels_contour,
-				extend='both',origin='lower',linewidths=0.5,colors='k',zorder=4)
+				eextend='both',origin='lower',linewidths=0.5,colors='k',zorder=4)
+			# note the minimum
+			error_min_c,error_min_e = curvature_extent_error[curvature_extent_error[:,2].argmin()][:2]
+			ax.plot([error_min_c],[error_min_e],marker='o',color='r',zorder=10)
 			ax.set_aspect(curvatures.ptp()/extents.ptp())
+			# colorbar
+			fig.colorbar(cs,ax=ax)
 			# metadata from the survey above
 			meta_out = copy.deepcopy(meta_out)
 			# attach hypotheses
