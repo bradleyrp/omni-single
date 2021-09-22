@@ -642,6 +642,7 @@ if __name__=='__main__':
 			'repro-positive','repro-positive-corrected',
 			# select the scheme here
 			'2021.09.21.2100',
+			'2021.09.21.2130',
 			][-1]
 		positive_vibe = False
 		oscillator_reverse = False
@@ -656,7 +657,6 @@ if __name__=='__main__':
 		plot_corrected = True
 		# whether we frame up the spectra or show the whole thing
 		do_energy_zoom = True
-
 
 		# perform the survey for specific hypotheses (see do_scheme above)
 		if do_scheme=='null':
@@ -707,6 +707,15 @@ if __name__=='__main__':
 			residual_name = 'standard'
 			plot_corrected = True
 			do_energy_zoom = False
+		elif do_scheme=='2021.09.21.2130':
+			positive_vibe = False
+			oscillator_reverse = True
+			equipartition_model = 'harmonic_oscillators'
+			binner_method = 'explicit'
+			model_style = 'tension'
+			residual_name = 'modelfix'
+			plot_corrected = False
+			do_energy_zoom = False
 
 		"""
 		SETTINGS NOTES
@@ -756,11 +765,11 @@ if __name__=='__main__':
 				halfsweep_bigger[::-1]*-1,[0.],halfsweep_bigger))
 		curvatures_catalog = [None,None,
 			np.array([0.0,0.001,0.005,0.010,0.02,0.024,0.032]), # curvature_sweep_number==2
-			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,0.04,0.05]),
+			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,0.04,0.05]), # this is from the paper
 			np.array([0.0,0.005,0.01,0.014,0.02,0.024,0.028,0.032,
 				0.04,0.05,0.06,0.08,0.1,0.2,0.5,1.0,2.0,10.0]),]
 		# select curvatures
-		curvature_sweep_number = 2
+		curvature_sweep_number = 3
 		curvatures = curvatures_catalog[curvature_sweep_number]
 		binners = ['explicit','perfect','blurry']
 		extents = np.array([0,1,2,4,8,12,18,24]).astype(float)
