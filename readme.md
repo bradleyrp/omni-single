@@ -114,7 +114,7 @@ conda env update --file env_bpcfac.yaml -n bpcfac
 conda activate bpcfac
 ```
 
-For the remainder of the pipeline you must activate this environment whenever you want to run a calculation.
+For the remainder of the pipeline you must activate this environment whenever you want to run a calculation. A *complete* environment file is provided at `calcs/specs/env_bpcfac_rockfish.yaml`. You can use this file with `conda env update`
 
 ### 3. Clone the (legacy) factory
 
@@ -225,8 +225,6 @@ make set meta_filter curvature_repro_MYNAME.yaml
 
 I strongly recommend maintaining your own specs files as you add data to your dataset and expand and refine your analyses. These individual files, combined with the git commit hashes for calculation codes, can tell you exactly how to reproduce a calculation later on. 
 
-...!!!
-
 ### 7. Compute undulation spectra
 
 At this point, we now have several components in place:
@@ -243,4 +241,19 @@ make compute
 make plot undulations
 ```
 
-Further instructions are included in the specs file for this specific example.
+### 8. Render undulation videos
+
+The undulation videos provide the most straightforward method for visualizing the curvature which we later quantify with the undulation-curvature coupling method. Since this curvature is highly dynamic, it may be "washed out" by an average height profile. Videos make the curvature more visible to the eye. To render these videos, you must first complete the following command:
+
+```
+make plot undulations_videos
+```
+
+This will probably cause errors on a cluster, since very few clusters include ffmpeg, which is required to render videos. Save the command before the error, and then use Singularity to render the videos in a container:
+
+```
+singularity pull docker://jrottenberg/ffmpeg
+singularity exec -B /data/rbradley/legacy-factory/data/banana/plot/ ffmpeg_latest.sif bash -c 'ffmpeg -i /data/rbradley/legacy-factory/data/banana/plot//vids/wavevid-v1021.seismic/wavevid-v1021.seismic.fr.%04d.png -b:v 0 -crf 20  /data/rbradley/legacy-factory/data/banana/plot//vids//wavevid-v1021.seismic.mp4'
+```
+
+The example commands above should be roughly similar to the ones you need to render videos. The paths may be slightly different. In the event that your cluster does not have Singularity, you can download the frames (png files written to the `plot` folder in your legacy factory location), and then render them on a local workstation which has ffmpeg installed already.
